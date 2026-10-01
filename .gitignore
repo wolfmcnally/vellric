@@ -1,0 +1,20 @@
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Agentic harness runtime state
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
+.claude/projects/
+.codex/cache/
+.kickoff/
+
+# Root-level methodology test runtime state
+__pycache__/
+.pytest_cache/
+
+
+.ruff_cache/

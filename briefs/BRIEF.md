@@ -1,0 +1,213 @@
+---
+title: Vellric — independent local PDF conversion
+date: 2026-09-30
+status: draft
+scope: Standalone Python command-line PDF inspection, conversion, rendering and OCR; durable artifact contracts; licensing and packaging; behavior-preserving Drawbridge integration. Fresh public source release and behavior-preserving consumer integration; no hosted service or data-store migration.
+---
+
+# Vellric
+
+*A local PDF tool that preserves evidence, recovers scanned text and produces complete, inspectable document artifacts.*
+
+## Recommendation and authorization
+
+Build Vellric as an independently useful Python command-line application. Put the proven PyMuPDF PDF processing, selective OCR, orientation recovery and deterministic native formatting inside its own process. Exchange complete document results through documented UTF-8 text, Markdown, JSON, CSV and standard images. Drawbridge invokes complete jobs, assembles its own mirror, and retains its general adapters, acquisition metadata, profiles and networked stages.
+
+Vellric's project license is AGPL-3.0-only. Preserve original copyright and MIT grants for adapted source, and distribute matching project source/notices. Source and artifacts begin with fresh public histories; private development records are excluded. Existing consumers integrate by invoking complete jobs rather than importing the native engine.
+
+## Problem, users and standalone value
+
+Users receive PDFs with unknown provenance: native text, scans, old OCR layers, mixed pages, unusual dimensions, encryption and corrupt objects. They need a page-faithful textual twin, trustworthy page references, optional readable formatting, controlled OCR costs and explicit failures. Vellric serves researchers, archivists and local document pipelines without requiring Drawbridge, credentials, a model provider or an internet connection at conversion time.
+
+A standalone user can inspect whether a document is readable and which pages need OCR; convert it to page-addressable text and Markdown; obtain exact native text alongside recognized text; inspect fonts, links, tables and image coverage; export selected page images or arbitrary crops; and optionally retain a searchable PDF derivative. Every output identifies the immutable input and the engine/settings that produced it. Source documents are never rewritten, and embedded links, actions, scripts and attachments are never executed or fetched.
+
+## Scope and responsibility boundary
+
+| Vellric owns | Drawbridge retains |
+|---|---|
+| PDF opening, full traversal, password/zero-page classification, native text and page geometry | General file identification and dispatch; PDF classification consumes Vellric's inspection result |
+| Raster coverage and OCR selection; native text/layout/font/character/link/table extraction | Acquisition/source metadata, mirror header/body schema and final mirror serialization |
+| Whole-document selective OCR, OCRmyPDF derivative preflight, four-rotation Tesseract recovery, quiet-row strips, subprocess accounting | Cross-document admission and shared CPU-token scheduling; child job deadlines and cancellation |
+| Deterministic native Markdown proposals and the existing strict word-preservation gate | Generic model structure/cleanup/description stages, profiles, credentials, egress/cost policy and caches |
+| PDF page/crop rendering and optional diagnostic artifacts; self-contained provenance and typed status | Office, spreadsheets, archives, text, image-description adapters, and audio/video through Quillric |
+
+No Drawbridge runtime import belongs in Vellric. No PyMuPDF import, shared-library loading, Python callback or in-process Vellric API belongs in Drawbridge's intended PDF integration. There is no daemon or RPC server in the first release. An internal Python package is an implementation detail of the CLI, not a public integration requirement.
+
+PDF processing is document-level work. `convert` performs its own complete inspection, selection, recognition and assembly and returns one complete result. `inspect` is independently useful admission/diagnostic work, and `render` produces a declared set of document/page image artifacts. Drawbridge may inspect before deciding to convert; it must not drive one subprocess per `get_text`, `get_pixmap`, `find_tables` or `get_links` call. Repeated full inspection is acceptable initially; a persistent service and cross-job private object cache are out of scope.
+
+### End-to-end conversion versus intermediate artifacts
+
+The primary result is a complete PDF-to-text/Markdown conversion, not a bag of primitives requiring the caller to implement OCR or reconstruct paragraphs. Vellric writes `document.md` for standalone readers and exact per-page text plus a manifest for pipelines. Native formatting is opt-in and produces a separate structured view; it never overwrites the fidelity view. Layout and rendering artifacts are optional user-facing diagnostics or exports, not a mandatory control channel between Drawbridge and the engine.
+
+Drawbridge still owns its cross-format mirror and acquisition provenance. Exporting a Drawbridge-specific YAML mirror as the only Vellric result would couple the independent tool to one consumer and move unrelated responsibilities. Drawbridge can assemble an identical mirror from the page artifacts and translate the manifest's inspection, methods, OCR records and warnings into its existing fields.
+
+## Proposed command surface
+
+The following command surface is the approved implementation target; current behavior and qualified limits are documented with the deliverable. Every command supports `--help`; `vellric --version` reports software version, and `vellric doctor --json` reports supported artifact-schema/behavior versions, exact engines, language-data identity, effective resource enforcement and unavailable capabilities without installing or downloading anything.
+
+| Command | Job and important options |
+|---|---|
+| `vellric inspect INPUT --out DIRECTORY` | Complete native traversal and scan selection; emits inspection, all page texts, dimensions and coverage. `--raster-threshold 0.5`, `--layout` optional. No OCR. |
+| `vellric convert INPUT --out DIRECTORY` | Complete document conversion. `--ocr auto\|never\|always`, `--preflight on\|off`, `--structure none\|native`, `--language eng`, `--dpi 300`, `--jobs N`, `--searchable-pdf`, `--layout`, `--diagnostics`, `--title TEXT`. Default: automatic selective OCR, preflight on, structure none. |
+| `vellric render INPUT --out DIRECTORY --pages RANGE` | Complete requested image set. `--format png\|pnm\|jpeg`, `--dpi 300`, `--rotation 0\|90\|180\|270`, `--clip x0,y0,x1,y1`, `--colorspace rgb\|gray`, `--strips`, `--strip-pixels 8000`, `--max-side`, `--jpeg-quality`. A page filter never hides incomplete document inspection. |
+| `vellric doctor --json` | Installation/capability/engine/license diagnosis; no input document required. |
+
+Inputs are local regular files, independent of filename extension. `INPUT=-` spools stdin to bounded private storage before processing. The initial CLI processes one document per invocation; callers handle batch scheduling. Page numbers are one-based; ranges are validated against the inspected count and sorted in original page order. `convert` returns every original page, with no page-subset mode in the initial contract. `--ocr never` deliberately preserves native text, including empty scan-page text, and reports unrecognized candidates; it does not claim successful recognition. The manifest carries `recognition_completeness: complete|unrecognized-candidates|not-requested` and the outstanding candidate numbers. Drawbridge must reject any bundle with outstanding candidates when it requires fidelity conversion with recognition, even when Vellric exits 0 for an explicitly native-only job.
+
+Shared options: `--schema 1`, `--expected-sha256 HEX`, `--status-json`, `--progress human|json|none`, `--timeout-seconds`, `--page-timeout-seconds`, `--memory-mib`, `--max-input-bytes`, `--max-pages`, `--max-output-bytes`, `--temp-dir`, and `--password-file PATH` or `--password-stdin` when the input is a file. Never accept passwords on the command line or in the manifest. Password use is opt-in; Drawbridge supplies none initially and preserves terminal password classification. No automatic overwrite: `--out` must not already exist. A caller publishes/replaces its own completed result explicitly after validation.
+
+`--searchable-pdf` requires `--preflight on` and `--ocr auto` or `always`; contradictory flags are usage errors. If automatic selection finds no candidate pages, produce a byte-identical copy of the input snapshot and record `derivative_kind: native-copy`, with no signature-invalidation claim. Otherwise produce the validated preflight derivative and record `derivative_kind: ocr-preflight`. The requested artifact is never silently omitted.
+
+Progress uses stderr; `--status-json` reserves stdout for one bounded terminal JSON record and no extracted content. JSON progress is newline-delimited events with schema, stage, done, total and optional page. Status serialization is separate from engine diagnostics; advertisements and native-library output cannot contaminate stdout. A killed process may emit no terminal record, and the parent must classify that as failure rather than fabricate success.
+
+## Artifact contract v1
+
+The schema is `vellric.document/1.0`; the major is negotiated explicitly. Software SemVer, artifact schema and extraction/formatting behavior identifiers are distinct. Additive optional fields can advance a schema minor; removing/changing meaning requires a new major. Before the first stable external release, replace incorrect draft schemas directly per the inherited greenfield policy. Published schemas and example artifacts live with the implementation; there is no promise of pre-release compatibility.
+
+| Artifact | Contract |
+|---|---|
+| `manifest.json` | Final complete result: schema, job kind/status, source SHA-256/size, tool and engine versions, behavior identifier, effective settings/limits, inspected page count, per-page records, warnings, provenance and file entries with sizes/digests/media types. Relative paths only. |
+| `pages/000001/native.txt` | Exact UTF-8 native extraction, including whitespace, ligatures and empty strings. No normalization, inferred text, Markdown escaping or NUL removal here. |
+| `pages/000001/text.txt` | Final fidelity text: exact native bytes for unselected pages; line-grouped recovered OCR for selected pages. One file for every original page, even empty. |
+| `document.txt` | Final page texts joined with form-feed separators; authoritative page boundaries/count remain in the manifest and per-page files. A literal form-feed inside a page is not a parser boundary. |
+| `document.md` | Reader view with title and one numbered page section per original page, including explicit empty-page markers. Documented presentation normalization is separate from the exact text artifacts. |
+| `pages/000001/structured.md`, `structured.md` | Optional gated native formatting for eligible native pages, fidelity fallback for others. Rejection reasons recorded; fidelity artifacts never replaced. No semantic rewriting. |
+| `pages/000001/layout.json` | Optional documented geometry, blocks/lines/runs/characters, original font name/size/flags, interpreted bold/italic/monospace, link rectangles/targets, image placements and table cells. Bulk document data, not serialized Python classes or PyMuPDF objects. |
+| `pages/000001/tables/0001.csv` | Optional UTF-8 RFC 4180 cell text; layout JSON records table/cell boxes and detection status. No spreadsheet-formula interpretation. |
+| `pages/000001/render-*.png`, `.pnm`, `.jpg`; `strips/` | Standard image files; manifest records crop, affine transform, physical/pixel bounds, requested/effective DPI, rotation, colorspace and order. |
+| `searchable.pdf` | Requested OCRmyPDF derivative only, with its own digest, signature-invalidated warning, page-count validation and actual preflight engine/settings. Never called the original or source evidence. |
+| `diagnostics/` | Opt-in sanitized tool logs and Tesseract TSV; private by default. Success does not depend on retaining diagnostic files. |
+
+JSON uses UTF-8, finite numbers and stable ordered page records; fields have documented null/absence semantics. Text and Markdown use LF; exact engine text artifacts preserve characters, while the reader view states its normalization. Absolute input paths, usernames, credentials and password hashes are omitted by default. PDF metadata and URI text can contain sensitive user content; they belong to document artifacts, not public telemetry. Artifact schemas permit replacement producers; Drawbridge validates documented facts and does not require engine-private objects.
+
+All PDF coordinates are points (1/72 inch). Each page records MediaBox, effective CropBox, intrinsic rotation and explicit named coordinate frames: original PDF user space, unrotated cropped-page space, and displayed-page space after intrinsic rotation. The CLI crop frame is `displayed-page`: origin top-left, x right, y down, with intrinsic rotation already represented; additional requested output rotation is applied after clipping. This is a proposed public convention, not an assertion that current PyMuPDF clips already have those semantics. The manifest provides explicit transforms to original PDF user coordinates and output pixels. Negative origins, non-default boxes and intrinsic rotation require parity fixtures before freezing this definition. Font values retain full precision; Drawbridge-compatible formatting keeps the current half-point rounding and flags/name heuristics.
+
+A page record carries `number`, geometry, `native_text_present`, raster coverage and its formula, OCR candidate/reason, final method, file paths/digests, empty-text state, OCR rotation/score/band count/effective DPI when applicable, formatting eligibility/outcome and optional layout/detection warnings. Empty pages remain represented and cannot be confused with missing files. Artifact checksums establish custody, not a proof that the recovered words are correct.
+
+## Fidelity, layout and OCR behavior to preserve
+
+The baseline is Drawbridge 0.4.3, PyMuPDF 1.28.2. Preserve the actual implementation and its test estate, not older descriptive prose where they disagree.
+
+- Fully traverse every page before reporting a readable document. Native text is the current `get_text("text")` result with its current flags/order; headers, footers and stale layers remain in native evidence. No layout model, dehyphenation, smart normalization or inferred reading order enters the fidelity lane.
+- Select each page for OCR if native text stripped is empty or raster coverage is at least 0.5. Current coverage is **the sum of image bounding-box areas clipped to the page**, divided by page area; it is not geometric union, and can exceed 1 on overlapping placements. Keep this arithmetic as behavior v1 and describe it accurately. A union algorithm would be a separately approved behavior change.
+- On unselected pages retain exact native text. For selected pages, recognize original visible page pixels, so stale OCR is replaced only in final text and kept in the native evidence file. A large decorative image may over-select; record this known proxy limitation.
+- Preserve raw character geometry, font names/flags and current look inference; associate URI links with character centers, not a whole intersecting sentence. Retain unrecognized link kinds as diagnostics without expanding the first release's formatting scope.
+- Preserve current PyMuPDF `find_tables` cell extraction and native heading/list/paragraph/table formatting. Table detection remains best effort: failure yields a warning and no tables, never lost native text. The strict existing word gate rejects an unsafe proposal and keeps fidelity text; its exact punctuation/Markdown exemptions are part of behavior v1. Font heuristics do not claim semantic truth.
+- Optional OCRmyPDF preflight operates on a private derivative: selected pages, force OCR, rotation threshold 2, invalidate derivative signatures, bounded jobs and `OMP_THREAD_LIMIT=1`. Verify derivative count against the original. Its own recognized text does not feed the fidelity result. Preflight failure refuses the requested job; it never silently disables preflight.
+- Tesseract recovery uses 300 DPI by default, four right-angle renderings, `--psm 3 tsv`, and the existing score: alphanumeric characters times `max(0, confidence - 50)`, summed over word rows. Tie order remains 0, 90, 180, 270. Malformed TSV is an operational error; a valid best score of zero yields an explicitly empty recovered page. Regroup words by block/paragraph/line exactly as today.
+- Deterministic native formatting applies to born-digital pages; OCR pages retain their recovered text. Export formatting eligibility/outcomes even when a page's approved structured text equals its fidelity text, so Drawbridge does not incorrectly send that page to a model during migration.
+
+### Oversized pages and arbitrary clips
+
+Port PyMuPDF's direct clip rendering and the proven quiet-row algorithm; do not render a giant full page and crop afterward. Limit effective DPI by width to keep a render side at most 30,000 pixels. If height still exceeds that bound, find horizontal cuts using a grayscale preview capped at 40 million pixels, selecting the quietest row in the last quarter of each 8,000-pixel strip allowance and the lowest row on ties. Compare all four rotations on the first strip, then recognize subsequent strips at the winner and join them in original strip order. Keep only bounded preview state and currently needed raster files; release pixmaps under the engine lock and delete per-attempt PNM files after OCR.
+
+A strip must satisfy both a side limit and a pixel-byte budget after rotation. The current width cap alone permits a very large 30,000 by 8,000 raster, so measured memory admission is required; silently reducing DPI or moving cuts would change behavior. Under a tighter configured byte budget, refuse with a typed resource-limit error unless the user explicitly authorizes a recorded alternative rendering policy. Preview analysis is bounded; PDF object decoding can still exceed memory limits and must be supervised. Exact target limits and intrinsic-rotation/clip-edge behavior are acceptance measurements, not claimed achievements of this design.
+
+## Completion, failure and provenance
+
+Each job snapshots the input into private storage while hashing it, then inspects and processes that snapshot. If `--expected-sha256` differs, refuse before output. The result identifies the actual bytes read, even if the caller's original path changes during the job. No password, native document pointer or client state crosses the process boundary.
+
+Create a hidden staging directory beside the requested output on the same filesystem. Generate artifacts there, verify count/order, schema, paths, digests and requested optional outputs, then write the final manifest and atomically publish the whole directory with an exclusive/no-replace operation. An earlier existence check followed by an ordinary replacing rename is insufficient: if another process creates the target concurrently, refuse without replacing it. Use a qualified platform primitive or fail safely where exclusive publication is unavailable. No partial directory is a success result. On failure, leave the requested output absent and clean temporary state; retained diagnostics require an explicit separate private destination and are marked failed. Atomic visibility is required; fsync policy and filesystem limitations must be documented separately from crash durability. Cancellation kills the process group, cleans staging on supervised exit, and crash leftovers are never consumed as results.
+
+| Exit | Status/class | Representative stable codes and handling |
+|---|---|---|
+| 0 | complete | Exactly the requested job committed and validated; declared heuristic warnings/fallbacks allowed. |
+| 2 | usage | Invalid ranges/settings/schema/password-input combination; no job output. |
+| 3 | blocked, inherent | `password-protected`, `degenerate-input`; requires new credentials or changed bytes. |
+| 4 | failed, document/open/read | `not-pdf`, `malformed-pdf`, `pdf-open-operational`, `pdf-read-operational`, `source-hash-mismatch`; replacement bytes or environment repair may help. |
+| 5 | failed, execution/protocol | `dependency-unavailable`, `ocr-preflight-refused`, `ocr-operational`, `page-count-drift`, `resource-limit`, `deadline`, `artifact-invalid`, `internal-error`. |
+
+Status JSON carries schema, status, code, stage, page when known, sanitized message, inspection facts known at failure, and a retry hint with reason. “Failed” does not imply that unchanged corrupt bytes deserve blind retries. Distinguish blocked classification from operational refusal. Preserve backend return codes in sanitized structured details; never classify by parsing prose alone. A native crash, timeout, signal, missing status, inconsistent manifest or nonzero process exit is failure even if some files exist. The caller validates both process status and complete manifest.
+
+Provenance records exact tool/engine/data versions or hashes, original source hash, behavior/settings, page method, OCR rotations/scores/strips, preflight derivative, formatting fallback and relevant warnings. Store timings in provenance without letting timestamps influence content digests or deterministic text comparisons. There is no baked-in analytics, update check, model download or credential access.
+
+## Isolation, concurrency and untrusted PDFs
+
+Each CLI job has a supervising process and an isolated PDF worker; a native crash cannot corrupt Drawbridge or another job. Start with single-process PyMuPDF access guarded by the existing reentrant lock and traceback cleanup discipline; OCR subprocesses may overlap within `--jobs`. A native PDF object is never shared between threads/processes or returned to the caller. Prefer process workers over adding native-engine threads. Cleanup and descendants are owned by the supervisor.
+
+Drawbridge grants each running Vellric job CPU tokens and passes the grant as `--jobs`; Vellric bounds its page recognition and preflight to that grant, with each recognition engine constrained to one thread. Standalone default is one job, with explicit opt-in parallelism. Independent CLI processes cannot share an in-memory token pool: deployment documentation must state aggregate scheduling responsibility. No daemon, machine-global broker or process-per-PDF-method protocol is needed.
+
+Validate input/output paths, restrict output to the private staging root, reject traversal and unsafe symlinks, bound stdout/stderr capture, and set disk/input/page/output/pixel/job time limits. Scrub provider credentials and inherited dynamic loader/Python injection settings from worker environments; use resolved trusted executable paths, argument arrays and an allowlist of needed locale/font/tessdata/temp variables. Do not invoke a shell or fetch embedded URIs. External tools use the same private workspace and offline policy. OCRmyPDF must not discover arbitrary user plugins through ambient environments.
+
+CLI resource options are explicit and recorded. Initial proposed admission defaults are 512 MiB input, 10,000 pages, 2 GiB output, 3,600 seconds per job, 300 seconds per recognition call and 1,800 seconds preflight; memory/pixel limits must be chosen from measured peak usage before implementation defaults are finalized. Linux can add rlimits and an optional network/filesystem sandbox; macOS needs an appropriate wrapper or container for equivalent hard isolation. Portable watchdog RSS limits can overshoot and are not a secure sandbox. `doctor` reports actual enforcement and supported modes; requested hard isolation fails closed if unavailable. Local execution alone does not make a parser safe for hostile PDFs. Document how to use an offline container for genuinely untrusted inputs; no hosted-service promise belongs to v1.
+
+## Dependencies, engines and licensing design
+
+The scaffold is Python 3.12 with an isolated `project/` deliverable, `uv` lockfile, `hatchling` packaging, pytest and Ruff. PyMuPDF 1.28.2 is the chosen native engine. Tesseract 5.5.2 and OCRmyPDF 17.7.0 are the inspected local baseline versions; implementation starts by qualifying and recording a reproducible engine/data matrix rather than taking whatever executable happens to be on PATH. The standard Python package installs native inspection/rendering; an OCR extra installs OCRmyPDF Python dependencies, and the system install guide supplies Tesseract/language data and the qualified derivative renderer. Do not put Tesseract binaries into an ordinary wheel implicitly.
+
+| Component | Role and license basis | Design disposition |
+|---|---|---|
+| Vellric original implementation | AGPL-3.0-only, selected by owner | Include full license text and preserve original MIT/dependency grants and notices. |
+| Extracted Drawbridge PDF/OCR/native-formatting code | Existing MIT provenance | Retain copyright/MIT notices and record exact source commits/files and adaptations. It can be incorporated in an AGPL-covered distribution without erasing its original MIT grant. |
+| Starter methodology/tooling | MIT | Preserve its original license and attribution under `LICENSES/`; do not relabel third-party files as newly authored AGPL. |
+| PyMuPDF 1.28.2 / bundled MuPDF | AGPL-3.0 or Artifex commercial | Use the AGPL path for this proposed tool; track full native/bundled third-party notices and matching source/build material. |
+| Tesseract / official tessdata | Apache-2.0 | Preserve license/NOTICE and pin language packs; arbitrary custom packs require individual review. |
+| Leptonica / image codecs | BSD-style and individual codec licenses | Include actual installed/bundled component notices and source duties where applicable. |
+| OCRmyPDF / pikepdf | MPL-2.0 | Keep executable boundary for preflight; audit actual release and MPL source obligations, including any secondary-license restrictions if combining code. |
+| pypdfium2 / PDFium | Apache-2.0 or BSD-3-Clause wrapper; BSD-style PDFium plus third-party notices | OCRmyPDF 17 can use it instead of Ghostscript for rasterization; qualify the exact installed renderer without assuming every dependency is permissive. |
+| Ghostscript, if the qualified OCRmyPDF path uses it | AGPL-3/commercial | Compatible intended distribution lane, with its own notices/source; optional since OCRmyPDF 17, but preserve the proven path until replacement parity is established. |
+| OCRmyPDF transitive fonts/renderers/optimizers | Individual terms, including fpdf2, shaping/fonts and optional unpaper/pngquant/jbig2enc | Freeze the selected actual closure and SBOM. Do not enable or bundle optional optimizers/models just because installed. |
+| PyMuPDF4LLM / pymupdf_layout | Separately dual AGPL-3/commercial, layout includes models | Not required for the proposed first release; the comparison did not preserve Drawbridge behavior. Reconsider only with separate source/model-license and parity review. |
+
+The selected Linux closure additionally includes fpdf2 2.8.9 (LGPL-3.0-only), img2pdf 0.6.3 (LGPLv3), pi-heif 1.4.0 (BSD source; LGPLv3 bundled binaries), and uharfbuzz 0.56.2 (Apache-2.0). See the package qualification record for exact versions and evidence. This matrix is a design inventory, not a certified complete license audit. Exact transitive licenses, bundled sources, font/data terms and optional native backends must be established from pinned release artifacts before distribution. Apache/MIT/BSD terms are generally compatible with AGPLv3, but their notices remain operative; component-specific LGPL/MPL/native exceptions and source duties are not replaced by a root AGPL label.
+
+### Installation and distribution
+
+Prefer independently installed `vellric` via `uv tool install` or `pipx`, with a tested locked developer setup and Linux/macOS support first. Drawbridge names a trusted executable path, checks capabilities/version and invokes it with ordinary arguments. Its intended post-migration Python package does not automatically install/import Vellric or PyMuPDF as a dependency; the existing package retains PyMuPDF until the coordinated migration is complete. A missing executable reports converter unavailability. A native-only install can inspect/render or explicitly convert with OCR disabled; automatic OCR refuses missing requested engines when candidates exist.
+
+Provide wheel and sdist for Vellric, a developer lockfile and documented external engine/language versions. Reproducible full-OCR installs may also have an offline container recipe after the basic CLI works; multi-platform single binaries and installer bundles are later choices, not prerequisites. Runtime versions are reported independently of Vellric's package version. Changes to OCR/data/settings or behavior change the processing fingerprint, even if the artifact schema is unchanged.
+
+For distributed AGPL-covered binaries, supply Corresponding Source using an appropriate section 6 route, including Vellric code, modifications and required build/install scripts, and matching dependency source/patches where obligations apply. A public repository URL by itself is not proof that a wheel/container's complete source obligations are met. Release engineering retains source archives and checksums, license texts/NOTICE, a component inventory and clear retrieval instructions alongside each binary distribution. Separate system-installed programs still have their own distribution obligations; if Vellric does not redistribute them, distinguish that from bundled wheel/container contents. Modified AGPL network-service deployments require assessing section 13's source offer to remote users; v1 adds no network service.
+
+Vellric uses the owner-selected AGPL-3.0-only grant; original Starter MIT material keeps its grant. Imported Drawbridge code is recorded in `THIRD_PARTY.md` and retains its original MIT notice. The AGPL label does not erase either original grant. Whether the separately installed tool and Drawbridge form independent works, mere aggregation or a combined derivative offering requires review of the actual interface, control flow, packaging and deployment. Subprocess execution alone does not decide that question.
+
+Concrete review questions before release: Are all extracted files owned/licensed as assumed? Is the document-artifact CLI sufficiently independently useful for the intended Drawbridge distribution and service deployments? What exactly is bundled and which source/NOTICE offers are required? Are layout/model terms avoided as designed? These questions inform release choices and do not block creating this design.
+
+## Empirical basis and acceptance strategy
+
+The bounded CLI comparison tested released mutool 1.28.5 and PyMuPDF4LLM 1.28.2 against public/synthetic Drawbridge fixtures without modifying its gates. Mutool XML matched exact native page text and OCR selection, and two 300-DPI rotations matched pixels, but the Homebrew build disabled OCR/threading, rejected band rendering and did not reproduce the native table golden. PyMuPDF4LLM retained stale text under `select-drop`, returned exit 0 for logged conversion failures and failed the existing formatting word gate. These results support porting proven behavior behind a complete CLI rather than stitching partial tools or adopting heuristic output as fidelity.
+
+The current Drawbridge sources are the behavior authority: `pdf_tools.py`, `ocr.py`, `orientation.py`, `native.py`, the word gate in `structure.py`, and their tests. The older design brief describes image union and no native formatting, both superseded by current code. Temporary investigation logs are supporting evidence, not a dependency of the new repository; implementation acceptance must regenerate durable local fixtures/results.
+
+The implementation checklist is deliberately lightweight. Keep inherited methodology/skills/mirrors available, but do not decompose this extraction into ceremonial phases or invoke kickoff without implementation authorization.
+
+1. Freeze behavior fixtures and artifact schemas: existing public fixture hashes and corrected attribution; synthetic native rich report, blank/mixed/logo/stale-OCR/encrypted/owner-password/zero/corrupt PDFs; negative origins, boxes, rotations, clipped images, overlapping coverage, malformed table detection and giant pages. Do not copy private documents, credentials or consumer records.
+2. Extract proven processing into Vellric and prove standalone complete jobs: exact native bytes and page sequences; current native Markdown golden and strict gate unchanged; 300-DPI/rotation/clip pixels against the same engine; existing TSV text/scoring/tie order; four-rotation and strip OCR; original hash unchanged. Native-only is an incremental executable checkpoint, not permission to ship missing OCR contracts.
+3. Prove failure and custody: injected mid-traversal errors, missing tools, malformed TSV, preflight refusal/count drift, native crash, signal/timeout, disk exhaustion, resource limits, corrupt/missing artifacts, symlink/path traversal, input changes, interrupted publish, concurrent destination creation and cancellation of grandchildren. Failed jobs never publish usable success output. Verify actual offline/resource boundaries separately from text parity.
+4. Qualify package/install: fresh isolated native and full-OCR installs on Linux/macOS, `doctor` versions/data, offline runtime, build artifacts, locked developer gates, source/NOTICE inventory and configured limits. No broad model benchmark; measure representative elapsed time, startup, peak RSS/temp disk and concurrency against current Drawbridge on the safe fixture estate.
+5. Only after authorization, migrate Drawbridge/consumers as a coordinated change: import no AGPL runtime; invoke complete jobs, validate status/manifests/artifact digests and map typed outcomes; retain mirror schema, page-body bytes, public return shapes, progress stages and model-stage eligibility. Keep implementation compatibility in Drawbridge's existing externally consumed API rather than adding legacy machinery to greenfield Vellric. Roll back by selecting the prior Drawbridge release, not a silent alternate engine inside Vellric.
+
+### Migration details that can otherwise be missed
+
+`PDF_LOCK` and `pdf_locked` are exported and used by an external consumer with its own PyMuPDF calls. Inventory those actual callers before migration: a Vellric subprocess does not make their native calls safe or remove their license obligations. Retain the Drawbridge exports until consumers explicitly migrate their own PDF work; do not silently turn the lock into a no-op. A consumer needing a PDF job should call Vellric's CLI/document artifacts directly, not call a new Drawbridge RPC facade.
+
+`pdf_tools.image_jpeg` also decodes non-PDF images for Drawbridge's description adapter through PyMuPDF. Moving PDF processing alone therefore does not remove every PyMuPDF dependency. Keep that adapter in Drawbridge and separately qualify a narrowly scoped permissive image decoder replacement during migration; do not move non-PDF image-description work into Vellric or declare the MIT dependency boundary complete beforehand.
+
+Drawbridge can request `convert --structure native` when its plan requires the deterministic pass and use Vellric's eligibility/results to preserve current model routing. If a previously produced fidelity mirror is structured later, Vellric repeats a full document job with the original input hash and identical OCR/settings/data, and the adapter requires all page text to match the existing mirror before using structured artifacts. This can be slower; reusing a privately retained validated complete bundle is acceptable, but retaining diagnostic artifacts or reading a private PyMuPDF layout channel is not required for normal operation.
+
+Current method labels such as `pymupdf-text` and `structure:native:pymupdf-typography` can remain truthful while the tool uses that engine. Record Vellric and dependency/data fingerprints in a documented extension. Changing cache identity or stored processing version is explicit; do not claim a wrapper preserves cache validity merely because the strings stayed the same. Golden parity is checked before changing generator metadata separately. Consumer source upgrades preserve existing derived files, stores and caches; any operational reprocessing requires explicit scope.
+
+## Owner decisions and deliberate non-goals
+
+The AGPL-3.0-only grant and independently useful complete-job subprocess architecture are settled. The release includes coordinated consumer integration through the documented complete-job interface. Record the actual packaging/deployment and satisfy distribution obligations before release. Choose whether the first public deliverable must include the full OCR installation recipe/searchable derivative (recommended) or explicitly ship a native-only milestone first. Confirm default resource limits after measurements. Naming is Vellric/`vellric`; package/command collision research is separate and still subject to review.
+
+No hosted service, paid/provider OCR, semantic model rewriting, Office/audio/image adapter migration, daemon, plugin ecosystem, GPU/layout models, exhaustive PDF standards support, automatic updates/downloads or data/store/AWS deployment is part of the standalone product. The important next artifact is an implementable contract and a parity checklist, not a new research survey.
+
+## Primary references
+
+- [PyMuPDF 1.28.2 AGPL text](https://raw.githubusercontent.com/pymupdf/PyMuPDF/1.28.2/COPYING) and [Artifex licensing](https://artifex.com/licensing).
+- [OCRmyPDF MPL-2.0](https://raw.githubusercontent.com/ocrmypdf/OCRmyPDF/main/LICENSE), [pikepdf MPL-2.0](https://raw.githubusercontent.com/pikepdf/pikepdf/main/LICENSE.txt) and [current installation/backend requirements](https://ocrmypdf.readthedocs.io/en/latest/installation.html). Living requirements inform the design; the implementation pins its actual release closure.
+- [Tesseract Apache-2.0](https://raw.githubusercontent.com/tesseract-ocr/tesseract/main/LICENSE), [official tessdata license](https://raw.githubusercontent.com/tesseract-ocr/tessdata/main/LICENSE) and [Leptonica license](https://raw.githubusercontent.com/DanBloomberg/leptonica/master/leptonica-license.txt).
+- [pypdfium2 licensing](https://pypdfium2.readthedocs.io/en/stable/readme.html#licensing) and [Ghostscript licensing](https://www.ghostscript.com/licensing/index.html).
+- [Released PyMuPDF4LLM 1.28.2](https://pypi.org/project/pymupdf4llm/1.28.2/) and [separately licensed layout dependency](https://pypi.org/project/pymupdf-layout/1.28.2/).
+
+## Catalog
+
+See [project guidance](../CLAUDE.md#project-briefs) for this brief and the inherited methodology references. The local seed/setup checklist follows the compact acceptance sequence above; the release and consumer qualification steps bind exact candidate artifacts.
+
+
+## Native identity and derivative capabilities
+
+Complete `render` jobs can export a deterministic selected-page PDF (`--subset-pdf`) and canonical full-page 144-DPI RGB fingerprints (`--pixel-fingerprints`). Canonical image jobs (`image`) preserve the native RGB pixel normalization, exact resizing and 9-by-8 difference-hash algorithm needed to compare existing media. Their normalized PNG, source identity, fingerprint and dimensions are declared artifacts, published atomically under the same source/resource/deadline supervision. Image jobs do not perform OCR. Ordinary non-PDF decoding and OCR in Drawbridge remain Pillow operations; native compatibility fingerprints use independently installed Vellric.
+
+The existing exact pixel/word/range assertions are retained. Difference hashes propose similarity; duplicate confirmation compares every normalized pixel at the smaller same-aspect resolution, without a mean-error tolerance. Consumers receive ordinary bytes and metadata, never native objects. The canonical range source must retain the original native bytes and deterministic trailer-ID behavior. Independent native-reference tests and source/custody validation qualify these complete operations.

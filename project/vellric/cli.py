@@ -1,0 +1,626 @@
+"""Standalone complete PDF jobs with a supervising process and private artifacts."""
+
+from __future__ import annotations
+
+import argparse
+import ctypes
+import hashlib
+import importlib.metadata
+import json
+import os
+import re
+import select
+import shutil
+import signal
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+from collections.abc import Sequence
+from pathlib import Path
+
+from . import __version__
+from .runtime import (
+    BEHAVIOR,
+    SCHEMA,
+    STATUS_SCHEMA,
+    JobError,
+    digest,
+    environment,
+    group_rss,
+    kill_group,
+    publish,
+    tree_size,
+    validate_bundle,
+    write_json,
+)
+
+
+class Parser(argparse.ArgumentParser):
+    def error(self, message):
+        raise JobError("usage", message, stage="settings")
+
+
+def parser() -> argparse.ArgumentParser:
+    p = Parser(
+        prog="vellric", description="Local PDF inspection, fidelity conversion, rendering and OCR."
+    )
+    p.add_argument("--version", action="version", version=f"vellric {__version__}")
+    commands = p.add_subparsers(dest="command")
+    doctor = commands.add_parser("doctor")
+    doctor.add_argument("--json", action="store_true")
+    doctor.add_argument("--language", default="eng")
+    doctor.add_argument("--tessdata-dir")
+    for name in ("inspect", "convert", "render", "image"):
+        c = commands.add_parser(name)
+        c.add_argument("input")
+        c.add_argument("--out", required=True)
+        c.add_argument("--schema", choices=["1"], default="1")
+        c.add_argument("--expected-sha256")
+        c.add_argument("--status-json", action="store_true")
+        c.add_argument("--progress", choices=["human", "json", "none"], default="human")
+        c.add_argument("--timeout-seconds", type=float, default=3600)
+        c.add_argument("--page-timeout-seconds", type=float, default=300)
+        c.add_argument("--memory-mib", type=int, default=2048)
+        c.add_argument("--max-raster-bytes", type=int, default=256 * 1024 * 1024)
+        c.add_argument("--max-input-bytes", type=int, default=512 * 1024 * 1024)
+        c.add_argument("--max-output-bytes", type=int, default=2 * 1024 * 1024 * 1024)
+        c.add_argument("--max-pages", type=int, default=10000)
+        c.add_argument("--temp-dir")
+        c.add_argument("--tessdata-dir")
+        c.add_argument("--layout", action="store_true")
+        c.add_argument("--raster-threshold", type=float, default=0.5)
+        c.add_argument("--dpi", type=float, default=300)
+        c.add_argument("--title")
+        passwords = c.add_mutually_exclusive_group()
+        passwords.add_argument("--password-file")
+        passwords.add_argument("--password-stdin", action="store_true")
+        c.set_defaults(
+            ocr="never",
+            preflight="off",
+            structure="none",
+            jobs=1,
+            language="eng",
+            searchable_pdf=False,
+            diagnostics=False,
+            ocr_pages=None,
+            rotate_threshold=2.0,
+            preflight_timeout_seconds=1800.0,
+        )
+        if name == "convert":
+            c.add_argument("--ocr", choices=["auto", "never", "always"], default="auto")
+            c.add_argument("--preflight", choices=["on", "off"], default="on")
+            c.add_argument("--structure", choices=["none", "native"], default="none")
+            c.add_argument(
+                "--ocr-pages", help="explicit recognition pages/ranges in a complete document job"
+            )
+            c.add_argument("--rotate-threshold", type=float, default=2.0)
+            c.add_argument("--preflight-timeout-seconds", type=float, default=1800.0)
+            c.add_argument("--jobs", type=int, default=1)
+            c.add_argument("--language", default="eng")
+            c.add_argument("--searchable-pdf", action="store_true")
+            c.add_argument("--diagnostics", action="store_true")
+        if name == "image":
+            c.add_argument("--width", type=int)
+            c.add_argument("--height", type=int)
+        if name == "render":
+            c.add_argument("--pages")
+            c.add_argument("--subset-pdf", action="store_true")
+            c.add_argument("--pixel-fingerprints", action="store_true")
+            c.add_argument("--format", choices=["png", "pnm", "jpeg"], default="png")
+            c.add_argument("--rotation", type=int, choices=[0, 90, 180, 270], default=0)
+            c.add_argument("--clip")
+            c.add_argument("--colorspace", choices=["rgb", "gray"], default="rgb")
+            c.add_argument("--strips", action="store_true")
+            c.add_argument("--strip-pixels", type=int, default=8000)
+            c.add_argument("--max-side", type=int)
+            c.add_argument("--jpeg-quality", type=int, default=85)
+    return p
+
+
+def doctor(
+    *, language: str = "eng", tessdata_dir: str | None = None, include_osd: bool = True
+) -> dict:
+    libc = ctypes.CDLL(None)
+    publication = (sys.platform == "darwin" and hasattr(libc, "renameatx_np")) or (
+        sys.platform.startswith("linux") and hasattr(libc, "renameat2")
+    )
+    data = {
+        "tool": {"name": "vellric", "version": __version__},
+        "schema": SCHEMA,
+        "behavior": BEHAVIOR,
+        "platform": sys.platform,
+        "license": "AGPL-3.0-only",
+        "enforcement": {
+            "memory": "process-group RSS watchdog; can overshoot",
+            "rss_available": Path("/proc").is_dir()
+            if sys.platform.startswith("linux")
+            else Path("/bin/ps").is_file(),
+            "disk": "private-workspace watchdog; can overshoot",
+            "raster": "pre-render byte admission",
+            "publication": "exclusive atomic rename available"
+            if publication
+            else "unavailable; jobs refuse",
+            "hard_sandbox": False,
+        },
+        "engines": {},
+        "language_data": [],
+    }
+    for package in ("pymupdf", "ocrmypdf"):
+        try:
+            data["engines"][package] = {"version": importlib.metadata.version(package)}
+        except importlib.metadata.PackageNotFoundError:
+            data["engines"][package] = {"available": False}
+
+    def probe(executable, argument, temp):
+        try:
+            result = subprocess.run(
+                [executable, argument],
+                capture_output=True,
+                text=True,
+                timeout=15,
+                env=environment(temp, tessdata_dir),
+            )
+            return result.returncode, result.stdout or result.stderr
+        except (OSError, subprocess.TimeoutExpired, UnicodeError):
+            return None, ""
+
+    tessdata = None
+    for tool in ("tesseract", "ocrmypdf", "gs"):
+        executable = shutil.which(tool, path=environment(Path("/tmp"))["PATH"])
+        entry = {"available": False}
+        if executable:
+            with tempfile.TemporaryDirectory(prefix="vellric-doctor-") as temp:
+                returncode, output = probe(executable, "--version", Path(temp))
+                lines = output.splitlines()
+                entry["returncode"] = returncode
+                entry["available"] = returncode == 0 and bool(lines)
+                if entry["available"]:
+                    entry["version"] = lines[0][:200]
+                    entry["executable_sha256"] = digest(Path(executable).resolve())
+                if tool == "tesseract" and entry["available"]:
+                    rc, listing = probe(executable, "--list-langs", Path(temp))
+                    match = re.search(r'List of available languages in "([^"]+)"', listing)
+                    if rc == 0:
+                        tessdata = (
+                            Path(tessdata_dir)
+                            if tessdata_dir
+                            else Path(match[1])
+                            if match
+                            else None
+                        )
+        data["engines"][tool] = entry
+    requested = set(language.split("+")) | ({"osd"} if include_osd else set())
+    missing = []
+    for name in sorted(requested):
+        # Language identifiers cannot escape the selected data directory.
+        path = (
+            tessdata / (name + ".traineddata")
+            if tessdata and re.fullmatch(r"[A-Za-z0-9_.-]+", name)
+            else None
+        )
+        if path and path.is_file():
+            data["language_data"].append({"name": path.name, "sha256": digest(path)})
+        else:
+            missing.append(name)
+    data["missing_languages"] = missing
+    return data
+
+
+def validate_options(options: dict) -> None:
+    for key in (
+        "timeout_seconds",
+        "page_timeout_seconds",
+        "preflight_timeout_seconds",
+        "memory_mib",
+        "max_raster_bytes",
+        "max_input_bytes",
+        "max_output_bytes",
+        "max_pages",
+        "dpi",
+        "jobs",
+    ):
+        value = options[key]
+        if not value > 0 or value == float("inf"):
+            raise JobError(
+                "usage", f"{key.replace('_', '-')} must be finite and positive", stage="settings"
+            )
+    if not 0 <= options["rotate_threshold"] < float("inf"):
+        raise JobError("usage", "rotate-threshold must be finite and nonnegative", stage="settings")
+    if options["ocr_pages"] is not None and options["ocr"] != "auto":
+        raise JobError("usage", "Explicit OCR pages require --ocr auto", stage="settings")
+    for key in ("temp_dir", "tessdata_dir"):
+        if options.get(key):
+            try:
+                directory = Path(options[key]).resolve(strict=True)
+                if not directory.is_dir():
+                    raise ValueError
+            except (OSError, ValueError) as exc:
+                raise JobError(
+                    "usage",
+                    f"{key.replace('_', '-')} must be an existing directory",
+                    stage="settings",
+                ) from exc
+            options[key] = str(directory)
+    if not 0 < options["raster_threshold"] <= 1:
+        raise JobError("usage", "Invalid raster threshold")
+    if options["password_stdin"] and options["input"] == "-":
+        raise JobError("usage", "Input and password cannot both use stdin")
+    if options["searchable_pdf"] and (options["preflight"] != "on" or options["ocr"] == "never"):
+        raise JobError("usage", "Searchable PDF requires preflight and OCR auto or always")
+    if options["expected_sha256"] and not re.fullmatch(
+        "[0-9a-fA-F]{64}", options["expected_sha256"]
+    ):
+        raise JobError("usage", "Expected SHA-256 must have 64 hexadecimal digits")
+    if not re.fullmatch("[A-Za-z0-9_+.-]+", options["language"]):
+        raise JobError("usage", "Invalid OCR language")
+    if options.get("clip"):
+        try:
+            options["clip"] = [float(v) for v in options["clip"].split(",")]
+            if len(options["clip"]) != 4 or any(
+                not float("-inf") < v < float("inf") for v in options["clip"]
+            ):
+                raise ValueError
+        except ValueError as exc:
+            raise JobError("usage", "Clip requires four finite coordinates") from exc
+    if options.get("strip_pixels", 1) <= 0 or (
+        options.get("max_side") is not None and options["max_side"] <= 0
+    ):
+        raise JobError("usage", "Invalid render limit")
+    if options.get("pixel_fingerprints") and (
+        options["dpi"] != 144
+        or options.get("rotation") != 0
+        or options.get("colorspace") != "rgb"
+        or options.get("clip")
+        or options.get("strips")
+        or options.get("max_side")
+        or options.get("format") == "jpeg"
+    ):
+        raise JobError("usage", "Canonical page fingerprints require full RGB pages at 144 DPI")
+    if options["command"] == "image":
+        width, height = options.get("width"), options.get("height")
+        if (width is None) != (height is None) or any(
+            type(n) is not int or n <= 0 or n > 30000 for n in (width, height) if n is not None
+        ):
+            raise JobError("usage", "Image resize requires positive width and height <=30000")
+    if not 1 <= options.get("jpeg_quality", 85) <= 100:
+        raise JobError("usage", "JPEG quality must be 1..100")
+
+
+def snapshot(options: dict, work: Path) -> tuple[Path, str, int]:
+    source = work / "source.pdf"
+    hashed = hashlib.sha256()
+    size = 0
+    if options["input"] == "-":
+        stream = sys.stdin.buffer
+        close = False
+    else:
+        try:
+            fd = os.open(options["input"], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                os.close(fd)
+                raise OSError("not regular")
+            stream = os.fdopen(fd, "rb")
+            close = True
+        except OSError as exc:
+            raise JobError(
+                "pdf-open-operational", "Input must be an accessible regular file; symlinks refused"
+            ) from exc
+    started = time.monotonic()
+
+    def blocks():
+        while True:
+            remaining = options["timeout_seconds"] - (time.monotonic() - started)
+            if remaining <= 0:
+                raise JobError("deadline", "Input snapshot deadline exceeded", stage="snapshot")
+            if options["input"] == "-":
+                ready, _, _ = select.select([stream], [], [], remaining)
+                if not ready:
+                    raise JobError("deadline", "Input stream deadline exceeded", stage="snapshot")
+                block = os.read(stream.fileno(), 1024 * 1024)
+            else:
+                block = stream.read(1024 * 1024)
+            if not block:
+                break
+            yield block
+
+    try:
+        with source.open("wb") as output:
+            for block in blocks():
+                size += len(block)
+                if size > options["max_input_bytes"]:
+                    raise JobError("resource-limit", "Input exceeds byte limit", stage="snapshot")
+                output.write(block)
+                hashed.update(block)
+    finally:
+        if close:
+            stream.close()
+    identity = hashed.hexdigest()
+    if options["expected_sha256"] and identity != options["expected_sha256"].lower():
+        raise JobError(
+            "source-hash-mismatch", "Input bytes differ from expected SHA-256", stage="snapshot"
+        )
+    return source, identity, size
+
+
+def run_job(options: dict) -> dict:
+    previous = {}
+
+    def cancelled(signum, frame):
+        raise JobError("deadline", "Job cancelled", stage="supervision", details={"signal": signum})
+
+    try:
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            previous[sig] = signal.signal(sig, cancelled)
+        return _run_job(options)
+    finally:
+        for sig, handler in previous.items():
+            signal.signal(sig, handler)
+
+
+def _run_job(options: dict) -> dict:
+    validate_options(options)
+    job_started = time.monotonic()
+    requested = Path(options["out"]).absolute()
+    parent = requested.parent.resolve(strict=True)
+    target = parent / requested.name
+    if target.exists() or target.is_symlink():
+        raise JobError("artifact-invalid", "Destination already exists", stage="publication")
+    temp_base = Path(options["temp_dir"]).resolve(strict=True) if options["temp_dir"] else None
+    with tempfile.TemporaryDirectory(prefix="vellric-job-", dir=temp_base) as temp:
+        work = Path(temp).resolve()
+        os.chmod(work, 0o700)
+        password = ""
+        if options["password_file"]:
+            with open(options["password_file"], "rb") as f:
+                raw = f.read(4097)
+            if len(raw) > 4096:
+                raise JobError("usage", "Password input exceeds 4096 bytes")
+            password = raw.decode("utf-8").rstrip("\r\n")
+        elif options["password_stdin"]:
+            raw = bytearray()
+            while not raw.endswith(b"\n"):
+                remaining = options["timeout_seconds"] - (time.monotonic() - job_started)
+                if remaining <= 0 or not select.select([sys.stdin.buffer], [], [], remaining)[0]:
+                    raise JobError("deadline", "Password input deadline exceeded", stage="snapshot")
+                chunk = os.read(sys.stdin.fileno(), 1)
+                if not chunk:
+                    break
+                raw.extend(chunk)
+                if len(raw) > 4096:
+                    raise JobError("usage", "Password input exceeds 4096 bytes")
+            password = raw.decode("utf-8").rstrip("\r\n")
+        source, identity, size = snapshot(options, work)
+        staging = None
+        process = None
+        try:
+            staging = Path(tempfile.mkdtemp(prefix=f".{target.name}.vellric-", dir=parent))
+            os.chmod(staging, 0o700)
+            title = (
+                re.sub(r"[^a-z0-9]+", " ", Path(options["input"]).stem.lower()).strip().title()
+                or "Document"
+            )
+            config = {
+                "options": options,
+                "source": str(source),
+                "sha256": identity,
+                "size": size,
+                "staging": str(staging),
+                "work": str(work),
+                "result": str(work / "result.json"),
+                "password": password,
+                "title": title,
+            }
+            write_json(work / "config.json", config)
+            os.chmod(work / "config.json", 0o600)
+            # Execute the installed package entry in isolation. The private
+            # bootstrap names only this package root.
+            bootstrap = (
+                "import sys;sys.path.insert(0,sys.argv.pop(1));"
+                "from vellric.worker import main;raise SystemExit(main())"
+            )
+            package_root = str(Path(__file__).resolve().parent.parent)
+            with (work / "engine.log").open("wb") as log:
+                process = subprocess.Popen(
+                    [
+                        sys.executable,
+                        "-I",
+                        "-c",
+                        bootstrap,
+                        package_root,
+                        str(work / "config.json"),
+                    ],
+                    stdout=log,
+                    stderr=log,
+                    env=environment(work, options.get("tessdata_dir")),
+                    start_new_session=True,
+                )
+                started = job_started
+                peak_rss = 0
+                peak_private_bytes = size
+                progress_offset = 0
+                next_disk_sample = 0.0
+
+                def progress():
+                    nonlocal progress_offset
+                    path = work / "progress.jsonl"
+                    if options["progress"] == "none" or not path.exists():
+                        return
+                    with path.open() as stream:
+                        stream.seek(progress_offset)
+                        while True:
+                            position = stream.tell()
+                            line = stream.readline()
+                            if not line:
+                                break
+                            if not line.endswith("\n"):
+                                stream.seek(position)
+                                break
+                            event = json.loads(line)
+                            if options["progress"] == "json":
+                                print(json.dumps(event), file=sys.stderr, flush=True)
+                            else:
+                                print(
+                                    f"vellric: {event['stage']} {event['done']}/{event['total']}",
+                                    file=sys.stderr,
+                                    flush=True,
+                                )
+                        progress_offset = stream.tell()
+
+                while process.poll() is None:
+                    if time.monotonic() - started > options["timeout_seconds"]:
+                        raise JobError("deadline", "Job deadline exceeded", stage="supervision")
+                    peak_rss = max(peak_rss, group_rss(process.pid))
+                    if time.monotonic() >= next_disk_sample:
+                        staging_bytes, work_bytes = tree_size(staging), tree_size(work)
+                        peak_private_bytes = max(peak_private_bytes, staging_bytes + work_bytes)
+                        next_disk_sample = time.monotonic() + 1.0
+                        if (
+                            staging_bytes > options["max_output_bytes"]
+                            or work_bytes > size + options["max_output_bytes"]
+                        ):
+                            raise JobError(
+                                "resource-limit", "Job disk limit exceeded", stage="supervision"
+                            )
+                    if peak_rss > options["memory_mib"] * 1024 * 1024:
+                        raise JobError(
+                            "resource-limit",
+                            "Job process-group memory exceeded",
+                            stage="supervision",
+                        )
+                    progress()
+                    time.sleep(0.1)
+                progress()
+            result_path = work / "result.json"
+            if not result_path.is_file() or result_path.stat().st_size > 65536:
+                raise JobError(
+                    "internal-error",
+                    "Worker exited without valid terminal status",
+                    stage="supervision",
+                    details={"worker_returncode": process.returncode},
+                )
+            try:
+                result = json.loads(result_path.read_text())
+                if not isinstance(result, dict) or set(result) != {"status", "exit_code"}:
+                    raise ValueError
+                status, code = result["status"], result["exit_code"]
+                if (
+                    not isinstance(status, dict)
+                    or type(code) is not int
+                    or code not in {0, 2, 3, 4, 5}
+                ):
+                    raise ValueError
+                if process.returncode != code or status.get("schema") != STATUS_SCHEMA:
+                    raise ValueError
+                if not isinstance(status.get("stage"), str) or not status["stage"]:
+                    raise ValueError
+                if code == 0:
+                    if (
+                        status.get("status") != "complete"
+                        or status.get("code") != "complete"
+                        or type(status.get("page_count")) is not int
+                        or status["page_count"] < 1
+                    ):
+                        raise ValueError
+                else:
+                    if (
+                        status.get("status") not in {"failed", "blocked"}
+                        or not isinstance(status.get("code"), str)
+                        or status["code"] == "complete"
+                        or not status["code"]
+                        or not isinstance(status.get("message"), str)
+                    ):
+                        raise ValueError
+                    page = status.get("page")
+                    if page is not None and (type(page) is not int or page < 1):
+                        raise ValueError
+                    if not isinstance(status.get("details"), dict):
+                        raise ValueError
+                    failure = JobError(
+                        status["code"],
+                        status["message"],
+                        stage=status["stage"],
+                        page=page,
+                        details=status["details"],
+                    )
+                    if failure.exit_code != code or failure.status()["status"] != status["status"]:
+                        raise ValueError
+            except (ValueError, TypeError, KeyError) as exc:
+                raise JobError(
+                    "internal-error", "Worker terminal protocol is invalid", stage="supervision"
+                ) from exc
+            if code:
+                raise failure
+            manifest = json.loads((staging / "manifest.json").read_text())
+            if manifest.get("page_count") != status["page_count"]:
+                raise JobError("artifact-invalid", "Worker page count differs from manifest")
+            if manifest.get("source") != {"sha256": identity, "size": size}:
+                raise JobError("artifact-invalid", "Artifact input identity mismatch")
+            manifest["provenance"]["supervision"] = {
+                "sampled_peak_group_rss_bytes": peak_rss,
+                "sampled_peak_private_bytes": peak_private_bytes,
+                "elapsed_seconds": time.monotonic() - job_started,
+                "sampling_interval_seconds": 0.1,
+                "disk_sampling_interval_seconds": 1.0,
+                "measurement": "watchdog samples; transient peaks may be missed",
+            }
+            write_json(staging / "manifest.json", manifest)
+            validate_bundle(staging, manifest)
+            if tree_size(staging) > options["max_output_bytes"]:
+                raise JobError("resource-limit", "Final output exceeds byte limit")
+            publish(staging, target)
+            return result["status"] | {
+                "stage": "published",
+                "source_sha256": identity,
+                "output": str(target),
+            }
+        finally:
+            if process is not None:
+                kill_group(process.pid)
+                process.wait()
+            if staging is not None and staging.exists():
+                shutil.rmtree(staging)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = list(argv) if argv is not None else sys.argv[1:]
+    want_json = "--status-json" in args
+    try:
+        p = parser()
+        parsed = p.parse_args(args)
+        if parsed.command is None:
+            p.print_help()
+            return 0
+        if parsed.command == "doctor":
+            data = doctor(language=parsed.language, tessdata_dir=parsed.tessdata_dir)
+            if parsed.json:
+                print(json.dumps(data, ensure_ascii=False, indent=2))
+            else:
+                print(f"vellric {__version__}: {data['enforcement']['publication']}")
+                for name, entry in data["engines"].items():
+                    print(f"{name}: {entry.get('version', 'unavailable')}")
+            return 0
+        options = vars(parsed)
+        status = run_job(options)
+        code = 0
+    except JobError as exc:
+        status, code = exc.status(), exc.exit_code
+    except Exception:
+        status, code = (
+            JobError(
+                "internal-error", "Filesystem or protocol failure; no success claimed"
+            ).status(),
+            5,
+        )
+    if want_json:
+        print(json.dumps(status, ensure_ascii=False, allow_nan=False))
+    else:
+        print(
+            f"vellric: {status['status']}: {status.get('message', status['code'])}", file=sys.stderr
+        )
+    return code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

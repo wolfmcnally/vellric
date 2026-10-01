@@ -1,0 +1,141 @@
+<!doctype html><meta charset="utf-8"><title>Vellric and Drawbridge 0.1.0 review</title><style>body{max-width:1050px;margin:32px auto;padding:0 20px;font:17px system-ui;line-height:1.5}pre{white-space:pre-wrap;background:#f4f5f6;padding:18px;font-size:14px}img{max-width:100%}td,th{padding:10px;border-bottom:1px solid #ddd;text-align:left}</style><h1>Vellric and Drawbridge 0.1.0</h1><p>Exact unchanged text is qualified. This is an optional concise visual review, with no blanket owner-approval hold.</p><table><tr><th>Sample</th><th>Measured result</th></tr><tr><td>27 public PDF pages</td><td>Exact baseline text, OCR selection and image coverage</td></tr><tr><td>Native report</td><td>Exact word/typography golden</td></tr><tr><td>Mixed / rotated / stale OCR</td><td>Expected visible text; stale text excluded</td></tr><tr><td>Tall scroll</td><td>All 59 lines in five 300-DPI bands</td></tr><tr><td>Sideways photo / two columns</td><td>Exact baseline text; confidence changes; columns rotation corrected 90° → 0°</td></tr></table><p>No unexplained new text difference in these samples requires owner judgment. Version and pdf_processor metadata changes are intentional. Both public repositories begin with fresh histories for their first 0.1.0 release.</p>
+<details><summary>native-report — <a href="inputs/native-report.pdf">original PDF</a></summary><pre>
+# Native Report
+
+## Page 1
+
+Annual Report
+Findings
+The committee met on nine occasions during the year and
+heard from forty witnesses, whose evidence is set out
+below in full.
+It found the central claim to be unsupported by run_check().
+· first exhibit
+· second exhibit
+See the archive for more.
+Year
+Hearings
+Witnesses
+2019
+4
+17
+2020
+5
+23
+Jane Example
+Clerk of the Committee
+12 Long Example Street North
+
+## Page 2
+
+A plain second page.
+</pre></details>
+<details><summary>mixed-rotated-stale — <a href="inputs/mixed-rotated-stale.pdf">original PDF</a></summary><pre>
+# Mixed Rotated Stale
+
+## Page 1
+
+Exact native evidence.
+
+## Page 2
+
+Scanned source evidence.
+The archive contains three readable records.
+Native text stays exact. Stale OCR is replaced.
+No private document was used.
+
+## Page 3
+
+Scanned source evidence.
+The archive contains three readable records.
+Native text stays exact. Stale OCR is replaced.
+No private document was used.
+</pre></details>
+<details><summary>tall-scroll — <a href="inputs/tall-scroll.pdf">original PDF</a></summary><pre>
+# Tall Scroll
+
+## Page 1
+
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+Scroll source evidence
+</pre></details>
+<h2>sideways-photo</h2><img src="sideways-photo.png"><pre># Sideways Photo
+
+## OCR
+
+NOTICE OF HEARING
+Courtroom four at nine</pre>
+<h2>two-columns</h2><img src="two-columns.png"><pre># Two Columns
+
+## OCR
+
+ALPHA COLUMN
+Amber apples arrive
+Bright birds belong
+Calm cats continue
+Deep doors descend
+END ALPHA
+BETA COLUMN
+Even eagles enter
+Fresh flowers float
+Green gardens grow
+Happy horses hurry
+END BETA</pre>
+<p>Public fixture attribution: <a href="PUBLIC-FIXTURE-PROVENANCE.md">source/license/hash manifest</a>. Remaining public-fixture parity is in the machine receipt. No private corpus is used.</p>

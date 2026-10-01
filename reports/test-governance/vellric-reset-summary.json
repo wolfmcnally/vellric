@@ -1,0 +1,21 @@
+{
+  "admissions": 80,
+  "dispositions": {
+    "consolidate": 1,
+    "delete": 1,
+    "repair": 0,
+    "retain": 124
+  },
+  "families": 149,
+  "leaves": 203,
+  "post_reset_repairs": 30,
+  "post_reset_retirements": 1,
+  "recall": {},
+  "recall_as_of": null,
+  "recall_unmeasured": [
+    "historical_defect",
+    "holdout_mutant"
+  ],
+  "schema": "agentic.proof_estate.v3",
+  "state": "valid"
+}

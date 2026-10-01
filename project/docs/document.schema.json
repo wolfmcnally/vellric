@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:vellric:document:1.0",
+  "title": "Vellric complete document bundle",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "job",
+    "source",
+    "tool",
+    "engines",
+    "behavior",
+    "settings",
+    "page_count",
+    "inspection",
+    "pages",
+    "recognition_completeness",
+    "outstanding_candidates",
+    "files"
+  ],
+  "properties": {
+    "schema": {
+      "const": "vellric.document/1.0"
+    },
+    "status": {
+      "const": "complete"
+    },
+    "job": {
+      "enum": [
+        "inspect",
+        "convert",
+        "render",
+        "image"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "sha256",
+        "size"
+      ],
+      "properties": {
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "page_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "pages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "number",
+          "geometry",
+          "method",
+          "files"
+        ],
+        "properties": {
+          "number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "method": {
+            "enum": [
+              "pymupdf-text",
+              "ocr",
+              "native-image"
+            ]
+          },
+          "files": {
+            "type": "object",
+            "required": [
+              "native",
+              "text"
+            ]
+          }
+        }
+      }
+    },
+    "recognition_completeness": {
+      "enum": [
+        "complete",
+        "unrecognized-candidates",
+        "not-requested"
+      ]
+    },
+    "outstanding_candidates": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "uniqueItems": true
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "size",
+          "sha256",
+          "media_type"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "media_type": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

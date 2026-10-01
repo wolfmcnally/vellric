@@ -1,0 +1,17 @@
+# Local Drawbridge integration
+
+Drawbridge uses the complete-job adapter described here. Vellric is installed independently; live consumer migrations require their own staged qualification.
+
+Invoke a trusted independently installed Vellric executable once per complete job. First probe doctor/schema/behavior. For admission use complete `inspect`; for fidelity use `convert --status-json --expected-sha256 HASH`, passing the caller's CPU grant as `--jobs`. Request `--structure native` when the existing plan enables deterministic native formatting. Preserve current preflight/OCR settings. Never replace complete jobs with per-method subprocess RPC or import Vellric/PyMuPDF into the intended Drawbridge PDF path.
+
+Require both process exit 0 and terminal complete status, then independently validate schema, original hash, page sequence/count, file sizes/digests and required artifacts. Reject outstanding OCR candidates whenever the Drawbridge conversion requires recognition, including explicit native-only bundles that exit 0. Map typed blocked/failed codes to existing Drawbridge exceptions without parsing prose. Assemble the current mirror header/body from per-page final text, retaining acquisition metadata, page-body normalization and truthful current method labels. Add processing fingerprints separately from golden content checks; invalidate caches explicitly when processing identity changes.
+
+Use page formatting eligibility even where structured text equals native text, preserving model routing. A later structure pass should reuse a retained validated complete bundle, or repeat a whole job with identical source/settings/engine/data and require every final page text to match the existing mirror before using formatting. Layout diagnostics are optional exports, not private control channels.
+
+Drawbridge runtime dependencies and source imports contain no PyMuPDF or Vellric package. Pillow owns non-PDF decoding, JPEG alpha composition, point/DPI scaling and bounded image band rendering. Image OCR retains automatic block/column segmentation and compares four explicit rotations using confidence-weighted characters from horizontally oriented word boxes; vertical word boxes cannot win by Tesseract silently turning sideways text. PDF OCR retains its existing four-rotation segmentation policy. PyMuPDF is a development-only synthetic PDF fixture authoring dependency. External consumers still using their own PyMuPDF objects retain the real `PDF_LOCK`/`pdf_locked` exports until separately migrated; those consumers retain their own dependency obligations.
+
+Local acceptance gate: exercise existing Drawbridge mirror/API/word goldens against this complete-job adapter in an isolated checkout, including native, mixed/stale OCR, encrypted/corrupt, oversize and operational failures. Keep runtime and Vellric independently installed, and test Drawbridge with PDF engine imports prohibited. Live consumer migration remains a subsequent separately authorized step. The MIT source grant remains distinct from obligations of any combined distribution: subprocess architecture does not provide a legal guarantee. AGPL-3.0-only is settled; exact packaging/source/notice completeness remains release engineering work.
+
+Final local qualification, evidence and release/consumer transition steps are in [the integration qualification record](INTEGRATION-QUALIFICATION.md).
+
+The standalone source/wheel publication route and exact consumer sequencing are in [release preparation](RELEASE-PREPARATION.md).

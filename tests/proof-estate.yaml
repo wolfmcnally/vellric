@@ -1,0 +1,1074 @@
+schema: agentic.proof_estate.v3
+baseline_report: reports/test-governance/vellric-pre-reset-baseline.json
+audit_ledger: reports/test-governance/vellric-reset.jsonl
+effectiveness_corpus: tests/fixtures/test_governance/corpus.yaml
+effectiveness_report: reports/test-governance/vellric-effectiveness.jsonl
+effectiveness_floors:
+  min_historical_recall: 0.8
+  min_mutant_recall: 0.8
+  min_historical_cases: 0
+  min_mutant_cases: 0
+size_ceilings_seconds:
+  small: 2
+  medium: 20
+  large: 200
+time_budget:
+  test_lane_seconds: 200
+  tolerance: 0.25
+  reference_machine: null
+critical_risks:
+  custody:
+    state: applicable
+    direct_proof: pytest:project/tests/test_jobs.py::test_snapshot_hash_and_no_overwrite
+  security:
+    state: applicable
+    direct_proof: pytest:project/tests/test_jobs.py::test_environment_excludes_credentials_and_injection
+  authority:
+    state: applicable
+    direct_proof: pytest:tests/test_kickoff_evidence.py::test_change_manifest_is_candidate_bound_and_detects_authority_drift
+  concurrency:
+    state: applicable
+    direct_proof: pytest:project/tests/test_jobs.py::test_exclusive_publication_race
+  atomicity:
+    state: applicable
+    direct_proof: pytest:project/tests/test_jobs.py::test_exclusive_publication_race
+  corruption:
+    state: applicable
+    direct_proof: pytest:project/tests/test_jobs.py::test_bundle_tampering_refused
+  recovery:
+    state: applicable
+    direct_proof: pytest:project/tests/test_jobs.py::test_cancellation_reaps_worker_grandchild
+  public-contract:
+    state: applicable
+    direct_proof: pytest:project/tests/test_jobs.py::test_native_full_job_and_golden
+  schema:
+    state: applicable
+    direct_proof: pytest:project/tests/test_jobs.py::test_native_full_job_and_golden
+  core-success:
+    state: applicable
+    direct_proof: pytest:project/tests/test_jobs.py::test_native_full_job_and_golden
+  deploy:
+    state: not-applicable
+    rationale: Local implementation is not deployed or published; packaging is qualified locally.
+    activation_trigger: Adding distribution/deployment commands requires direct deployment proofs.
+families:
+- id: gate-changed
+  kind: gate
+  selectors:
+  - changed
+  source_paths:
+  - bin/check
+  covers:
+  - bin/check
+  contract: Destination-local changed executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
+- id: gate-format
+  kind: gate
+  selectors:
+  - format
+  source_paths:
+  - bin/check
+  covers:
+  - bin/check
+  contract: Destination-local format executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
+- id: gate-lint
+  kind: gate
+  selectors:
+  - lint
+  source_paths:
+  - bin/check
+  covers:
+  - bin/check
+  contract: Destination-local lint executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
+- id: gate-policy-candidate-partition
+  kind: gate
+  selectors:
+  - policy-candidate-partition
+  source_paths:
+  - bin/check
+  covers:
+  - bin/check
+  contract: Destination-local policy-candidate-partition executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
+- id: gate-policy-catalogs
+  kind: gate
+  selectors:
+  - policy-catalogs
+  source_paths:
+  - bin/check
+  covers:
+  - bin/check
+  contract: Destination-local policy-catalogs executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
+- id: gate-policy-config
+  kind: gate
+  selectors:
+  - policy-config
+  source_paths:
+  - bin/check
+  covers:
+  - bin/check
+  contract: Destination-local policy-config executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
+- id: gate-policy-execution-dashboards
+  kind: gate
+  selectors:
+  - policy-execution-dashboards
+  source_paths:
+  - bin/check
+  covers:
+  - bin/check
+  contract: Destination-local policy-execution-dashboards executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
+- id: gate-policy-harness-parity
+  kind: gate
+  selectors:
+  - policy-harness-parity
+  source_paths:
+  - bin/check
+  covers:
+  - bin/check
+  contract: Destination-local policy-harness-parity executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
+- id: gate-policy-hooks-installed
+  kind: gate
+  selectors:
+  - policy-hooks-installed
+  source_paths:
+  - bin/check
+  covers:
+  - bin/check
+  contract: Destination-local policy-hooks-installed executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
+- id: gate-policy-lessons
+  kind: gate
+  selectors:
+  - policy-lessons
+  source_paths:
+  - bin/check
+  covers:
+  - bin/check
+  contract: Destination-local policy-lessons executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
+- id: gate-policy-log
+  kind: gate
+  selectors:
+  - policy-log
+  source_paths:
+  - bin/check
+  covers:
+  - bin/check
+  contract: Destination-local policy-log executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
+- id: gate-policy-shell-syntax
+  kind: gate
+  selectors:
+  - policy-shell-syntax
+  source_paths:
+  - bin/check
+  covers:
+  - bin/check
+  contract: Destination-local policy-shell-syntax executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
+- id: gate-policy-test-governance
+  kind: gate
+  selectors:
+  - policy-test-governance
+  source_paths:
+  - bin/check
+  covers:
+  - bin/check
+  contract: Destination-local policy-test-governance executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
+- id: gate-policy-test-time
+  kind: gate
+  selectors:
+  - policy-test-time
+  source_paths:
+  - bin/check
+  covers:
+  - bin/check
+  contract: Destination-local policy-test-time executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
+- id: gate-policy-toolchain-callers
+  kind: gate
+  selectors:
+  - policy-toolchain-callers
+  source_paths:
+  - bin/check
+  covers:
+  - bin/check
+  contract: Destination-local policy-toolchain-callers executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
+- id: gate-policy-treatise
+  kind: gate
+  selectors:
+  - policy-treatise
+  source_paths:
+  - bin/check
+  covers:
+  - bin/check
+  contract: Destination-local policy-treatise executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
+- id: gate-test
+  kind: gate
+  selectors:
+  - test
+  source_paths:
+  - bin/check
+  covers:
+  - bin/check
+  contract: Destination-local test executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
+- id: gate-vital
+  kind: gate
+  selectors:
+  - vital
+  source_paths:
+  - bin/check
+  covers:
+  - bin/check
+  contract: Destination-local vital executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
+- id: hook-hook:-githooks-pre-commit:--bin-check-candidate-partition --staged
+  kind: hook
+  selectors:
+  - hook:.githooks/pre-commit:./bin/check-candidate-partition --staged
+  source_paths:
+  - bin/check
+  covers:
+  - bin/check
+  contract: Destination-local hook:.githooks/pre-commit:./bin/check-candidate-partition --staged executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
+- id: hook-hook:-githooks-pre-commit:--bin-check-harness-parity
+  kind: hook
+  selectors:
+  - hook:.githooks/pre-commit:./bin/check-harness-parity
+  source_paths:
+  - bin/check
+  covers:
+  - bin/check
+  contract: Destination-local hook:.githooks/pre-commit:./bin/check-harness-parity executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
+- id: hook-hook:-githooks-pre-commit:--bin-check-log --staged
+  kind: hook
+  selectors:
+  - hook:.githooks/pre-commit:./bin/check-log --staged
+  source_paths:
+  - bin/check
+  covers:
+  - bin/check
+  contract: Destination-local hook:.githooks/pre-commit:./bin/check-log --staged executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
+- id: hook-hook:-githooks-pre-commit:--bin-check-toolchain-callers
+  kind: hook
+  selectors:
+  - hook:.githooks/pre-commit:./bin/check-toolchain-callers
+  source_paths:
+  - bin/check
+  covers:
+  - bin/check
+  contract: Destination-local hook:.githooks/pre-commit:./bin/check-toolchain-callers executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
+- id: hook-hook:-githooks-pre-commit:--bin-test-governance validate
+  kind: hook
+  selectors:
+  - hook:.githooks/pre-commit:./bin/test-governance validate
+  source_paths:
+  - bin/check
+  covers:
+  - bin/check
+  contract: Destination-local hook:.githooks/pre-commit:./bin/test-governance validate executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
+- id: pytest-project-tests-test_cli-py
+  kind: pytest
+  selectors:
+  - project/tests/test_cli.py
+  source_paths:
+  - project/tests/test_cli.py
+  covers:
+  - project/tests/test_cli.py
+  - project/vellric/cli.py
+  contract: Destination-local project/tests/test_cli.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Actual CLI help; complete PDF outcomes have separate direct product proofs.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: small
+  flake_rate: 0.0
+- id: pytest-tests-test_check-py
+  kind: pytest
+  selectors:
+  - tests/test_check.py
+  source_paths:
+  - tests/test_check.py
+  covers:
+  - tests/test_check.py
+  contract: Destination-local tests/test_check.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: small
+  flake_rate: 0.0
+- id: pytest-tests-test_check_catalogs-py
+  kind: pytest
+  selectors:
+  - tests/test_check_catalogs.py
+  source_paths:
+  - tests/test_check_catalogs.py
+  covers:
+  - tests/test_check_catalogs.py
+  contract: Destination-local tests/test_check_catalogs.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: medium
+  flake_rate: 0.0
+- id: pytest-tests-test_check_hooks_installed-py
+  kind: pytest
+  selectors:
+  - tests/test_check_hooks_installed.py
+  source_paths:
+  - tests/test_check_hooks_installed.py
+  covers:
+  - tests/test_check_hooks_installed.py
+  contract: Destination-local tests/test_check_hooks_installed.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: small
+  flake_rate: 0.0
+- id: pytest-tests-test_check_plan_concreteness-py
+  kind: pytest
+  selectors:
+  - tests/test_check_plan_concreteness.py
+  source_paths:
+  - tests/test_check_plan_concreteness.py
+  covers:
+  - tests/test_check_plan_concreteness.py
+  contract: Destination-local tests/test_check_plan_concreteness.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: small
+  flake_rate: 0.0
+- id: pytest-tests-test_check_plan_delivery-py
+  kind: pytest
+  selectors:
+  - tests/test_check_plan_delivery.py
+  source_paths:
+  - tests/test_check_plan_delivery.py
+  covers:
+  - tests/test_check_plan_delivery.py
+  contract: Destination-local tests/test_check_plan_delivery.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: small
+  flake_rate: 0.0
+- id: pytest-tests-test_check_receipt-py
+  kind: pytest
+  selectors:
+  - tests/test_check_receipt.py
+  source_paths:
+  - tests/test_check_receipt.py
+  covers:
+  - tests/test_check_receipt.py
+  contract: Destination-local tests/test_check_receipt.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: medium
+  flake_rate: 0.0
+- id: pytest-tests-test_execution_dashboard-py
+  kind: pytest
+  selectors:
+  - tests/test_execution_dashboard.py
+  source_paths:
+  - tests/test_execution_dashboard.py
+  covers:
+  - tests/test_execution_dashboard.py
+  contract: Destination-local tests/test_execution_dashboard.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: small
+  flake_rate: 0.0
+- id: pytest-tests-test_execution_telemetry-py
+  kind: pytest
+  selectors:
+  - tests/test_execution_telemetry.py
+  source_paths:
+  - tests/test_execution_telemetry.py
+  covers:
+  - tests/test_execution_telemetry.py
+  contract: Destination-local tests/test_execution_telemetry.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: medium
+  flake_rate: 0.0
+- id: pytest-tests-test_install_hooks-py
+  kind: pytest
+  selectors:
+  - tests/test_install_hooks.py
+  source_paths:
+  - tests/test_install_hooks.py
+  covers:
+  - tests/test_install_hooks.py
+  contract: Destination-local tests/test_install_hooks.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: small
+  flake_rate: 0.0
+- id: pytest-tests-test_kickoff_config-py
+  kind: pytest
+  selectors:
+  - tests/test_kickoff_config.py
+  source_paths:
+  - tests/test_kickoff_config.py
+  covers:
+  - tests/test_kickoff_config.py
+  contract: Destination-local tests/test_kickoff_config.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: medium
+  flake_rate: 0.0
+- id: pytest-tests-test_kickoff_control_plane-py
+  kind: pytest
+  selectors:
+  - tests/test_kickoff_control_plane.py
+  source_paths:
+  - tests/test_kickoff_control_plane.py
+  covers:
+  - tests/test_kickoff_control_plane.py
+  contract: Destination-local tests/test_kickoff_control_plane.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: small
+  flake_rate: 0.0
+- id: pytest-tests-test_kickoff_evidence-py
+  kind: pytest
+  selectors:
+  - tests/test_kickoff_evidence.py
+  source_paths:
+  - tests/test_kickoff_evidence.py
+  covers:
+  - tests/test_kickoff_evidence.py
+  contract: Destination-local tests/test_kickoff_evidence.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: large
+  flake_rate: 0.0
+- id: pytest-tests-test_kickoff_tree_id-py
+  kind: pytest
+  selectors:
+  - tests/test_kickoff_tree_id.py
+  source_paths:
+  - tests/test_kickoff_tree_id.py
+  covers:
+  - tests/test_kickoff_tree_id.py
+  contract: Destination-local tests/test_kickoff_tree_id.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: small
+  flake_rate: 0.0
+- id: pytest-tests-test_lessons-py
+  kind: pytest
+  selectors:
+  - tests/test_lessons.py
+  source_paths:
+  - tests/test_lessons.py
+  covers:
+  - tests/test_lessons.py
+  contract: Destination-local tests/test_lessons.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: small
+  flake_rate: 0.0
+- id: pytest-tests-test_log_control_plane-py
+  kind: pytest
+  selectors:
+  - tests/test_log_control_plane.py
+  source_paths:
+  - tests/test_log_control_plane.py
+  covers:
+  - tests/test_log_control_plane.py
+  contract: Destination-local tests/test_log_control_plane.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: small
+  flake_rate: 0.0
+- id: pytest-tests-test_mirror_parity-py
+  kind: pytest
+  selectors:
+  - tests/test_mirror_parity.py
+  source_paths:
+  - tests/test_mirror_parity.py
+  covers:
+  - tests/test_mirror_parity.py
+  contract: Destination-local tests/test_mirror_parity.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: small
+  flake_rate: 0.0
+- id: pytest-tests-test_new_name-py
+  kind: pytest
+  selectors:
+  - tests/test_new_name.py
+  source_paths:
+  - tests/test_new_name.py
+  covers:
+  - tests/test_new_name.py
+  contract: Destination-local tests/test_new_name.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: small
+  flake_rate: 0.0
+- id: pytest-tests-test_pre_commit-py
+  kind: pytest
+  selectors:
+  - tests/test_pre_commit.py
+  source_paths:
+  - tests/test_pre_commit.py
+  covers:
+  - tests/test_pre_commit.py
+  contract: Destination-local tests/test_pre_commit.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: small
+  flake_rate: 0.0
+- id: pytest-tests-test_research_authority-py
+  kind: pytest
+  selectors:
+  - tests/test_research_authority.py
+  source_paths:
+  - tests/test_research_authority.py
+  covers:
+  - tests/test_research_authority.py
+  contract: Destination-local tests/test_research_authority.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: small
+  flake_rate: 0.0
+- id: pytest-tests-test_review_verdicts-py
+  kind: pytest
+  selectors:
+  - tests/test_review_verdicts.py
+  source_paths:
+  - tests/test_review_verdicts.py
+  covers:
+  - tests/test_review_verdicts.py
+  contract: Destination-local tests/test_review_verdicts.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: small
+  flake_rate: 0.0
+- id: pytest-tests-test_shell_syntax-py
+  kind: pytest
+  selectors:
+  - tests/test_shell_syntax.py
+  source_paths:
+  - tests/test_shell_syntax.py
+  covers:
+  - tests/test_shell_syntax.py
+  contract: Destination-local tests/test_shell_syntax.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: small
+  flake_rate: 0.0
+- id: pytest-tests-test_test_governance-py
+  kind: pytest
+  selectors:
+  - tests/test_test_governance.py
+  source_paths:
+  - tests/test_test_governance.py
+  covers:
+  - tests/test_test_governance.py
+  contract: Destination-local tests/test_test_governance.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: medium
+  flake_rate: 0.0
+- id: pytest-tests-test_toolchain_callers-py
+  kind: pytest
+  selectors:
+  - tests/test_toolchain_callers.py
+  source_paths:
+  - tests/test_toolchain_callers.py
+  covers:
+  - tests/test_toolchain_callers.py
+  contract: Destination-local tests/test_toolchain_callers.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: small
+  flake_rate: 0.0
+- id: pytest-tests-test_toolchain_entrypoints-py
+  kind: pytest
+  selectors:
+  - tests/test_toolchain_entrypoints.py
+  source_paths:
+  - tests/test_toolchain_entrypoints.py
+  covers:
+  - tests/test_toolchain_entrypoints.py
+  contract: Destination-local tests/test_toolchain_entrypoints.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: small
+  flake_rate: 0.0
+- id: pytest-tests-test_treatise-py
+  kind: pytest
+  selectors:
+  - tests/test_treatise.py
+  source_paths:
+  - tests/test_treatise.py
+  covers:
+  - tests/test_treatise.py
+  contract: Destination-local tests/test_treatise.py executable contract.
+  risk_class: scaffold-contract
+  oracle: Named assertions and exact nonzero failure propagation.
+  admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
+  nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: small
+  flake_rate: 0.0
+- id: pytest-project-tests-test_jobs-py
+  kind: pytest
+  selectors:
+  - project/tests/test_jobs.py
+  source_paths:
+  - project/tests/test_jobs.py
+  covers:
+  - project/tests/test_jobs.py
+  - project/vellric/**
+  - project/tests/conftest.py
+  - project/docs/CLI.md
+  - project/docs/document.schema.json
+  contract: Complete PDF job fidelity, custody, atomicity, resources and OCR where applicable.
+  risk_class: pdf-custody-and-fidelity
+  oracle: Exact native/golden/pixel/hash outcomes and typed refusal with absent partial output.
+  admission: New standalone product contracts require direct executable tests beyond inherited methodology proofs.
+  nearest_overlap: Each case exercises its distinct success/failure boundary; no measured historical recall claimed.
+  historical_evidence: []
+  mutation_evidence:
+  - ignored-settings
+  - missing-threshold
+  replacement_lineage: []
+  tier: vital
+  size: medium
+  flake_rate: 0.0
+- id: pytest-project-tests-test_ocr-py
+  kind: pytest
+  selectors:
+  - project/tests/test_ocr.py
+  source_paths:
+  - project/tests/test_ocr.py
+  covers:
+  - project/tests/test_ocr.py
+  - project/vellric/**
+  - project/tests/conftest.py
+  - project/docs/CLI.md
+  - project/docs/document.schema.json
+  contract: Complete PDF job fidelity, custody, atomicity, resources and OCR where applicable.
+  risk_class: pdf-custody-and-fidelity
+  oracle: Exact native/golden/pixel/hash outcomes and typed refusal with absent partial output.
+  admission: New standalone product contracts require direct executable tests beyond inherited methodology proofs.
+  nearest_overlap: Each case exercises its distinct success/failure boundary; no measured historical recall claimed.
+  historical_evidence: []
+  mutation_evidence:
+  - selection-in-identity
+  replacement_lineage: []
+  tier: vital
+  size: medium
+  flake_rate: 0.0
+- id: pytest-project-tests-test_review_regressions-py
+  kind: pytest
+  selectors:
+  - project/tests/test_review_regressions.py
+  source_paths:
+  - project/tests/test_review_regressions.py
+  covers:
+  - project/tests/test_review_regressions.py
+  - project/vellric/**
+  - project/docs/CLI.md
+  - project/docs/document.schema.json
+  contract: Review-identified PDF geometry, custody, resource, cancellation and provenance boundaries.
+  risk_class: pdf-custody-and-fidelity
+  oracle: Literal PDF ink, exact text/hash/pixel values, selected data identity, causal fault windows and typed refusal with no partial output.
+  admission: Independent review identified gaps; isolated production-owner defects were observed red and live source preserved byte-exactly.
+  nearest_overlap: Each named proof protects a distinct boundary absent from the native golden; no measured corpus recall claim.
+  historical_evidence: []
+  mutation_evidence:
+  - bundle-parent
+  - preallocation
+  - fail-fast
+  - language-identity
+  - probe-failure
+  - recognition-page
+  - table-warning
+  - coverage
+  - pdf-geometry
+  - gray-colorspace
+  - early-cancellation
+  - temp-usage
+  - publication-cleanup
+  - eligibility
+  - qualification
+  replacement_lineage: []
+  tier: vital
+  size: medium
+  flake_rate: 0.0
+- id: pytest-project-tests-test_media-py
+  kind: pytest
+  selectors:
+  - project/tests/test_media.py
+  source_paths:
+  - project/tests/test_media.py
+  covers:
+  - project/vellric/media.py
+  - project/vellric/cli.py
+  - project/vellric/worker.py
+  - project/docs/document.schema.json
+  contract: Canonical native pixel and deterministic PDF derivative identities across the process boundary.
+  risk_class: native-artifact-custody
+  oracle: Exact independent native pixel/difference hashes, original range bytes and absent output on admission refusal.
+  admission: New standalone media/range capabilities need independent native identity and resource witnesses.
+  nearest_overlap: Existing PDF raster/word/custody proofs do not exercise native image resizing or deterministic PDF subsets.
+  historical_evidence: []
+  mutation_evidence:
+  - image-native-id
+  - image-raster-admission
+  - subset-native-id
+  replacement_lineage: []
+  tier: vital
+  size: medium
+  flake_rate: 0.0

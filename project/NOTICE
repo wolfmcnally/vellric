@@ -1,0 +1,28 @@
+Vellric 0.1.0 — local release qualification
+Copyright (c) 2026 Wolf McNally.
+Project grant: AGPL-3.0-only. Full license: LICENSE.
+
+Adapted Drawbridge source retains its original MIT grant and copyright,
+from an MIT source snapshot:
+pdf_tools.py, orientation.py, native.py, errors.py, structure.py, ocr.py,
+mirror.py and synthetic typography fixtures/golden.
+Full original grant: LICENSES/drawbridge-MIT.txt.
+
+Starter-derived material retains its original MIT grant and copyright,
+from an MIT source snapshot.
+Full original grant: LICENSES/starter-MIT.txt.
+
+This wheel contains Vellric Python source, documentation and notices only.
+It contains no MuPDF/PyMuPDF native library, OCR executable, codec, font,
+language data, model, or dependency wheel. Dependencies install separately
+and retain their original grants. PyMuPDF 1.28.2 uses the AGPL lane here;
+no Artifex commercial license is claimed. Optional OCRmyPDF 17.7.0 and its
+closure retain MPL/LGPL/Apache/BSD/MIT and component-specific grants.
+
+The local companion release-preparation bundle retains exact dependency
+metadata, actual installed notice texts/hashes, source-download hashes and
+qualified native/data identities. It does not redistribute dependency binaries.
+Distributing a future bundled environment requires the matching component
+source/build/NOTICE material for those actual binaries; do not infer that
+an inspected upstream source tag is the complete bundled-native build source.
+See docs/RELEASE-PREPARATION.md for the concrete delivery route.
