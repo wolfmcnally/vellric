@@ -32,24 +32,7 @@ workflow:
   allowed_harnesses:
     - claude
     - codex
-  targets:
-    sol:
-      harness: codex
-      model: gpt-6-sol
-      provider: openai
-      backend: direct
-      auth: subscription
-      efforts:
-        - low
-        - medium
-        - high
-        - xhigh
-        - max
-      usage_windows:
-        - base_model_inference/primary_window
-      terms: operator-configured subscription access
-      credential_env: []
-      backend_env: {}
+  targets: {}
 
 # Optional project- or harness-specific keys may be added here. The current
 # manager preserves unknown extension data without interpreting it.
