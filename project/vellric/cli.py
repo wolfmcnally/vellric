@@ -6,6 +6,7 @@ import argparse
 import ctypes
 import hashlib
 import importlib.metadata
+import importlib.util
 import json
 import os
 import re
@@ -16,11 +17,13 @@ import stat
 import subprocess
 import sys
 import tempfile
+import threading
 import time
+import urllib.parse
 from collections.abc import Sequence
 from pathlib import Path
 
-from . import __version__
+from . import __version__, vision
 from .runtime import (
     BEHAVIOR,
     SCHEMA,
@@ -101,6 +104,24 @@ def parser() -> argparse.ArgumentParser:
             c.add_argument("--language", default="eng")
             c.add_argument("--searchable-pdf", action="store_true")
             c.add_argument("--diagnostics", action="store_true")
+            c.add_argument(
+                "--vision-provider",
+                choices=list(vision.PROVIDERS),
+                help="opt in to a high-quality pass by a vision-capable model",
+            )
+            c.add_argument("--vision-model", help="model name as the provider knows it")
+            c.add_argument("--vision-base-url", help="endpoint for the anthropic/openai provider")
+            c.add_argument(
+                "--vision-api-key-env", help="name of the environment variable holding the key"
+            )
+            c.add_argument("--vision-command", help="program for --vision-provider command")
+            c.add_argument("--vision-pages", help="pages/ranges that receive the vision pass")
+            c.add_argument("--vision-cross-check", choices=["on", "off"], default="on")
+            c.add_argument("--vision-max-side", type=int, default=vision.DEFAULT_MAX_SIDE)
+            c.add_argument("--vision-max-output-tokens", type=int)
+            c.add_argument(
+                "--amend", help="earlier convert result of this input whose other pages are kept"
+            )
         if name == "image":
             c.add_argument("--width", type=int)
             c.add_argument("--height", type=int)
@@ -286,6 +307,127 @@ def validate_options(options: dict) -> None:
             raise JobError("usage", "Image resize requires positive width and height <=30000")
     if not 1 <= options.get("jpeg_quality", 85) <= 100:
         raise JobError("usage", "JPEG quality must be 1..100")
+    validate_vision(options)
+
+
+def validate_vision(options: dict) -> None:
+    """Vision and amend settings exist on convert only; refuse every contradiction up front."""
+    provider = options.get("vision_provider")
+    if provider is None:
+        named = [
+            key
+            for key in (
+                "vision_model",
+                "vision_base_url",
+                "vision_api_key_env",
+                "vision_command",
+                "vision_pages",
+                "vision_max_output_tokens",
+                "amend",
+            )
+            if options.get(key) is not None
+        ]
+        if named:
+            raise JobError(
+                "usage",
+                f"--{named[0].replace('_', '-')} requires --vision-provider",
+                stage="settings",
+            )
+        return
+
+    def refuse(message: str) -> JobError:
+        return JobError("usage", message, stage="settings")
+
+    if not 256 <= options["vision_max_side"] <= 30000:
+        raise refuse("vision-max-side must be 256..30000")
+    tokens = options["vision_max_output_tokens"]
+    if tokens is not None and not 1 <= tokens <= 1_000_000:
+        raise refuse("vision-max-output-tokens must be positive")
+    if options["searchable_pdf"] and options["vision_cross_check"] == "off":
+        # Skipping Tesseract for vision pages would leave them out of the searchable derivative.
+        raise refuse("Searchable PDF requires --vision-cross-check on")
+    if provider == "command":
+        if options["vision_base_url"] or options["vision_api_key_env"] or tokens is not None:
+            raise refuse("The command provider takes no base URL, API key or token limit")
+        try:
+            command = Path(options["vision_command"] or "").resolve(strict=True)
+            if not command.is_file() or not os.access(command, os.X_OK):
+                raise ValueError
+        except (OSError, ValueError) as exc:
+            raise refuse("vision-command must name an executable file") from exc
+        options["vision_command"] = str(command)
+    else:
+        if options["vision_command"]:
+            raise refuse("vision-command requires the command provider")
+        if not options["vision_model"]:
+            raise refuse("This vision provider requires --vision-model")
+        url = options["vision_base_url"] or vision.DEFAULT_BASE_URL[provider]
+        try:
+            parts = urllib.parse.urlsplit(url)
+            valid = (
+                parts.scheme in ("http", "https")
+                and bool(parts.hostname)
+                and "@" not in parts.netloc
+                and (parts.port is None or parts.port > 0)
+            )
+        except ValueError:
+            valid = False
+        if not valid:
+            raise refuse("vision-base-url must be an http(s) URL without credentials")
+        options["vision_base_url"] = url
+        name = options["vision_api_key_env"]
+        if name is not None and not re.fullmatch("[A-Za-z_][A-Za-z0-9_]*", name):
+            raise refuse("Invalid API key variable name")
+        # A key goes only where the user sent it: the provider's own endpoint takes the
+        # provider's usual variable, and any other endpoint takes a key only when one is named.
+        if name is None and url == vision.DEFAULT_BASE_URL[provider]:
+            name = options["vision_api_key_env"] = vision.DEFAULT_KEY_ENV[provider]
+        if name is None and provider == "anthropic":
+            raise refuse("A custom Anthropic endpoint requires --vision-api-key-env")
+        if name is not None and not os.environ.get(name):
+            raise refuse(f"Environment variable {name} holds no API key")
+        if provider == "anthropic" and importlib.util.find_spec("anthropic") is None:
+            raise JobError(
+                "dependency-unavailable",
+                "The anthropic provider requires the vision extra: install vellric[vision]",
+                stage="settings",
+            )
+    if options["amend"] is not None:
+        if options["vision_pages"] is None:
+            raise refuse("--amend requires --vision-pages")
+        if options["searchable_pdf"] or options["diagnostics"] or options["ocr_pages"] is not None:
+            raise refuse("--amend cannot be combined with searchable PDF, diagnostics or OCR pages")
+        try:
+            prior = Path(options["amend"]).resolve(strict=True)
+            if not (prior / "manifest.json").is_file():
+                raise ValueError
+        except (OSError, ValueError) as exc:
+            raise refuse("--amend must name an earlier convert result directory") from exc
+        if prior in Path(options["out"]).absolute().parents:
+            raise refuse("--out must lie outside the --amend directory")
+        options["amend"] = str(prior)
+        # An amend run recognises nothing itself: every other page is carried forward.
+        options["ocr"], options["preflight"] = "never", "off"
+
+
+def vision_settings(options: dict) -> dict | None:
+    """What the worker needs to reach the provider, including material no artifact may carry."""
+    provider = options.get("vision_provider")
+    if provider is None:
+        return None
+    settings = {
+        "provider": provider,
+        "model": options["vision_model"],
+        "base_url": options["vision_base_url"],
+        "max_output_tokens": options["vision_max_output_tokens"]
+        or (vision.ANTHROPIC_MAX_OUTPUT_TOKENS if provider == "anthropic" else None),
+    }
+    if provider == "command":
+        # The user's own program runs as the user would run it.
+        settings |= {"command": options["vision_command"], "env": dict(os.environ)}
+    elif options["vision_api_key_env"]:
+        settings["api_key"] = os.environ[options["vision_api_key_env"]]
+    return settings
 
 
 def snapshot(options: dict, work: Path) -> tuple[Path, str, int]:
@@ -411,6 +553,7 @@ def _run_job(options: dict) -> dict:
                 "result": str(work / "result.json"),
                 "password": password,
                 "title": title,
+                "vision": options.get("vision_provider") is not None,
             }
             write_json(work / "config.json", config)
             os.chmod(work / "config.json", 0o600)
@@ -431,11 +574,26 @@ def _run_job(options: dict) -> dict:
                         package_root,
                         str(work / "config.json"),
                     ],
+                    stdin=subprocess.PIPE if config["vision"] else None,
                     stdout=log,
                     stderr=log,
                     env=environment(work, options.get("tessdata_dir")),
                     start_new_session=True,
                 )
+                if config["vision"]:
+                    # The key travels on a pipe so that no crash can leave it on disk.
+                    def feed(stream, payload):
+                        try:
+                            stream.write(payload)
+                            stream.close()
+                        except OSError:
+                            pass  # The worker ended first; its status is read below.
+
+                    threading.Thread(
+                        target=feed,
+                        args=(process.stdin, json.dumps(vision_settings(options)).encode()),
+                        daemon=True,
+                    ).start()
                 started = job_started
                 peak_rss = 0
                 peak_private_bytes = size

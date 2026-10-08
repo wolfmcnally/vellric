@@ -34,6 +34,7 @@ As of 2026-10-07, a vision language model (Claude Opus 5.5) was given only cropp
 - `Fake_Doc_watermarked.pdf`: 99.2% of the original's words and all 48 mathematical symbols, against Tesseract's 96.4% and 12 under the same scorer. Every remaining difference was a defect in the reference text, not a misreading.
 - `Fake_Math_Doc_watermarked.pdf`: every word outside mathematics, all 250 Greek letters and operator symbols, and all 20 displayed formulas token-for-token after macro expansion and removal of spacing and sizing commands (2682 mathematical tokens). It kept the authors' own slips verbatim.
 - The Tesseract draft changed nothing: the two runs differed only in spacing and delimiter sizing.
+- Run through the shipped pipeline (`convert --vision-provider command` with a program that asks the same model), the second fixture converted in 48 seconds at `--jobs 4` with the same result, and Tesseract confirmed 96 to 99.6% of the model's prose words per page.
 - Where Tesseract and the model agreed on a word of the first fixture, the word was right; all of Tesseract's errors lay in the roughly 3% of words where they disagreed. Agreement is therefore a usable quality signal without a reference for prose. It says nothing about mathematics, which Tesseract cannot read.
 
 These are two documents of clean typeset English, eight pages in all. Tables, figures, handwriting and poor scans are untested.

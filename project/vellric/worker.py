@@ -12,11 +12,11 @@ import shutil
 import sys
 import threading
 import time
-from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, as_completed, wait
 from dataclasses import asdict
 from pathlib import Path
 
-from . import __version__, native, pdf_tools
+from . import __version__, native, pdf_tools, vision
 from .errors import ConverterUnavailable, OcrOperationalError
 from .fidelity import native_section
 from .orientation import MAX_RENDER_SIDE, recover_page
@@ -210,6 +210,32 @@ def preflight(
         )
 
 
+def load_prior(root: Path, config: dict, count: int) -> tuple[dict, set[str]]:
+    """Admit an earlier convert result of the same input as the base of an amend run."""
+    try:
+        manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+        validate_bundle(root, manifest)
+        listed = {entry["path"] for entry in manifest["files"]}
+        same = (
+            manifest["job"] == "convert"
+            and manifest["source"] == {"sha256": config["sha256"], "size": config["size"]}
+            and manifest["page_count"] == count
+            and 0 < float(manifest["settings"]["raster_threshold"]) <= 1
+            and all(isinstance(record["files"], dict) for record in manifest["pages"])
+        )
+    except (OSError, ValueError, KeyError, TypeError, JobError) as exc:
+        raise JobError(
+            "artifact-invalid", "Earlier result is not a valid complete bundle", stage="amend"
+        ) from exc
+    if not same:
+        raise JobError(
+            "artifact-invalid",
+            "Earlier result is not a conversion of this input",
+            stage="amend",
+        )
+    return manifest, listed
+
+
 def execute(config: dict) -> dict:
     started = time.monotonic()
     options = config["options"]
@@ -253,6 +279,12 @@ def execute(config: dict) -> dict:
         count = inspection.page_count
         texts = list(inspection.page_texts)
         coverage = pdf_tools.page_image_coverage(source)
+        prior, prior_root, prior_files = None, None, set()
+        if options.get("amend"):
+            prior_root = Path(options["amend"])
+            prior, prior_files = load_prior(prior_root, config, count)
+            # Carried pages were selected under the earlier run's threshold.
+            options["raster_threshold"] = float(prior["settings"]["raster_threshold"])
         candidates = pdf_tools.ocr_page_numbers(
             source, raster_threshold=options["raster_threshold"], inspection=inspection
         )
@@ -268,8 +300,26 @@ def execute(config: dict) -> dict:
                 if options["ocr"] == "auto"
                 else []
             )
+        reading = config.get("vision") if options["command"] == "convert" else None
+        vision_pages = []
+        if reading:
+            vision_pages = (
+                page_range(options["vision_pages"], count)
+                if options["vision_pages"] is not None
+                else list(selected)
+                if options["ocr"] != "never"
+                else list(candidates)
+            )
+            if options["vision_cross_check"] == "off":
+                selected = [n for n in selected if n not in vision_pages]
         derivative_kind = None
         engine_facts = {}
+        if prior and isinstance(prior.get("engines"), dict):
+            # Carried Tesseract readings keep the engine identity that produced them.
+            if prior["engines"].get("ocr") is not None:
+                engine_facts["engines"] = prior["engines"]["ocr"]
+            if prior["engines"].get("language_data"):
+                engine_facts["language_data"] = prior["engines"]["language_data"]
         if options["ocr"] != "never":
             from .cli import doctor
 
@@ -374,7 +424,134 @@ def execute(config: dict) -> dict:
         if options.get("searchable_pdf") and not selected:
             shutil.copyfile(source, root / "searchable.pdf")
             derivative_kind = "native-copy"
-        native_numbers = [n for n in range(1, count + 1) if n not in selected]
+
+        def carried_file(relative: str) -> bytes:
+            if relative not in prior_files:
+                raise JobError(
+                    "artifact-invalid", "Earlier result names an undeclared file", stage="amend"
+                )
+            return (prior_root / relative).read_bytes()
+
+        # Pages an amend run does not redo keep the earlier run's reading and model view.
+        carried, views, kept_methods = {}, {}, {}
+        try:
+            for record in prior["pages"] if prior else []:
+                number, redo = record["number"], record["number"] in vision_pages
+                if record["method"] not in ("pymupdf-text", "ocr", "vision"):
+                    raise ValueError
+                if not redo:
+                    kept_methods[number] = record["method"]
+                if record["method"] == "ocr" or (record["method"] == "vision" and not redo):
+                    if not isinstance(record.get("ocr", {}), dict):
+                        raise TypeError
+                    carried[number] = record
+                    texts[number - 1] = carried_file(record["files"]["text"]).decode("utf-8")
+                if "vision" in record["files"] and not redo:
+                    if not isinstance(record["vision"], dict):
+                        raise TypeError
+                    check = record["files"].get("vision_check")
+                    views[number] = {
+                        "markdown": carried_file(record["files"]["vision"]).decode("utf-8"),
+                        "record": record["vision"],
+                        "check": carried_file(check) if check else None,
+                    }
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            raise JobError(
+                "artifact-invalid", "Earlier result has a malformed page record", stage="amend"
+            ) from exc
+        ocr_read = {page.page for page in recovered} | {
+            number for number, record in carried.items() if record["method"] == "ocr"
+        }
+        if vision_pages:
+            progress("vision", 0, len(vision_pages))
+            vision_cancel = threading.Event()
+
+            def read(number):
+                width, height = pdf_tools.page_size(source, number)
+                dpi = min(
+                    float(options["dpi"]),
+                    options["vision_max_side"] * 72 / max(width, height, 1.0),
+                )
+                image = work / f"vision-{number:06d}.png"
+                try:
+                    pdf_tools.render_page_png(source, number, image, dpi=dpi)
+                    markdown, facts = vision.transcribe(
+                        image,
+                        number,
+                        reading,
+                        timeout=options["page_timeout_seconds"],
+                        temp=work,
+                        cancel_event=vision_cancel,
+                    )
+                finally:
+                    image.unlink(missing_ok=True)
+                return number, markdown, facts | {"effective_dpi": dpi}
+
+            with ThreadPoolExecutor(max_workers=options["jobs"]) as pool:
+                futures = [pool.submit(read, number) for number in vision_pages]
+                try:
+                    for done, future in enumerate(as_completed(futures), 1):
+                        number, markdown, facts = future.result()
+                        native_text = inspection.page_texts[number - 1]
+                        reference = (
+                            (texts[number - 1], "ocr")
+                            if number in ocr_read
+                            else (native_text, "native")
+                            if native_text.strip()
+                            else None
+                        )
+                        summary, spans = (
+                            vision.cross_check(reference[0], markdown, reference[1])
+                            if reference
+                            else (None, None)
+                        )
+                        views[number] = {
+                            "markdown": markdown,
+                            "record": {
+                                "provider": reading["provider"],
+                                "model": reading["model"],
+                                "prompt_sha256": vision.PROMPT_SHA256,
+                                **facts,
+                                "cross_check": summary,
+                            },
+                            "check": (
+                                json.dumps(
+                                    {
+                                        "schema": "vellric.vision-check/1.0",
+                                        **summary,
+                                        "spans": spans,
+                                    },
+                                    ensure_ascii=False,
+                                    indent=2,
+                                )
+                                + "\n"
+                            ).encode("utf-8")
+                            if reference
+                            else None,
+                        }
+                        progress("vision", done, len(vision_pages), number)
+                except BaseException:
+                    vision_cancel.set()
+                    for future in futures:
+                        future.cancel()
+                    raise
+        # The final text is an independent reading where one exists. A scanned page that only
+        # the model has read takes the model's transcription and says so in its method.
+        methods = {}
+        for number in range(1, count + 1):
+            if number in kept_methods:
+                # A page an amend run does not redo keeps the method its text came from.
+                methods[number] = kept_methods[number]
+            elif number in ocr_read:
+                methods[number] = "ocr"
+            elif number in views and (
+                number in candidates or not inspection.page_texts[number - 1].strip()
+            ):
+                methods[number] = "vision"
+                texts[number - 1] = views[number]["markdown"]
+            else:
+                methods[number] = "pymupdf-text"
+        native_numbers = [n for n in range(1, count + 1) if methods[n] == "pymupdf-text"]
         want_structure = options.get("structure") == "native"
         layouts = (
             pdf_tools.page_layouts(
@@ -411,7 +588,7 @@ def execute(config: dict) -> dict:
                 else "raster-coverage"
                 if number in candidates
                 else None,
-                "method": "ocr" if number in selected else "pymupdf-text",
+                "method": methods[number],
                 "empty_text": not texts[number - 1].strip(),
                 "formatting_eligible": bool(native_text.strip()) and number in native_numbers,
                 "structure_requested": want_structure,
@@ -430,6 +607,18 @@ def execute(config: dict) -> dict:
                         float(options["dpi"]), MAX_RENDER_SIDE * 72 / max(width, 1.0)
                     ),
                 }
+            elif "ocr" in carried.get(number, {}):
+                record["ocr"] = carried[number]["ocr"]
+            if number in views:
+                view = views[number]
+                (folder / "vision.md").write_bytes(view["markdown"].encode("utf-8"))
+                record["vision"] = view["record"]
+                record["files"]["vision"] = str((folder / "vision.md").relative_to(root))
+                if view["check"] is not None:
+                    (folder / "vision-check.json").write_bytes(view["check"])
+                    record["files"]["vision_check"] = str(
+                        (folder / "vision-check.json").relative_to(root)
+                    )
             if want_structure:
                 formatted, reason = (
                     native_section(texts[number - 1], proposals[number])
@@ -494,7 +683,13 @@ def execute(config: dict) -> dict:
             progress("artifacts", number, count, number)
         title = options.get("title") or config["title"]
         (root / "document.txt").write_bytes("\f".join(texts).encode("utf-8"))
-        (root / "document.md").write_text(reader(title, texts), encoding="utf-8")
+        reading_view = [
+            vision.reader_section(views[n]["markdown"])
+            if n in views and views[n]["markdown"].strip()
+            else texts[n - 1]
+            for n in range(1, count + 1)
+        ]
+        (root / "document.md").write_text(reader(title, reading_view), encoding="utf-8")
         if want_structure:
             (root / "structured.md").write_text(reader(title, structured), encoding="utf-8")
         subset = None
@@ -509,7 +704,29 @@ def execute(config: dict) -> dict:
                     start = previous = number
                 derivative.save(root / "subset.pdf", no_new_id=True)
             subset = {"path": "subset.pdf", "pages": render_pages}
-        outstanding = [n for n in candidates if n not in selected]
+        recognized = set(selected) | set(carried) | set(views)
+        outstanding = [n for n in candidates if n not in recognized]
+        fingerprint_extra = {}
+        if reading:
+            fingerprint_extra["vision"] = {
+                "provider": reading["provider"],
+                "model": reading["model"],
+                "base_url": reading["base_url"],
+                "prompt_sha256": vision.PROMPT_SHA256,
+                "max_side": options["vision_max_side"],
+                "max_output_tokens": reading["max_output_tokens"],
+                "cross_check": options["vision_cross_check"],
+            }
+            if reading["provider"] == "command":
+                fingerprint_extra["vision"]["command"] = {
+                    "name": Path(reading["command"]).name,
+                    "sha256": digest(Path(reading["command"])),
+                }
+        if prior:
+            earlier = prior.get("provenance")
+            fingerprint_extra["amended_from"] = (
+                earlier.get("processing_fingerprint") if isinstance(earlier, dict) else None
+            )
         files = []
         for path in sorted(root.rglob("*")):
             if path.is_file():
@@ -545,6 +762,8 @@ def execute(config: dict) -> dict:
                     "password_stdin",
                     "temp_dir",
                     "tessdata_dir",
+                    "vision_command",
+                    "amend",
                 }
             },
             "page_count": count,
@@ -553,7 +772,7 @@ def execute(config: dict) -> dict:
             "recognition_completeness": "unrecognized-candidates"
             if outstanding
             else "complete"
-            if selected
+            if recognized
             else "not-requested",
             "outstanding_candidates": outstanding,
             "derivative_kind": derivative_kind,
@@ -580,7 +799,8 @@ def execute(config: dict) -> dict:
                                     "rotate_threshold",
                                 )
                             },
-                        },
+                        }
+                        | fingerprint_extra,
                         sort_keys=True,
                     ).encode()
                 ).hexdigest(),
@@ -592,6 +812,14 @@ def execute(config: dict) -> dict:
             "files": files,
             "pdf_subset": subset,
         }
+        if reading:
+            manifest["vision"] = fingerprint_extra["vision"] | {"pages": vision_pages}
+        if prior:
+            manifest["amended_from"] = {
+                "manifest_sha256": digest(prior_root / "manifest.json"),
+                "tool": prior.get("tool"),
+                "amended_pages": vision_pages,
+            }
         validate_bundle(root, manifest)
         write_json(root / "manifest.json", manifest)
         return manifest
@@ -632,6 +860,9 @@ def execute(config: dict) -> dict:
 
 def main() -> int:
     config = json.loads(Path(sys.argv[1]).read_text())
+    if config.get("vision"):
+        # Provider settings and their secret arrive on a pipe and never touch the disk.
+        config["vision"] = json.loads(sys.stdin.buffer.read())
     result = Path(config["result"])
     try:
         manifest = execute(config)

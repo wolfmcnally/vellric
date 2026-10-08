@@ -111,12 +111,27 @@ def run_tool(
     stage: str = "recognition",
     tessdata_dir: str | None = None,
     cancel_event=None,
+    env: dict[str, str] | None = None,
+    stdin: Path | None = None,
 ) -> str:
-    """Files avoid unbounded capture; the supervisor owns the inherited process group."""
-    with tempfile.TemporaryFile(dir=temp) as out, tempfile.TemporaryFile(dir=temp) as err:
+    """Files avoid unbounded capture; the supervisor owns the inherited process group.
+
+    ``env`` replaces the private environment for a program the user explicitly supplied;
+    ``stdin`` names a file fed to the program, which otherwise reads nothing.
+    """
+    with (
+        tempfile.TemporaryFile(dir=temp) as out,
+        tempfile.TemporaryFile(dir=temp) as err,
+        open(stdin if stdin is not None else os.devnull, "rb") as source,
+    ):
         try:
             process = subprocess.Popen(
-                command, stdout=out, stderr=err, env=environment(temp, tessdata_dir)
+                command,
+                stdin=source,
+                stdout=out,
+                stderr=err,
+                cwd=temp if env is not None else None,
+                env=environment(temp, tessdata_dir) if env is None else env,
             )
         except OSError as exc:
             raise JobError(

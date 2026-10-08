@@ -2,7 +2,7 @@
 
 Vellric 0.1.0 is AGPL-3.0-only. [Full GNU text](../LICENSE), [NOTICE](../NOTICE) and the original Drawbridge/Starter MIT grants under LICENSES accompany the wheel/source. Those retained grants remain operative; no commercial Artifex grant is claimed.
 
-The project wheel ships Vellric source, docs and notices. PyMuPDF/MuPDF and optional OCR dependencies/system engines install separately and keep their own AGPL/MPL/LGPL/Apache/BSD/MIT and component notices. The exact qualified inventory is [dependencies-qualified.json](dependencies-qualified.json); actual notice texts and source-download hashes are retained in the local release bundle. This is not a wholly permissive OCR stack.
+The project wheel ships Vellric source, docs and notices. PyMuPDF/MuPDF and optional OCR dependencies/system engines install separately and keep their own AGPL/MPL/LGPL/Apache/BSD/MIT and component notices. The exact qualified inventory is [dependencies-qualified.json](dependencies-qualified.json); actual notice texts and source-download hashes are retained in the local release bundle. This is not a wholly permissive OCR stack. The optional `vision` extra installs the MIT-licensed `anthropic` package and its dependencies; that closure is locked in `uv.lock` but is not yet part of the qualified inventory.
 
 The prepared release publishes matching project wheel/source/lock/build material. Its concrete sequence is in [release preparation](RELEASE-PREPARATION.md). A future environment/container that redistributes third-party binaries needs corresponding materials for those actual binaries; that is a separate artifact, not a theoretical hold on these project packages.
 

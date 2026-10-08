@@ -25,4 +25,16 @@ For a scan, use a local image-only PDF and the full-OCR setup:
 
 Diagnostics contain document text. Keep them private. The optional public/synthetic review bundle demonstrates native typography, rotated scans with stale OCR, a five-band scroll and image comparisons; its original PDFs and visible-text expectations are provided with the local qualification evidence. No private corpus is used.
 
+To read scans and mathematics with a vision-capable model, name a provider and a model; the key comes from the environment. To re-read two pages of that result later without redoing the rest, amend it into a new directory:
+
+```bash
+.venv/bin/vellric convert scan.pdf --vision-provider anthropic --vision-model MODEL --out scan-vision --status-json
+```
+
+```bash
+.venv/bin/vellric convert scan.pdf --amend scan-vision --vision-provider anthropic --vision-model MODEL --vision-pages 3,7 --out scan-vision-2 --status-json
+```
+
+Page images are sent to the provider. See the vision pass in [CLI](CLI.md) for local endpoints, an external program, the cross-check figures and limits.
+
 For an encrypted PDF, provide a password file or stdin through the documented options, never a command-line password value. Blocked status can include partial inspection facts; no incomplete bundle is published. See [CLI](CLI.md) and [troubleshooting](TROUBLESHOOTING.md).

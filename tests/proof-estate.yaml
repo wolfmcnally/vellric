@@ -1072,3 +1072,36 @@ families:
   tier: vital
   size: medium
   flake_rate: 0.0
+- id: pytest-project-tests-test_vision-py
+  kind: pytest
+  selectors:
+  - project/tests/test_vision.py
+  source_paths:
+  - project/tests/test_vision.py
+  covers:
+  - project/tests/test_vision.py
+  - project/vellric/vision.py
+  - project/vellric/cli.py
+  - project/vellric/worker.py
+  - project/vellric/runtime.py
+  - project/docs/CLI.md
+  - project/docs/document.schema.json
+  contract: Opt-in vision transcription stays a separate, cross-checked, provenance-bound view; selected pages amend an earlier result.
+  risk_class: model-view-custody-and-fidelity
+  oracle: Exact artifact bytes, cross-check counts, provider request contents, typed refusal codes and absent output.
+  admission: A new opt-in model pass and amend run are product contracts that no existing proof reaches.
+  nearest_overlap: Existing OCR and custody proofs never call a model provider, carry pages from an earlier bundle or handle a provider credential.
+  historical_evidence: []
+  mutation_evidence:
+  - model-text-overwrites-native-fidelity
+  - vision-pass-ignores-automatic-page-selection
+  - truncated-endpoint-reply-accepted
+  - ambient-key-sent-to-named-endpoint
+  - model-refusal-not-classified
+  - amend-drops-carried-model-text
+  - amend-accepts-result-of-different-input
+  - credentials-in-base-url-accepted
+  replacement_lineage: []
+  tier: vital
+  size: medium
+  flake_rate: 0.0

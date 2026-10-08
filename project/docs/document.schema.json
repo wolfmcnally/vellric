@@ -75,6 +75,7 @@
             "enum": [
               "pymupdf-text",
               "ocr",
+              "vision",
               "native-image"
             ]
           },

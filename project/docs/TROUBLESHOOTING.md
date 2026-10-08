@@ -12,6 +12,7 @@ Start with `vellric doctor --json`, then preserve the terminal `--status-json` r
 | Source hash mismatch | Reacquire the intended immutable input and expected hash; never accept a later source for an earlier mirror. |
 | Native bundle has outstanding candidates | Install OCR and convert, or keep the truthful native-only result. A caller requiring recognition must refuse it. |
 | Unsupported publication platform | Use a qualified macOS/Linux environment; atomic publication is required. |
+| `vision-operational` or `vision-refused` | Read the status `details` (HTTP status, stop reason, page). Check the key variable, model name and endpoint; lower `--vision-max-side` for an oversize image; raise `--vision-max-output-tokens` for a truncated reply; raise `--memory-mib` for a heavy `--vision-command` program. Nothing is published, so rerun, or amend an earlier result. |
 | Forced kill left private directories | Treat them as incomplete and remove after confirming no live job owns them. The watchdog is not a hostile-document sandbox. |
 
 Exit/status classifications, configured defaults, publication and cancellation limits are detailed in [CLI](CLI.md). For Drawbridge failures, consult that package's troubleshooting guide; typed document failures are mapped across the standalone CLI boundary.

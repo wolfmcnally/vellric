@@ -9,13 +9,13 @@
       "leaves": 5
     },
     "pytest": {
-      "families": 132,
-      "leaves": 190
+      "families": 137,
+      "leaves": 196
     }
   },
   "counts": {
-    "families": 155,
-    "leaves": 213
+    "families": 160,
+    "leaves": 219
   },
   "families": [
     "gate:changed",
@@ -91,6 +91,11 @@
     "pytest:project/tests/test_review_regressions.py::test_rotated_coverage_preserves_policy",
     "pytest:project/tests/test_review_regressions.py::test_table_failure_retains_fidelity",
     "pytest:project/tests/test_review_regressions.py::test_unqualified_native_engine_refuses",
+    "pytest:project/tests/test_vision.py::test_amend_redoes_only_the_named_pages",
+    "pytest:project/tests/test_vision.py::test_hosted_provider_request_custody_and_typed_refusals",
+    "pytest:project/tests/test_vision.py::test_model_view_is_separate_and_cross_checked",
+    "pytest:project/tests/test_vision.py::test_scan_read_only_by_the_model_takes_its_text",
+    "pytest:project/tests/test_vision.py::test_vision_settings_refuse_before_any_work",
     "pytest:tests/test_check.py::test_all_is_default_locked_ordered_and_cwd_independent",
     "pytest:tests/test_check.py::test_all_policy_failure_cannot_be_masked_by_later_policy_output",
     "pytest:tests/test_check.py::test_authoritative_runtime_probe_failure_stops_before_gate_without_fallback",
@@ -174,7 +179,7 @@
     "pytest:tests/test_treatise.py::test_an_external_fact_without_a_retrieval_date_fails",
     "pytest:tests/test_treatise.py::test_the_repository_own_treatises_validate"
   ],
-  "inventory_sha256": "719739feb5fcc9136664441cd78a8b0b635889272c6e4cf39e47455fb23bf696",
+  "inventory_sha256": "0cda45198291e4669585bd148344570e8cb1cca6303fd97058ff2272dbbecdad",
   "proofs": [
     {
       "family": "pytest:project/tests/test_cli.py::test_help",
@@ -805,6 +810,48 @@
       "kind": "pytest",
       "selector": "project/tests/test_review_regressions.py::test_unqualified_native_engine_refuses",
       "source_path": "project/tests/test_review_regressions.py"
+    },
+    {
+      "family": "pytest:project/tests/test_vision.py::test_model_view_is_separate_and_cross_checked",
+      "id": "pytest:project/tests/test_vision.py::test_model_view_is_separate_and_cross_checked",
+      "kind": "pytest",
+      "selector": "project/tests/test_vision.py::test_model_view_is_separate_and_cross_checked",
+      "source_path": "project/tests/test_vision.py"
+    },
+    {
+      "family": "pytest:project/tests/test_vision.py::test_scan_read_only_by_the_model_takes_its_text",
+      "id": "pytest:project/tests/test_vision.py::test_scan_read_only_by_the_model_takes_its_text",
+      "kind": "pytest",
+      "selector": "project/tests/test_vision.py::test_scan_read_only_by_the_model_takes_its_text",
+      "source_path": "project/tests/test_vision.py"
+    },
+    {
+      "family": "pytest:project/tests/test_vision.py::test_hosted_provider_request_custody_and_typed_refusals",
+      "id": "pytest:project/tests/test_vision.py::test_hosted_provider_request_custody_and_typed_refusals[openai]",
+      "kind": "pytest",
+      "selector": "project/tests/test_vision.py::test_hosted_provider_request_custody_and_typed_refusals[openai]",
+      "source_path": "project/tests/test_vision.py"
+    },
+    {
+      "family": "pytest:project/tests/test_vision.py::test_hosted_provider_request_custody_and_typed_refusals",
+      "id": "pytest:project/tests/test_vision.py::test_hosted_provider_request_custody_and_typed_refusals[anthropic]",
+      "kind": "pytest",
+      "selector": "project/tests/test_vision.py::test_hosted_provider_request_custody_and_typed_refusals[anthropic]",
+      "source_path": "project/tests/test_vision.py"
+    },
+    {
+      "family": "pytest:project/tests/test_vision.py::test_amend_redoes_only_the_named_pages",
+      "id": "pytest:project/tests/test_vision.py::test_amend_redoes_only_the_named_pages",
+      "kind": "pytest",
+      "selector": "project/tests/test_vision.py::test_amend_redoes_only_the_named_pages",
+      "source_path": "project/tests/test_vision.py"
+    },
+    {
+      "family": "pytest:project/tests/test_vision.py::test_vision_settings_refuse_before_any_work",
+      "id": "pytest:project/tests/test_vision.py::test_vision_settings_refuse_before_any_work",
+      "kind": "pytest",
+      "selector": "project/tests/test_vision.py::test_vision_settings_refuse_before_any_work",
+      "source_path": "project/tests/test_vision.py"
     },
     {
       "family": "pytest:tests/test_check.py::test_all_is_default_locked_ordered_and_cwd_independent",
