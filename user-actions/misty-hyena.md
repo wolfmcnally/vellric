@@ -19,7 +19,7 @@ refs:
 
 Version 0.2.0 runs natively on Windows and has been proved on a GitHub-hosted Windows Server 2025 machine under an administrator account. Three things need the owner.
 
-First, try it on the target machine, which no agent session can reach: a Windows 11 desktop edition, an account without administrator rights and Python 3.13. Install the bundle as its `INSTALL.txt` says, run `vellric doctor`, and convert a document with the Bedrock vision provider. Report anything that fails; a fix is a patch release.
+First, try it on the target machine, which no agent session can reach: a Windows 11 desktop edition, an account without administrator rights and Python 3.13. The owner did the first part on 2026-10-10: the bundle installed with no package index, and `doctor`, `inspect` and a `convert` through the Bedrock vision provider completed on a generated two-page PDF with neither engine installed. What remains is a real scanned document, judged by the owner. Report anything that fails; a fix is a patch release.
 
 Second, ask the machine's administrators to install Tesseract 5.5.3 (`tesseract-ocr-w64-setup-5.5.3.20260724.exe`) and Ghostscript 10.07.1 (`gs10071w64.exe`) to their default folders. Until they do, scanned pages read by a vision model have no independent check.
 
