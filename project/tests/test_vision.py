@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import subprocess
 import sys
 import threading
@@ -65,6 +66,11 @@ def adapter(tmp_path, name, replies, key="VELLRIC_VISION_PAGE"):
         "sys.stdout.write(reply)\n"
     )
     script.chmod(0o755)
+    if os.name == "nt":
+        # Windows starts a script through a command file; the program still reads and writes UTF-8.
+        wrapper = tmp_path / f"{name}.cmd"
+        wrapper.write_text(f'@"{sys.executable}" -X utf8 "{script}" %*\n')
+        return wrapper
     return script
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import errno
 import hashlib
 import json
+import os
 import signal
 import subprocess
 import sys
@@ -49,7 +50,11 @@ def test_bundle_parent_alias_and_internal_symlink(pdf, tmp_path):
     assert cli.main(["inspect", str(pdf), "--out", str(out), "--status-json"]) == 0
     m = json.loads((out / "manifest.json").read_text())
     alias = tmp_path / "alias"
-    alias.symlink_to(tmp_path, target_is_directory=True)
+    try:
+        alias.symlink_to(tmp_path, target_is_directory=True)
+    except OSError:  # Windows lets only some accounts make links.
+        assert os.name == "nt"
+        return
     runtime.validate_bundle(alias / "bundle", m)
     text = out / "pages/000001/text.txt"
     original = tmp_path / "same.txt"
@@ -89,7 +94,7 @@ def test_ocr_failure_stops_pending_pages(tmp_path, monkeypatch):
         "doctor",
         lambda **kw: {
             "engines": {
-                "tesseract": {"available": True, "version": "tesseract 5.5.2"},
+                "tesseract": {"available": True, "version": worker.QUALIFIED_TESSERACT},
                 "ocrmypdf": {"available": False},
             },
             "language_data": [],
@@ -286,7 +291,11 @@ def test_gray_render_formats(pdf, tmp_path, format):
     assert pix.colorspace.n == 1 and (pix.width, pix.height) == (100, 200)
 
 
-@pytest.mark.parametrize("signum", [signal.SIGINT, signal.SIGTERM])
+# Windows has one way for a parent to ask a child to stop: a break event sent to its group.
+STOP_SIGNALS = [signal.CTRL_BREAK_EVENT] if os.name == "nt" else [signal.SIGINT, signal.SIGTERM]
+
+
+@pytest.mark.parametrize("signum", STOP_SIGNALS)
 def test_early_password_cancellation(pdf, tmp_path, signum):
     temp = tmp_path / "private"
     temp.mkdir()
@@ -309,6 +318,7 @@ def test_early_password_cancellation(pdf, tmp_path, signum):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        **runtime.GROUP_FLAGS,
     )
     try:
         deadline = time.monotonic() + 5

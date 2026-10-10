@@ -151,7 +151,7 @@ def recover_page(
                     diagnostics.mkdir(parents=True, exist_ok=True)
                     (
                         diagnostics / f"page-{page_number:06d}-band-{band:04d}-rotation-{angle}.tsv"
-                    ).write_text(raw, encoding="utf-8")
+                    ).write_text(raw, encoding="utf-8", newline="\n")
                 return tsv_text_and_score(raw)
             except JobError as exc:
                 raise JobError(

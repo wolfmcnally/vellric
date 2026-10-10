@@ -70,7 +70,7 @@ def image_job(config: dict) -> dict:
         (root / "document.md").write_bytes(b"")
         files = [
             {
-                "path": str(p.relative_to(root)),
+                "path": p.relative_to(root).as_posix(),
                 "size": p.stat().st_size,
                 "sha256": digest(p),
                 "media_type": "image/png" if p.suffix == ".png" else "text/plain",

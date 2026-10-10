@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 
@@ -401,8 +402,12 @@ def test_stdin_snapshot_and_progress(simple, tmp_path):
 
 def test_symlink_and_non_pdf_refused(simple, tmp_path):
     linked = tmp_path / "link.pdf"
-    linked.symlink_to(simple)
-    assert job(linked, tmp_path / "symlink-out", "inspect")[1]["code"] == "pdf-open-operational"
+    try:
+        linked.symlink_to(simple)
+    except OSError:  # Windows lets only some accounts make links.
+        assert os.name == "nt"
+    else:
+        assert job(linked, tmp_path / "symlink-out", "inspect")[1]["code"] == "pdf-open-operational"
     image = tmp_path / "image.png"
     with pymupdf.open(simple) as document:
         document[0].get_pixmap().save(image)
@@ -435,7 +440,9 @@ def test_cancellation_reaps_worker_grandchild(simple, tmp_path, monkeypatch):
         if command[0] == "/bin/ps":
             return original(command, **kwargs)
         script = (
-            "import os,time;from pathlib import Path;p=os.fork();"
+            "import os,subprocess,sys,time;from pathlib import Path;"
+            "p=subprocess.Popen([sys.executable,'-c','import time;time.sleep(20)']).pid "
+            "if os.name=='nt' else os.fork();"
             f"Path({str(marker)!r}).write_text(str(p)) if p else None;time.sleep(20)"
         )
         return original([sys.executable, "-c", script], **kwargs)
@@ -450,6 +457,14 @@ def test_cancellation_reaps_worker_grandchild(simple, tmp_path, monkeypatch):
         cli.run_job(options)
     assert error.value.code == "deadline" and not (tmp_path / "out").exists()
     child = int(marker.read_text())
+    if os.name == "nt":
+        listed = subprocess.run(
+            ["tasklist", "/FI", f"PID eq {child}", "/FO", "CSV", "/NH"],
+            capture_output=True,
+            text=True,
+        )
+        assert listed.returncode == 0 and f'"{child}"' not in listed.stdout
+        return
     result = subprocess.run(
         ["/bin/ps", "-o", "stat=", "-p", str(child)], capture_output=True, text=True
     )

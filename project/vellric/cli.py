@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import ctypes
 import hashlib
 import importlib.metadata
 import importlib.util
@@ -26,13 +25,17 @@ from pathlib import Path
 from . import __version__, vision
 from .runtime import (
     BEHAVIOR,
+    GROUP_FLAGS,
     SCHEMA,
     STATUS_SCHEMA,
+    WINDOWS,
     JobError,
+    contain,
     digest,
     environment,
     group_rss,
     kill_group,
+    publication_available,
     publish,
     tree_size,
     validate_bundle,
@@ -159,10 +162,7 @@ def parser() -> argparse.ArgumentParser:
 def doctor(
     *, language: str = "eng", tessdata_dir: str | None = None, include_osd: bool = True
 ) -> dict:
-    libc = ctypes.CDLL(None)
-    publication = (sys.platform == "darwin" and hasattr(libc, "renameatx_np")) or (
-        sys.platform.startswith("linux") and hasattr(libc, "renameat2")
-    )
+    publication = publication_available()
     data = {
         "tool": {"name": "vellric", "version": __version__},
         "schema": SCHEMA,
@@ -171,9 +171,12 @@ def doctor(
         "license": "AGPL-3.0-only",
         "enforcement": {
             "memory": "process-group RSS watchdog; can overshoot",
-            "rss_available": Path("/proc").is_dir()
-            if sys.platform.startswith("linux")
-            else Path("/bin/ps").is_file(),
+            "rss_available": WINDOWS
+            or (
+                Path("/proc").is_dir()
+                if sys.platform.startswith("linux")
+                else Path("/bin/ps").is_file()
+            ),
             "disk": "private-workspace watchdog; can overshoot",
             "raster": "pre-render byte admission",
             "publication": "exclusive atomic rename available"
@@ -205,7 +208,9 @@ def doctor(
 
     tessdata = None
     for tool in ("tesseract", "ocrmypdf", "gs"):
-        executable = shutil.which(tool, path=environment(Path("/tmp"))["PATH"])
+        # Ghostscript's console program has its own name on Windows.
+        name = "gswin64c" if WINDOWS and tool == "gs" else tool
+        executable = shutil.which(name, path=environment(Path(tempfile.gettempdir()))["PATH"])
         entry = {"available": False}
         if executable:
             with tempfile.TemporaryDirectory(prefix="vellric-doctor-") as temp:
@@ -468,6 +473,47 @@ def vision_settings(options: dict) -> dict | None:
     return settings
 
 
+def read_within(descriptor: int, size: int, remaining: float) -> bytes | None:
+    """One read of a stream that may never deliver; None once ``remaining`` seconds pass."""
+    if not WINDOWS:
+        if remaining <= 0 or not select.select([descriptor], [], [], remaining)[0]:
+            return None
+        return os.read(descriptor, size)
+    # Windows cannot wait on a pipe or a console, so the read waits on a thread of its own.
+    box = []
+
+    def read():
+        try:
+            box.append(os.read(descriptor, size))
+        except OSError:
+            box.append(b"")
+
+    reader = threading.Thread(target=read, daemon=True)
+    reader.start()
+    deadline = time.monotonic() + remaining
+    while reader.is_alive() and time.monotonic() < deadline:
+        reader.join(0.05)  # Short waits let a cancellation signal be handled between them.
+    return box[0] if box else None
+
+
+def open_input(name: str):
+    """The named regular file itself, never what a link stands for."""
+    if not WINDOWS:
+        fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    else:
+        named = os.lstat(name)
+        if not stat.S_ISREG(named.st_mode) or Path(name).is_junction():
+            raise OSError("not regular")
+        fd = os.open(name, os.O_RDONLY | os.O_BINARY)
+        if not os.path.samestat(named, os.fstat(fd)):  # The name was swapped for a link.
+            os.close(fd)
+            raise OSError("not regular")
+    if not stat.S_ISREG(os.fstat(fd).st_mode):
+        os.close(fd)
+        raise OSError("not regular")
+    return os.fdopen(fd, "rb")
+
+
 def snapshot(options: dict, work: Path) -> tuple[Path, str, int]:
     source = work / "source.pdf"
     hashed = hashlib.sha256()
@@ -477,11 +523,7 @@ def snapshot(options: dict, work: Path) -> tuple[Path, str, int]:
         close = False
     else:
         try:
-            fd = os.open(options["input"], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
-            if not stat.S_ISREG(os.fstat(fd).st_mode):
-                os.close(fd)
-                raise OSError("not regular")
-            stream = os.fdopen(fd, "rb")
+            stream = open_input(options["input"])
             close = True
         except OSError as exc:
             raise JobError(
@@ -495,10 +537,9 @@ def snapshot(options: dict, work: Path) -> tuple[Path, str, int]:
             if remaining <= 0:
                 raise JobError("deadline", "Input snapshot deadline exceeded", stage="snapshot")
             if options["input"] == "-":
-                ready, _, _ = select.select([stream], [], [], remaining)
-                if not ready:
+                block = read_within(stream.fileno(), 1024 * 1024, remaining)
+                if block is None:
                     raise JobError("deadline", "Input stream deadline exceeded", stage="snapshot")
-                block = os.read(stream.fileno(), 1024 * 1024)
             else:
                 block = stream.read(1024 * 1024)
             if not block:
@@ -531,7 +572,8 @@ def run_job(options: dict) -> dict:
         raise JobError("deadline", "Job cancelled", stage="supervision", details={"signal": signum})
 
     try:
-        for sig in (signal.SIGINT, signal.SIGTERM):
+        # Windows delivers a parent's request to stop as a break event.
+        for sig in (signal.SIGINT, signal.SIGTERM, *([signal.SIGBREAK] if WINDOWS else [])):
             previous[sig] = signal.signal(sig, cancelled)
         return _run_job(options)
     finally:
@@ -541,6 +583,11 @@ def run_job(options: dict) -> dict:
 
 def _run_job(options: dict) -> dict:
     validate_options(options)
+    if WINDOWS and sys.version_info < (3, 12, 4):
+        # Earlier releases create the private workspace readable by other accounts.
+        raise JobError(
+            "dependency-unavailable", "Windows requires Python 3.12.4 or later", stage="settings"
+        )
     job_started = time.monotonic()
     requested = Path(options["out"]).absolute()
     parent = requested.parent.resolve(strict=True)
@@ -562,9 +609,9 @@ def _run_job(options: dict) -> dict:
             raw = bytearray()
             while not raw.endswith(b"\n"):
                 remaining = options["timeout_seconds"] - (time.monotonic() - job_started)
-                if remaining <= 0 or not select.select([sys.stdin.buffer], [], [], remaining)[0]:
+                chunk = read_within(sys.stdin.fileno(), 1, remaining)
+                if chunk is None:
                     raise JobError("deadline", "Password input deadline exceeded", stage="snapshot")
-                chunk = os.read(sys.stdin.fileno(), 1)
                 if not chunk:
                     break
                 raw.extend(chunk)
@@ -574,6 +621,7 @@ def _run_job(options: dict) -> dict:
         source, identity, size = snapshot(options, work)
         staging = None
         process = None
+        group = None
         try:
             staging = Path(tempfile.mkdtemp(prefix=f".{target.name}.vellric-", dir=parent))
             os.chmod(staging, 0o700)
@@ -616,8 +664,9 @@ def _run_job(options: dict) -> dict:
                     stdout=log,
                     stderr=log,
                     env=environment(work, options.get("tessdata_dir")),
-                    start_new_session=True,
+                    **GROUP_FLAGS,
                 )
+                group = contain(process)
                 if config["vision"]:
                     # The key travels on a pipe so that no crash can leave it on disk.
                     def feed(stream, payload):
@@ -643,7 +692,7 @@ def _run_job(options: dict) -> dict:
                     path = work / "progress.jsonl"
                     if options["progress"] == "none" or not path.exists():
                         return
-                    with path.open() as stream:
+                    with path.open(encoding="utf-8") as stream:
                         stream.seek(progress_offset)
                         while True:
                             position = stream.tell()
@@ -667,7 +716,7 @@ def _run_job(options: dict) -> dict:
                 while process.poll() is None:
                     if time.monotonic() - started > options["timeout_seconds"]:
                         raise JobError("deadline", "Job deadline exceeded", stage="supervision")
-                    peak_rss = max(peak_rss, group_rss(process.pid))
+                    peak_rss = max(peak_rss, group_rss(group))
                     if time.monotonic() >= next_disk_sample:
                         staging_bytes, work_bytes = tree_size(staging), tree_size(work)
                         peak_private_bytes = max(peak_private_bytes, staging_bytes + work_bytes)
@@ -697,7 +746,7 @@ def _run_job(options: dict) -> dict:
                     details={"worker_returncode": process.returncode},
                 )
             try:
-                result = json.loads(result_path.read_text())
+                result = json.loads(result_path.read_text(encoding="utf-8"))
                 if not isinstance(result, dict) or set(result) != {"status", "exit_code"}:
                     raise ValueError
                 status, code = result["status"], result["exit_code"]
@@ -748,7 +797,7 @@ def _run_job(options: dict) -> dict:
                 ) from exc
             if code:
                 raise failure
-            manifest = json.loads((staging / "manifest.json").read_text())
+            manifest = json.loads((staging / "manifest.json").read_text(encoding="utf-8"))
             if manifest.get("page_count") != status["page_count"]:
                 raise JobError("artifact-invalid", "Worker page count differs from manifest")
             if manifest.get("source") != {"sha256": identity, "size": size}:
@@ -773,7 +822,10 @@ def _run_job(options: dict) -> dict:
             }
         finally:
             if process is not None:
-                kill_group(process.pid)
+                if group is None:
+                    process.kill()  # Stopped between starting the worker and holding its group.
+                else:
+                    kill_group(group)
                 process.wait()
             if staging is not None and staging.exists():
                 shutil.rmtree(staging)
@@ -782,6 +834,11 @@ def _run_job(options: dict) -> dict:
 def main(argv: Sequence[str] | None = None) -> int:
     args = list(argv) if argv is not None else sys.argv[1:]
     want_json = "--status-json" in args
+    if WINDOWS:
+        # A redirected stream would otherwise take the legacy code page and refuse other text.
+        for stream in (sys.stdout, sys.stderr):
+            if hasattr(stream, "reconfigure"):
+                stream.reconfigure(encoding="utf-8", errors="backslashreplace")
     try:
         p = parser()
         parsed = p.parse_args(args)

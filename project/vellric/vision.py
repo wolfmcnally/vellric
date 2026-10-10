@@ -23,7 +23,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from .runtime import JobError, run_tool
+from .runtime import JobError, remove, run_tool
 
 PROVIDERS = ("anthropic", "openai", "bedrock", "command")
 DEFAULT_BASE_URL = {"anthropic": "https://api.anthropic.com", "openai": "https://api.openai.com/v1"}
@@ -395,7 +395,11 @@ def _command(
 ) -> tuple[str, dict]:
     prompt = temp / f"vision-prompt-{page:06d}.txt"
     # A program takes one instruction text: what the tool is doing, then the page instructions.
-    prompt.write_text(system_message(settings["declarations"]) + "\n\n" + PROMPT, encoding="utf-8")
+    prompt.write_text(
+        system_message(settings["declarations"]) + "\n\n" + PROMPT,
+        encoding="utf-8",
+        newline="\n",
+    )
     env = dict(settings.get("env") or {})
     env["VELLRIC_VISION_PAGE"] = str(page)
     if settings.get("model"):
@@ -414,8 +418,9 @@ def _command(
     except UnicodeDecodeError as exc:
         raise _failure("The vision command returned text that is not UTF-8", page) from exc
     finally:
-        prompt.unlink(missing_ok=True)
-    return text, {}
+        remove(prompt)
+    # A program on Windows ends its lines the Windows way; the model view has one line ending.
+    return text.replace("\r\n", "\n"), {}
 
 
 def transcribe(

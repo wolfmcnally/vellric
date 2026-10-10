@@ -20,7 +20,17 @@ from . import __version__, native, pdf_tools, vision
 from .errors import ConverterUnavailable, OcrOperationalError
 from .fidelity import native_section
 from .orientation import MAX_RENDER_SIDE, recover_page
-from .runtime import BEHAVIOR, SCHEMA, JobError, digest, run_tool, validate_bundle, write_json
+from .runtime import (
+    BEHAVIOR,
+    SCHEMA,
+    WINDOWS,
+    JobError,
+    digest,
+    remove,
+    run_tool,
+    validate_bundle,
+    write_json,
+)
 
 
 def reader(title: str, texts: list[str]) -> str:
@@ -171,6 +181,11 @@ def render_one(source: Path, number: int, target: Path, options: dict, clip=None
         return result
 
 
+# The first line of ``tesseract --version`` for the release measured on each system. The project
+# publishes no Windows build of the release measured on macOS and Linux.
+QUALIFIED_TESSERACT = "tesseract v5.5.3.20260724" if WINDOWS else "tesseract 5.5.2"
+
+
 def preflight(
     source: Path, selected: list[int], count: int, options: dict, work: Path, out: Path
 ) -> None:
@@ -248,7 +263,7 @@ def execute(config: dict) -> dict:
     work = Path(config["work"])
 
     def progress(stage, done, total, page=None):
-        with (work / "progress.jsonl").open("a", encoding="utf-8") as f:
+        with (work / "progress.jsonl").open("a", encoding="utf-8", newline="\n") as f:
             f.write(
                 json.dumps(
                     {
@@ -349,10 +364,10 @@ def execute(config: dict) -> dict:
                 raise JobError(
                     "dependency-unavailable", "tesseract unavailable", stage="recognition"
                 )
-            if engine_facts["engines"]["tesseract"].get("version") != "tesseract 5.5.2":
+            if engine_facts["engines"]["tesseract"].get("version") != QUALIFIED_TESSERACT:
                 raise JobError(
                     "dependency-unavailable",
-                    "Unqualified Tesseract version; required 5.5.2",
+                    f"Unqualified Tesseract version; required {QUALIFIED_TESSERACT.split()[1]}",
                     stage="recognition",
                 )
             if options["preflight"] == "on" and not engine_facts["engines"]["ocrmypdf"].get(
@@ -564,7 +579,7 @@ def execute(config: dict) -> dict:
                             else None,
                         }
                 finally:
-                    image.unlink(missing_ok=True)
+                    remove(image)
                 if reference is None:
                     # Nothing else has read this page, so there is no reading to fall back on.
                     raise failure
@@ -646,8 +661,8 @@ def execute(config: dict) -> dict:
                 "structure_requested": want_structure,
                 "warnings": list(layouts[number].warnings) if number in layouts else [],
                 "files": {
-                    "native": str((folder / "native.txt").relative_to(root)),
-                    "text": str((folder / "text.txt").relative_to(root)),
+                    "native": (folder / "native.txt").relative_to(root).as_posix(),
+                    "text": (folder / "text.txt").relative_to(root).as_posix(),
                 },
             }
             rec = next((r for r in recovered if r.page == number), None)
@@ -665,11 +680,11 @@ def execute(config: dict) -> dict:
                 view = views[number]
                 (folder / "vision.md").write_bytes(view["markdown"].encode("utf-8"))
                 record["vision"] = view["record"]
-                record["files"]["vision"] = str((folder / "vision.md").relative_to(root))
+                record["files"]["vision"] = (folder / "vision.md").relative_to(root).as_posix()
                 if view["check"] is not None:
                     (folder / "vision-check.json").write_bytes(view["check"])
-                    record["files"]["vision_check"] = str(
-                        (folder / "vision-check.json").relative_to(root)
+                    record["files"]["vision_check"] = (
+                        (folder / "vision-check.json").relative_to(root).as_posix()
                     )
             elif number in rejected:
                 record["vision"] = rejected[number]
@@ -683,7 +698,7 @@ def execute(config: dict) -> dict:
                     else (texts[number - 1], None)
                 )
                 structured.append(formatted)
-                (folder / "structured.md").write_text(formatted, encoding="utf-8")
+                (folder / "structured.md").write_text(formatted, encoding="utf-8", newline="\n")
                 record["formatting"] = {
                     "outcome": "fallback"
                     if reason
@@ -692,7 +707,9 @@ def execute(config: dict) -> dict:
                     else "ineligible",
                     "reason": reason,
                 }
-                record["files"]["structured"] = str((folder / "structured.md").relative_to(root))
+                record["files"]["structured"] = (
+                    (folder / "structured.md").relative_to(root).as_posix()
+                )
             if options["layout"]:
                 layout = geometry["layout"]
                 # Interpreted runs retain the proven half-point/name/flag inference.
@@ -706,7 +723,7 @@ def execute(config: dict) -> dict:
                             csv.writer(f).writerows(table.rows)
                         layout["tables"].append(asdict(table))
                 write_json(folder / "layout.json", layout)
-                record["files"]["layout"] = str((folder / "layout.json").relative_to(root))
+                record["files"]["layout"] = (folder / "layout.json").relative_to(root).as_posix()
             if number in render_pages:
                 rect = geometry["displayed_rect"]
                 clip = options.get("clip") or rect
@@ -733,7 +750,7 @@ def execute(config: dict) -> dict:
                         options | {"_effective_dpi": dpi},
                         (clip[0], top, clip[2], bottom),
                     )
-                    rendered["path"] = str(target.relative_to(root))
+                    rendered["path"] = target.relative_to(root).as_posix()
                     rendered["order"] = i
                     record["renders"].append(rendered)
             records.append(record)
@@ -746,9 +763,13 @@ def execute(config: dict) -> dict:
             else texts[n - 1]
             for n in range(1, count + 1)
         ]
-        (root / "document.md").write_text(reader(title, reading_view), encoding="utf-8")
+        (root / "document.md").write_text(
+            reader(title, reading_view), encoding="utf-8", newline="\n"
+        )
         if want_structure:
-            (root / "structured.md").write_text(reader(title, structured), encoding="utf-8")
+            (root / "structured.md").write_text(
+                reader(title, structured), encoding="utf-8", newline="\n"
+            )
         subset = None
         if options.get("subset_pdf"):
             with pdf_tools._open(source) as original, mu.open() as derivative:
@@ -792,7 +813,7 @@ def execute(config: dict) -> dict:
             if path.is_file():
                 files.append(
                     {
-                        "path": str(path.relative_to(root)),
+                        "path": path.relative_to(root).as_posix(),
                         "size": path.stat().st_size,
                         "sha256": digest(path),
                         "media_type": mimetypes.guess_type(path)[0] or "application/octet-stream",
@@ -929,7 +950,7 @@ def execute(config: dict) -> dict:
 
 
 def main() -> int:
-    config = json.loads(Path(sys.argv[1]).read_text())
+    config = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
     if config.get("vision"):
         # Provider settings and their secret arrive on a pipe and never touch the disk.
         config["vision"] = json.loads(sys.stdin.buffer.read())

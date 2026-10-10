@@ -1,0 +1,95 @@
+name: Windows
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  tests:
+    name: Tests without OCR engines, Python ${{ matrix.python }}
+    runs-on: windows-2025
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
+        with:
+          version: "0.9.26"
+      - name: Provision the locked project
+        run: uv sync --locked --project project --python ${{ matrix.python }}
+      - name: Run the project tests
+        working-directory: project
+        # The tests read and write UTF-8; the tool they start runs in the system's own mode.
+        run: uv run --no-sync python -X utf8 -m pytest -q
+  bundle:
+    name: Bundle, OCR engines and fixture conversion
+    runs-on: windows-2025
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
+        with:
+          version: "0.9.26"
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.13"
+      - name: Build the bundle
+        run: python project/packaging/windows_bundle.py --out dist
+      - name: Install the bundle with no package index
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          Expand-Archive (Get-Item dist\*.zip).FullName -DestinationPath bundle
+          Get-Content bundle\INSTALL.txt
+          python -m venv "$env:RUNNER_TEMP\vellric"
+          & "$env:RUNNER_TEMP\vellric\Scripts\python.exe" -m pip install --no-index --find-links bundle\wheels "vellric[ocr]"
+          "VELLRIC=$env:RUNNER_TEMP\vellric\Scripts\vellric.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Run the installed tool with no OCR engines
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          & $env:VELLRIC doctor
+          & $env:VELLRIC inspect project\tests\fixtures\Fake_Doc_watermarked.pdf --out "$env:RUNNER_TEMP\inspected" --status-json
+          & $env:VELLRIC render project\tests\fixtures\Fake_Doc_watermarked.pdf --out "$env:RUNNER_TEMP\rendered" --status-json
+      - name: Install the OCR engines
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          $installers = @(
+            @{
+              url = 'https://github.com/tesseract-ocr/tesseract/releases/download/5.5.3/tesseract-ocr-w64-setup-5.5.3.20260724.exe'
+              sha256 = 'bee9e3434bd94fd65387d9be28cd467a41f61b1275383b55b0f59a1331270ae4'
+            },
+            @{
+              url = 'https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs10071/gs10071w64.exe'
+              sha256 = '3a4c28d0aac47aa7cccd35a5932c55110376e9dbd966898dde388b7faba444a4'
+            }
+          )
+          foreach ($installer in $installers) {
+            $file = Join-Path $env:RUNNER_TEMP (Split-Path $installer.url -Leaf)
+            Invoke-WebRequest $installer.url -OutFile $file
+            if ((Get-FileHash $file -Algorithm SHA256).Hash -ne $installer.sha256) { throw "Digest mismatch: $file" }
+            $run = Start-Process $file -ArgumentList '/S' -Wait -PassThru
+            if ($run.ExitCode -ne 0) { throw "Installer failed: $file" }
+          }
+          "C:\Program Files\Tesseract-OCR" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Run the project tests with the engines present
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          uv sync --locked --project project --extra ocr --python 3.13
+          Set-Location project
+          uv run --no-sync python -X utf8 -m pytest -q
+      - name: Convert the fixtures with the installed tool
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          New-Item -ItemType Directory measured | Out-Null
+          & $env:VELLRIC doctor --json | Out-File measured\doctor.json -Encoding utf8
+          foreach ($name in 'Fake_Doc_watermarked', 'Fake_Math_Doc_watermarked') {
+            & $env:VELLRIC convert "project\tests\fixtures\$name.pdf" --out "measured\$name" --ocr auto --status-json
+          }
+      - name: Keep the bundle and the measured results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-bundle
+          path: |
+            dist
+            measured
