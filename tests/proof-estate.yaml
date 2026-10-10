@@ -1101,6 +1101,16 @@ families:
   - amend-drops-carried-model-text
   - amend-accepts-result-of-different-input
   - credentials-in-base-url-accepted
+  - bedrock-model-check-skipped
+  - bedrock-filtered-reply-not-classified
+  - undeclared-statement-sent-to-model
+  - low-agreement-transcription-kept
+  - failed-page-discards-run-despite-independent-reading
+  - amend-drops-rejected-page-record
+  - mostly-mathematics-transcription-rejected
+  - page-overrun-discards-run
+  - program-not-told-what-the-tool-is-doing
+  - failed-first-model-fails-job-despite-fallback
   replacement_lineage: []
   tier: vital
   size: medium

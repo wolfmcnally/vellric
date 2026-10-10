@@ -110,7 +110,23 @@ def parser() -> argparse.ArgumentParser:
                 help="opt in to a high-quality pass by a vision-capable model",
             )
             c.add_argument("--vision-model", help="model name as the provider knows it")
-            c.add_argument("--vision-base-url", help="endpoint for the anthropic/openai provider")
+            c.add_argument("--vision-base-url", help="endpoint for a hosted provider")
+            c.add_argument("--vision-region", help="AWS region for --vision-provider bedrock")
+            c.add_argument(
+                "--vision-fallback-model", help="second model tried on a page the first fails"
+            )
+            c.add_argument("--vision-min-agreement", type=float)
+            c.add_argument(
+                "--own-work", action="store_true", help="tell the model the document is your own"
+            )
+            c.add_argument(
+                "--under-license",
+                action="store_true",
+                help="tell the model you hold a license to copy the document",
+            )
+            c.add_argument(
+                "--fair-use", action="store_true", help="tell the model your use is fair use"
+            )
             c.add_argument(
                 "--vision-api-key-env", help="name of the environment variable holding the key"
             )
@@ -319,6 +335,9 @@ def validate_vision(options: dict) -> None:
             for key in (
                 "vision_model",
                 "vision_base_url",
+                "vision_region",
+                "vision_fallback_model",
+                "vision_min_agreement",
                 "vision_api_key_env",
                 "vision_command",
                 "vision_pages",
@@ -326,7 +345,7 @@ def validate_vision(options: dict) -> None:
                 "amend",
             )
             if options.get(key) is not None
-        ]
+        ] + [key for key in vision.DECLARATIONS if options.get(key)]
         if named:
             raise JobError(
                 "usage",
@@ -343,6 +362,20 @@ def validate_vision(options: dict) -> None:
     tokens = options["vision_max_output_tokens"]
     if tokens is not None and not 1 <= tokens <= 1_000_000:
         raise refuse("vision-max-output-tokens must be positive")
+    if options["vision_min_agreement"] is None:
+        options["vision_min_agreement"] = vision.DEFAULT_MIN_AGREEMENT
+    if not 0.0 <= options["vision_min_agreement"] <= 1.0:
+        raise refuse("vision-min-agreement must be 0..1")
+    fallback = options["vision_fallback_model"]
+    if fallback is not None and (not fallback or fallback == options["vision_model"]):
+        raise refuse("vision-fallback-model must name a different model")
+    region = options["vision_region"]
+    if region is not None and provider != "bedrock":
+        raise refuse("vision-region requires the bedrock provider")
+    if provider == "bedrock" and (region is None) == (options["vision_base_url"] is None):
+        raise refuse("The bedrock provider requires --vision-region or --vision-base-url, not both")
+    if region is not None and not re.fullmatch("[a-z]{2,5}(-[a-z]+)+-[0-9]+", region):
+        raise refuse("vision-region must be an AWS region name")
     if options["searchable_pdf"] and options["vision_cross_check"] == "off":
         # Skipping Tesseract for vision pages would leave them out of the searchable derivative.
         raise refuse("Searchable PDF requires --vision-cross-check on")
@@ -361,7 +394,10 @@ def validate_vision(options: dict) -> None:
             raise refuse("vision-command requires the command provider")
         if not options["vision_model"]:
             raise refuse("This vision provider requires --vision-model")
-        url = options["vision_base_url"] or vision.DEFAULT_BASE_URL[provider]
+        default_url = (
+            vision.bedrock_url(region) if region else vision.DEFAULT_BASE_URL.get(provider)
+        )
+        url = options["vision_base_url"] or default_url
         try:
             parts = urllib.parse.urlsplit(url)
             valid = (
@@ -380,10 +416,10 @@ def validate_vision(options: dict) -> None:
             raise refuse("Invalid API key variable name")
         # A key goes only where the user sent it: the provider's own endpoint takes the
         # provider's usual variable, and any other endpoint takes a key only when one is named.
-        if name is None and url == vision.DEFAULT_BASE_URL[provider]:
+        if name is None and url == default_url:
             name = options["vision_api_key_env"] = vision.DEFAULT_KEY_ENV[provider]
-        if name is None and provider == "anthropic":
-            raise refuse("A custom Anthropic endpoint requires --vision-api-key-env")
+        if name is None and provider != "openai":
+            raise refuse(f"A custom {provider.capitalize()} endpoint requires --vision-api-key-env")
         if name is not None and not os.environ.get(name):
             raise refuse(f"Environment variable {name} holds no API key")
         if provider == "anthropic" and importlib.util.find_spec("anthropic") is None:
@@ -418,6 +454,8 @@ def vision_settings(options: dict) -> dict | None:
     settings = {
         "provider": provider,
         "model": options["vision_model"],
+        "fallback_model": options["vision_fallback_model"],
+        "declarations": [name for name in vision.DECLARATIONS if options[name]],
         "base_url": options["vision_base_url"],
         "max_output_tokens": options["vision_max_output_tokens"]
         or (vision.ANTHROPIC_MAX_OUTPUT_TOKENS if provider == "anthropic" else None),

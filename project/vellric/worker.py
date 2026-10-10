@@ -312,6 +312,15 @@ def execute(config: dict) -> dict:
             )
             if options["vision_cross_check"] == "off":
                 selected = [n for n in selected if n not in vision_pages]
+            readers = [reading] + (
+                [reading | {"model": reading["fallback_model"]}]
+                if reading["fallback_model"]
+                else []
+            )
+            prompt_identity = vision.prompt_sha256(reading["declarations"])
+            if vision_pages and reading["provider"] == "bedrock":
+                for candidate in readers:
+                    vision.probe(candidate, timeout=options["page_timeout_seconds"])
         derivative_kind = None
         engine_facts = {}
         if prior and isinstance(prior.get("engines"), dict):
@@ -433,7 +442,7 @@ def execute(config: dict) -> dict:
             return (prior_root / relative).read_bytes()
 
         # Pages an amend run does not redo keep the earlier run's reading and model view.
-        carried, views, kept_methods = {}, {}, {}
+        carried, views, kept_methods, rejected = {}, {}, {}, {}
         try:
             for record in prior["pages"] if prior else []:
                 number, redo = record["number"], record["number"] in vision_pages
@@ -455,6 +464,10 @@ def execute(config: dict) -> dict:
                         "record": record["vision"],
                         "check": carried_file(check) if check else None,
                     }
+                elif "vision" in record and not redo:
+                    if not isinstance(record["vision"], dict):
+                        raise TypeError
+                    rejected[number] = record["vision"]
         except (OSError, ValueError, KeyError, TypeError) as exc:
             raise JobError(
                 "artifact-invalid", "Earlier result has a malformed page record", stage="amend"
@@ -467,53 +480,74 @@ def execute(config: dict) -> dict:
             vision_cancel = threading.Event()
 
             def read(number):
+                """Ask each model in turn until one gives a transcription worth keeping."""
                 width, height = pdf_tools.page_size(source, number)
                 dpi = min(
                     float(options["dpi"]),
                     options["vision_max_side"] * 72 / max(width, height, 1.0),
                 )
+                native_text = inspection.page_texts[number - 1]
+                reference = (
+                    (texts[number - 1], "ocr")
+                    if number in ocr_read
+                    else (native_text, "native")
+                    if native_text.strip()
+                    else None
+                )
                 image = work / f"vision-{number:06d}.png"
+                attempts, failure = [], None
                 try:
                     pdf_tools.render_page_png(source, number, image, dpi=dpi)
-                    markdown, facts = vision.transcribe(
-                        image,
-                        number,
-                        reading,
-                        timeout=options["page_timeout_seconds"],
-                        temp=work,
-                        cancel_event=vision_cancel,
-                    )
-                finally:
-                    image.unlink(missing_ok=True)
-                return number, markdown, facts | {"effective_dpi": dpi}
-
-            with ThreadPoolExecutor(max_workers=options["jobs"]) as pool:
-                futures = [pool.submit(read, number) for number in vision_pages]
-                try:
-                    for done, future in enumerate(as_completed(futures), 1):
-                        number, markdown, facts = future.result()
-                        native_text = inspection.page_texts[number - 1]
-                        reference = (
-                            (texts[number - 1], "ocr")
-                            if number in ocr_read
-                            else (native_text, "native")
-                            if native_text.strip()
-                            else None
-                        )
+                    for reader_settings in readers:
+                        attempt = {"model": reader_settings["model"]}
+                        try:
+                            markdown, facts = vision.transcribe(
+                                image,
+                                number,
+                                reader_settings,
+                                timeout=options["page_timeout_seconds"],
+                                temp=work,
+                                cancel_event=vision_cancel,
+                            )
+                        except JobError as exc:
+                            # A page's own time limit is one more way a model fails the page;
+                            # the same code after cancellation means the job is ending.
+                            overran = exc.code == "deadline" and not vision_cancel.is_set()
+                            if exc.code not in ("vision-operational", "vision-refused") and (
+                                not overran
+                            ):
+                                raise
+                            failure = exc
+                            attempts.append(attempt | {"outcome": exc.code})
+                            continue
                         summary, spans = (
                             vision.cross_check(reference[0], markdown, reference[1])
                             if reference
                             else (None, None)
                         )
-                        views[number] = {
+                        if summary and vision.below_floor(
+                            summary, markdown, options["vision_min_agreement"]
+                        ):
+                            attempts.append(
+                                attempt
+                                | {"outcome": "low-agreement"}
+                                | {
+                                    key: summary[key]
+                                    for key in ("agreement", "vision_words", "reference_words")
+                                }
+                            )
+                            continue
+                        return number, {
                             "markdown": markdown,
                             "record": {
                                 "provider": reading["provider"],
-                                "model": reading["model"],
-                                "prompt_sha256": vision.PROMPT_SHA256,
+                                "model": reader_settings["model"],
+                                "prompt_sha256": prompt_identity,
                                 **facts,
+                                "effective_dpi": dpi,
                                 "cross_check": summary,
-                            },
+                            }
+                            | ({"attempts": attempts} if attempts else {}),
                             "check": (
                                 json.dumps(
                                     {
@@ -529,6 +563,24 @@ def execute(config: dict) -> dict:
                             if reference
                             else None,
                         }
+                finally:
+                    image.unlink(missing_ok=True)
+                if reference is None:
+                    # Nothing else has read this page, so there is no reading to fall back on.
+                    raise failure
+                return number, {
+                    "provider": reading["provider"],
+                    "prompt_sha256": prompt_identity,
+                    "rejected": True,
+                    "attempts": attempts,
+                }
+
+            with ThreadPoolExecutor(max_workers=options["jobs"]) as pool:
+                futures = [pool.submit(read, number) for number in vision_pages]
+                try:
+                    for done, future in enumerate(as_completed(futures), 1):
+                        number, outcome = future.result()
+                        (rejected if outcome.get("rejected") else views)[number] = outcome
                         progress("vision", done, len(vision_pages), number)
                 except BaseException:
                     vision_cancel.set()
@@ -619,6 +671,11 @@ def execute(config: dict) -> dict:
                     record["files"]["vision_check"] = str(
                         (folder / "vision-check.json").relative_to(root)
                     )
+            elif number in rejected:
+                record["vision"] = rejected[number]
+                record["warnings"].append(
+                    "No model transcription was accepted; this page shows the independent reading"
+                )
             if want_structure:
                 formatted, reason = (
                     native_section(texts[number - 1], proposals[number])
@@ -711,8 +768,11 @@ def execute(config: dict) -> dict:
             fingerprint_extra["vision"] = {
                 "provider": reading["provider"],
                 "model": reading["model"],
+                "fallback_model": reading["fallback_model"],
+                "declarations": reading["declarations"],
+                "min_agreement": options["vision_min_agreement"],
                 "base_url": reading["base_url"],
-                "prompt_sha256": vision.PROMPT_SHA256,
+                "prompt_sha256": prompt_identity,
                 "max_side": options["vision_max_side"],
                 "max_output_tokens": reading["max_output_tokens"],
                 "cross_check": options["vision_cross_check"],
@@ -776,9 +836,16 @@ def execute(config: dict) -> dict:
             else "not-requested",
             "outstanding_candidates": outstanding,
             "derivative_kind": derivative_kind,
-            "warnings": ["Derivative signatures may be invalidated"]
-            if derivative_kind == "ocr-preflight"
-            else [],
+            "warnings": (
+                ["Derivative signatures may be invalidated"]
+                if derivative_kind == "ocr-preflight"
+                else []
+            )
+            + (
+                [f"No model transcription was accepted for pages {sorted(rejected)}"]
+                if rejected
+                else []
+            ),
             "provenance": {
                 "processing_fingerprint": hashlib.sha256(
                     json.dumps(
@@ -813,7 +880,10 @@ def execute(config: dict) -> dict:
             "pdf_subset": subset,
         }
         if reading:
-            manifest["vision"] = fingerprint_extra["vision"] | {"pages": vision_pages}
+            manifest["vision"] = fingerprint_extra["vision"] | {
+                "pages": vision_pages,
+                "rejected_pages": sorted(rejected),
+            }
         if prior:
             manifest["amended_from"] = {
                 "manifest_sha256": digest(prior_root / "manifest.json"),

@@ -19,18 +19,48 @@ import re
 import ssl
 import unicodedata
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
 from .runtime import JobError, run_tool
 
-PROVIDERS = ("anthropic", "openai", "command")
+PROVIDERS = ("anthropic", "openai", "bedrock", "command")
 DEFAULT_BASE_URL = {"anthropic": "https://api.anthropic.com", "openai": "https://api.openai.com/v1"}
-DEFAULT_KEY_ENV = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY"}
+DEFAULT_KEY_ENV = {
+    "anthropic": "ANTHROPIC_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "bedrock": "AWS_BEARER_TOKEN_BEDROCK",
+}
 DEFAULT_MAX_SIDE = 2576
 ANTHROPIC_MAX_OUTPUT_TOKENS = 16000
 RESPONSE_LIMIT = 16 * 1024 * 1024
 MAX_SPANS = 200
+DEFAULT_MIN_AGREEMENT = 0.7
+# An independent reading this short cannot show that a transcription is wrong, and neither can
+# this few prose words in a transcription that is mostly mathematics.
+MIN_REFERENCE_WORDS = 50
+MIN_JUDGED_WORDS = 20
+
+# What the tool is doing, which a model otherwise has to guess from a bare page image.
+SYSTEM = (
+    "You are the page-transcription stage of a local document-conversion (OCR) tool. The person "
+    "running the tool supplied this page image, and the transcription is written back to their "
+    "own machine as a text version of it. A summary or a partial transcription is a conversion "
+    "failure."
+)
+# Statements only the user can make about the document; each is sent only when they make it.
+DECLARATIONS = {
+    "own_work": "The person running the tool declares that this document is their own work.",
+    "under_license": (
+        "The person running the tool declares that they hold a license that permits them to "
+        "copy this document."
+    ),
+    "fair_use": (
+        "The person running the tool declares that their use of this document, including this "
+        "transcription, is fair use under copyright law."
+    ),
+}
 
 PROMPT = """Transcribe this scanned page into Markdown. Read only what is visibly on the page.
 
@@ -52,7 +82,22 @@ between lines containing only `$$`, with a printed equation number as `\\tag{...
 every subscript, superscript, accent and bracket exactly, including nested ones.
 - Reply with the transcription only: no preamble, no commentary and no code fence around it. \
 If the page has no text, reply with nothing."""
-PROMPT_SHA256 = hashlib.sha256(PROMPT.encode()).hexdigest()
+
+
+def system_message(declarations) -> str:
+    return " ".join(
+        [SYSTEM, *(text for name, text in DECLARATIONS.items() if name in declarations)]
+    )
+
+
+def prompt_sha256(declarations) -> str:
+    """Identity of everything a model is told: the system message and the page instructions."""
+    return hashlib.sha256((system_message(declarations) + "\n\n" + PROMPT).encode()).hexdigest()
+
+
+def bedrock_url(region: str) -> str:
+    return f"https://bedrock-runtime.{region}.amazonaws.com"
+
 
 _WORD = re.compile(r"[^\W_]+(?:['’-][^\W_]+)*")
 # Inline mathematics opens and closes against a non-space, so two prices on one line are
@@ -67,11 +112,13 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def _failure(message: str, page: int, **details) -> JobError:
+def _failure(message: str, page: int | None, **details) -> JobError:
     return JobError("vision-operational", message, stage="vision", page=page, details=details)
 
 
-def _anthropic(image: bytes, page: int, settings: dict, timeout: float) -> tuple[str, dict]:
+def _anthropic(
+    image: bytes, page: int, settings: dict, timeout: float, system: str
+) -> tuple[str, dict]:
     try:
         import anthropic
     except ImportError as exc:
@@ -92,6 +139,7 @@ def _anthropic(image: bytes, page: int, settings: dict, timeout: float) -> tuple
         response = client.messages.create(
             model=settings["model"],
             max_tokens=settings.get("max_output_tokens") or ANTHROPIC_MAX_OUTPUT_TOKENS,
+            system=system,
             messages=[
                 {
                     "role": "user",
@@ -121,6 +169,10 @@ def _anthropic(image: bytes, page: int, settings: dict, timeout: float) -> tuple
         raise _failure(
             "The vision provider could not be reached", page, error=type(exc).__name__
         ) from exc
+    except anthropic.AnthropicError as exc:
+        raise _failure(
+            "The vision provider returned a malformed response", page, error=type(exc).__name__
+        ) from exc
     if response.stop_reason == "refusal":
         category = getattr(response.stop_details, "category", None)
         raise JobError(
@@ -137,42 +189,23 @@ def _anthropic(image: bytes, page: int, settings: dict, timeout: float) -> tuple
             stop_reason=str(response.stop_reason)[:200],
             request_id=response._request_id,
         )
-    text = "".join(block.text for block in response.content if block.type == "text")
-    usage = {
-        "input_tokens": response.usage.input_tokens,
-        "output_tokens": response.usage.output_tokens,
-    }
+    try:
+        text = "".join(block.text for block in response.content if block.type == "text")
+        usage = {
+            "input_tokens": response.usage.input_tokens,
+            "output_tokens": response.usage.output_tokens,
+        }
+    except (AttributeError, TypeError) as exc:
+        raise _failure("The vision provider returned a malformed response", page) from exc
     return text, {"served_model": response.model, "usage": usage}
 
 
-def _openai(image: bytes, page: int, settings: dict, timeout: float) -> tuple[str, dict]:
-    body = {
-        "model": settings["model"],
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": PROMPT},
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": "data:image/png;base64,"
-                            + base64.standard_b64encode(image).decode("ascii")
-                        },
-                    },
-                ],
-            }
-        ],
-    }
-    if settings.get("max_output_tokens"):
-        body["max_tokens"] = settings["max_output_tokens"]
-    headers = {"Content-Type": "application/json"}
-    if settings.get("api_key"):
-        headers["Authorization"] = "Bearer " + settings["api_key"]
+def _post(url: str, body: dict, headers: dict, page: int | None, timeout: float) -> dict:
+    """POST JSON without following a redirect and return the decoded reply."""
     request = urllib.request.Request(
-        settings["base_url"].rstrip("/") + "/chat/completions",
+        url,
         data=json.dumps(body).encode(),
-        headers=headers,
+        headers={"Content-Type": "application/json", **headers},
         method="POST",
     )
     try:
@@ -186,9 +219,11 @@ def _openai(image: bytes, page: int, settings: dict, timeout: float) -> tuple[st
         with opener.open(request, timeout=timeout) as response:
             raw = response.read(RESPONSE_LIMIT + 1)
     except urllib.error.HTTPError as exc:
-        raise _failure(
-            "The vision provider refused the request", page, http_status=exc.code
-        ) from exc
+        details = {"http_status": exc.code}
+        kind = exc.headers.get("x-amzn-errortype") if exc.headers else None
+        if kind:
+            details["error"] = kind.split(":", 1)[0][:100]
+        raise _failure("The vision provider refused the request", page, **details) from exc
     except (
         urllib.error.URLError,
         http.client.HTTPException,
@@ -203,6 +238,50 @@ def _openai(image: bytes, page: int, settings: dict, timeout: float) -> tuple[st
         raise _failure("The vision provider response exceeds the size limit", page)
     try:
         data = json.loads(raw)
+        if not isinstance(data, dict):
+            raise TypeError
+    except (ValueError, TypeError) as exc:
+        raise _failure("The vision provider returned a malformed response", page) from exc
+    return data
+
+
+def _refused(page: int) -> JobError:
+    return JobError(
+        "vision-refused", "The model declined to transcribe this page", stage="vision", page=page
+    )
+
+
+def _openai(
+    image: bytes, page: int, settings: dict, timeout: float, system: str
+) -> tuple[str, dict]:
+    body = {
+        "model": settings["model"],
+        "messages": [
+            {"role": "system", "content": system},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": PROMPT},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": "data:image/png;base64,"
+                            + base64.standard_b64encode(image).decode("ascii")
+                        },
+                    },
+                ],
+            },
+        ],
+    }
+    if settings.get("max_output_tokens"):
+        body["max_tokens"] = settings["max_output_tokens"]
+    headers = {}
+    if settings.get("api_key"):
+        headers["Authorization"] = "Bearer " + settings["api_key"]
+    data = _post(
+        settings["base_url"].rstrip("/") + "/chat/completions", body, headers, page, timeout
+    )
+    try:
         choice = data["choices"][0]
         finish = choice.get("finish_reason")
         content = choice["message"]["content"]
@@ -214,15 +293,10 @@ def _openai(image: bytes, page: int, settings: dict, timeout: float) -> tuple[st
             content = ""
         if not isinstance(content, str):
             raise TypeError
-    except (ValueError, KeyError, IndexError, TypeError, AttributeError) as exc:
+    except (KeyError, IndexError, TypeError, AttributeError) as exc:
         raise _failure("The vision provider returned a malformed response", page) from exc
     if finish == "content_filter":
-        raise JobError(
-            "vision-refused",
-            "The model declined to transcribe this page",
-            stage="vision",
-            page=page,
-        )
+        raise _refused(page)
     if finish not in (None, "stop"):
         raise _failure(
             "The model stopped before finishing the page", page, stop_reason=str(finish)[:200]
@@ -240,11 +314,88 @@ def _openai(image: bytes, page: int, settings: dict, timeout: float) -> tuple[st
     return content, facts
 
 
+def _converse(settings: dict, body: dict, page: int | None, timeout: float) -> dict:
+    """Bedrock's one request shape for every model family, authorised by a bearer token."""
+    if settings.get("max_output_tokens"):
+        body["inferenceConfig"] = {"maxTokens": settings["max_output_tokens"]}
+    return _post(
+        settings["base_url"].rstrip("/")
+        + "/model/"
+        + urllib.parse.quote(settings["model"], safe="")
+        + "/converse",
+        body,
+        {"Authorization": "Bearer " + settings["api_key"]},
+        page,
+        timeout,
+    )
+
+
+def _bedrock(
+    image: bytes, page: int, settings: dict, timeout: float, system: str
+) -> tuple[str, dict]:
+    picture = {"format": "png", "source": {"bytes": base64.standard_b64encode(image).decode()}}
+    body = {
+        "system": [{"text": system}],
+        "messages": [{"role": "user", "content": [{"image": picture}, {"text": PROMPT}]}],
+    }
+    data = _converse(settings, body, page, timeout)
+    try:
+        stop = data["stopReason"]
+        text = "".join(
+            block["text"]
+            for block in data["output"]["message"]["content"]
+            if isinstance(block.get("text"), str)
+        )
+    except (KeyError, TypeError, AttributeError) as exc:
+        raise _failure("The vision provider returned a malformed response", page) from exc
+    if stop in ("content_filtered", "guardrail_intervened"):
+        raise _refused(page)
+    if stop != "end_turn":
+        raise _failure(
+            "The model stopped before finishing the page", page, stop_reason=str(stop)[:200]
+        )
+    usage = data.get("usage")
+    facts = {}
+    if isinstance(usage, dict):
+        facts["usage"] = {
+            key: usage[key]
+            for key in ("inputTokens", "outputTokens")
+            if type(usage.get(key)) is int
+        }
+    return text, facts
+
+
+def probe(settings: dict, *, timeout: float) -> None:
+    """Refuse a Bedrock model the key cannot invoke before any page is read.
+
+    A model listing shows what a region offers, not what a key may call, so the check is one
+    small request to the model itself.
+    """
+    body = {"messages": [{"role": "user", "content": [{"text": "Reply with the word ready."}]}]}
+    try:
+        _converse(settings | {"max_output_tokens": 64}, body, None, timeout)
+    except JobError as exc:
+        status = exc.details.get("http_status", 0)
+        # Only a client-side refusal says the key cannot use the model; anything else is an outage.
+        verdict = (
+            "is not available to this key"
+            if 400 <= status < 500 and status != 429
+            else "could not be checked"
+        )
+        raise JobError(
+            "vision-operational",
+            f"Model {settings['model']} {verdict}",
+            stage="vision",
+            details=exc.details,
+        ) from exc
+
+
 def _command(
     image_path: Path, page: int, settings: dict, timeout: float, temp: Path, cancel_event
 ) -> tuple[str, dict]:
     prompt = temp / f"vision-prompt-{page:06d}.txt"
-    prompt.write_text(PROMPT, encoding="utf-8")
+    # A program takes one instruction text: what the tool is doing, then the page instructions.
+    prompt.write_text(system_message(settings["declarations"]) + "\n\n" + PROMPT, encoding="utf-8")
     env = dict(settings.get("env") or {})
     env["VELLRIC_VISION_PAGE"] = str(page)
     if settings.get("model"):
@@ -276,10 +427,15 @@ def transcribe(
     try:
         if settings["provider"] == "command":
             text, facts = _command(image_path, page, settings, timeout, temp, cancel_event)
-        elif settings["provider"] == "anthropic":
-            text, facts = _anthropic(image_path.read_bytes(), page, settings, timeout)
         else:
-            text, facts = _openai(image_path.read_bytes(), page, settings, timeout)
+            hosted = {"anthropic": _anthropic, "openai": _openai, "bedrock": _bedrock}
+            text, facts = hosted[settings["provider"]](
+                image_path.read_bytes(),
+                page,
+                settings,
+                timeout,
+                system_message(settings["declarations"]),
+            )
     except JobError as exc:
         raise JobError(exc.code, str(exc), stage="vision", page=page, details=exc.details) from exc
     text = text.replace("\r\n", "\n").replace("\x00", "").strip()
@@ -331,6 +487,19 @@ def cross_check(reference: str, markdown: str, kind: str) -> tuple[dict, list[di
         "disagreements_listed": min(len(spans), MAX_SPANS),
     }
     return summary, spans[:MAX_SPANS]
+
+
+def below_floor(summary: dict, markdown: str, floor: float) -> bool:
+    """Whether a transcription disagrees with a substantial independent reading too much to keep.
+
+    A model that declines in its own words, or summarises, ends its turn normally; its reply
+    then shares few words with what another reader found on the page.
+    """
+    if summary["reference_words"] < MIN_REFERENCE_WORDS:
+        return False
+    if summary["vision_words"] < MIN_JUDGED_WORDS and _MATH.search(markdown):
+        return False
+    return (summary["agreement"] or 0.0) < floor
 
 
 def reader_section(markdown: str) -> str:

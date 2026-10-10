@@ -35,6 +35,12 @@ To read scans and mathematics with a vision-capable model, name a provider and a
 .venv/bin/vellric convert scan.pdf --amend scan-vision --vision-provider anthropic --vision-model MODEL --vision-pages 3,7 --out scan-vision-2 --status-json
 ```
 
+The same pass through Amazon Bedrock takes a Bedrock API key from `AWS_BEARER_TOKEN_BEDROCK`, a region and a model ID, and may name a second model for pages the first fails:
+
+```bash
+.venv/bin/vellric convert scan.pdf --vision-provider bedrock --vision-region us-east-2 --vision-model MODEL --vision-fallback-model OTHER --out scan-bedrock --status-json
+```
+
 Page images are sent to the provider. See the vision pass in [CLI](CLI.md) for local endpoints, an external program, the cross-check figures and limits.
 
 For an encrypted PDF, provide a password file or stdin through the documented options, never a command-line password value. Blocked status can include partial inspection facts; no incomplete bundle is published. See [CLI](CLI.md) and [troubleshooting](TROUBLESHOOTING.md).

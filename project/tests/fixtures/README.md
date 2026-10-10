@@ -37,4 +37,12 @@ As of 2026-10-07, a vision language model (Claude Opus 5.5) was given only cropp
 - Run through the shipped pipeline (`convert --vision-provider command` with a program that asks the same model), the second fixture converted in 48 seconds at `--jobs 4` with the same result, and Tesseract confirmed 96 to 99.6% of the model's prose words per page.
 - Where Tesseract and the model agreed on a word of the first fixture, the word was right; all of Tesseract's errors lay in the roughly 3% of words where they disagreed. Agreement is therefore a usable quality signal without a reference for prose. It says nothing about mathematics, which Tesseract cannot read.
 
+As of 2026-10-09, both fixtures were converted through `convert --vision-provider bedrock` with a Bedrock bearer key in `us-east-2`.
+
+- Claude Opus 5.5 (`global.anthropic.claude-opus-5-5`) on `Fake_Math_Doc_watermarked.pdf`: 99.9% of the words outside mathematics, all 250 symbols and 19 of 20 displayed formulas exact, the twentieth differing by an invisible sizing delimiter, in 39 seconds at `--jobs 4`. Each page cost about 5,300 input and 1,000 to 3,800 output tokens.
+- With no system message the same model declined pages 3 and 4 of `Fake_Doc_watermarked.pdf` in its own words and summarised them, three runs of three, while ending each reply normally. Agreement with Tesseract on those pages was 0.42 to 0.56, against 0.85 or more on every page read correctly. With the system message Vellric now sends, it transcribed both in six runs of six: 98.8% of the original's words and all 48 symbols.
+- Qwen3-VL 235B (`qwen.qwen3-vl-235b-a22b`) declined nothing in seven runs, 28 pages, with or without the system message. On `Fake_Doc_watermarked.pdf` it matched Opus (98.8 to 99.1% of words, 48 of 48 symbols). On `Fake_Math_Doc_watermarked.pdf` it was weaker and varied between runs: 94 to 97% of the words outside mathematics, 247 to 249 of 250 symbols and 12 to 16 of 20 displayed formulas exact, dropping deeply nested superscripts.
+- On the densest mathematical page alone, Grok 4.7 and GPT-6.1 Sol read 99.7% and 99.2% of the mathematical tokens, Kimi K3 all of them with extra tokens, GPT-6 Sol 97.7% and Pixtral Large 82.6%.
+- An inference profile listed as active returned HTTP 503 on some requests and answered others within the same hour.
+
 These are two documents of clean typeset English, eight pages in all. Tables, figures, handwriting and poor scans are untested.

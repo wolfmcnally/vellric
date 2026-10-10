@@ -9,13 +9,13 @@
       "leaves": 5
     },
     "pytest": {
-      "families": 137,
-      "leaves": 196
+      "families": 138,
+      "leaves": 198
     }
   },
   "counts": {
-    "families": 160,
-    "leaves": 219
+    "families": 161,
+    "leaves": 221
   },
   "families": [
     "gate:changed",
@@ -94,6 +94,7 @@
     "pytest:project/tests/test_vision.py::test_amend_redoes_only_the_named_pages",
     "pytest:project/tests/test_vision.py::test_hosted_provider_request_custody_and_typed_refusals",
     "pytest:project/tests/test_vision.py::test_model_view_is_separate_and_cross_checked",
+    "pytest:project/tests/test_vision.py::test_rejected_transcription_falls_back_to_second_model_then_independent_text",
     "pytest:project/tests/test_vision.py::test_scan_read_only_by_the_model_takes_its_text",
     "pytest:project/tests/test_vision.py::test_vision_settings_refuse_before_any_work",
     "pytest:tests/test_check.py::test_all_is_default_locked_ordered_and_cwd_independent",
@@ -179,7 +180,7 @@
     "pytest:tests/test_treatise.py::test_an_external_fact_without_a_retrieval_date_fails",
     "pytest:tests/test_treatise.py::test_the_repository_own_treatises_validate"
   ],
-  "inventory_sha256": "0cda45198291e4669585bd148344570e8cb1cca6303fd97058ff2272dbbecdad",
+  "inventory_sha256": "64e3595200379c67a24995719319055cbaed06d6a49c001dcaab6e4c5cc11637",
   "proofs": [
     {
       "family": "pytest:project/tests/test_cli.py::test_help",
@@ -837,6 +838,20 @@
       "id": "pytest:project/tests/test_vision.py::test_hosted_provider_request_custody_and_typed_refusals[anthropic]",
       "kind": "pytest",
       "selector": "project/tests/test_vision.py::test_hosted_provider_request_custody_and_typed_refusals[anthropic]",
+      "source_path": "project/tests/test_vision.py"
+    },
+    {
+      "family": "pytest:project/tests/test_vision.py::test_hosted_provider_request_custody_and_typed_refusals",
+      "id": "pytest:project/tests/test_vision.py::test_hosted_provider_request_custody_and_typed_refusals[bedrock]",
+      "kind": "pytest",
+      "selector": "project/tests/test_vision.py::test_hosted_provider_request_custody_and_typed_refusals[bedrock]",
+      "source_path": "project/tests/test_vision.py"
+    },
+    {
+      "family": "pytest:project/tests/test_vision.py::test_rejected_transcription_falls_back_to_second_model_then_independent_text",
+      "id": "pytest:project/tests/test_vision.py::test_rejected_transcription_falls_back_to_second_model_then_independent_text",
+      "kind": "pytest",
+      "selector": "project/tests/test_vision.py::test_rejected_transcription_falls_back_to_second_model_then_independent_text",
       "source_path": "project/tests/test_vision.py"
     },
     {
