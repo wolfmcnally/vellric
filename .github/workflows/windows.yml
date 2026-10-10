@@ -67,8 +67,19 @@ jobs:
             $file = Join-Path $env:RUNNER_TEMP (Split-Path $installer.url -Leaf)
             Invoke-WebRequest $installer.url -OutFile $file
             if ((Get-FileHash $file -Algorithm SHA256).Hash -ne $installer.sha256) { throw "Digest mismatch: $file" }
-            $run = Start-Process $file -ArgumentList '/S' -Wait -PassThru
-            if ($run.ExitCode -ne 0) { throw "Installer failed: $file" }
+            # Wait for the installer alone; a helper it leaves running must not hold the job.
+            $run = Start-Process $file -ArgumentList '/S' -PassThru
+            if (-not $run.WaitForExit(300000)) {
+              Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'gs|tesseract|nsis|setup' } | Format-Table ProcessId, ParentProcessId, Name, CommandLine -Wrap
+              $run.Kill($true)
+              Write-Warning "Installer did not finish in five minutes: $file"
+            } elseif ($run.ExitCode -ne 0) { throw "Installer failed with $($run.ExitCode): $file" }
+          }
+          foreach ($program in 'C:\Program Files\Tesseract-OCR\tesseract.exe', 'C:\Program Files\gs\gs10.07.1\bin\gswin64c.exe') {
+            if (-not (Test-Path $program)) {
+              Get-ChildItem 'C:\Program Files\gs', 'C:\Program Files\Tesseract-OCR' -Depth 2 -ErrorAction SilentlyContinue | Select-Object -First 40 FullName
+              throw "Not installed: $program"
+            }
           }
           "C:\Program Files\Tesseract-OCR" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Run the project tests with the engines present

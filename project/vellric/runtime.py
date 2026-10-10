@@ -153,7 +153,15 @@ def remove(path: Path) -> None:
 
 
 def tree_size(path: Path) -> int:
-    return sum(p.stat().st_size for p in path.rglob("*") if p.is_file())
+    """Bytes under a folder a running job is still changing; a file that goes counts nothing."""
+    total = 0
+    for entry in path.rglob("*"):
+        try:
+            if entry.is_file():
+                total += entry.stat().st_size
+        except OSError:  # Gone, or on Windows being deleted, between listing and measuring.
+            continue
+    return total
 
 
 def run_tool(

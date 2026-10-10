@@ -12,6 +12,8 @@ import pymupdf
 import pytest
 
 SECRET = "sk-test-0123456789-never-published"
+# Windows starts the stand-in program through a command file of the same name.
+SUFFIX = ".cmd" if os.name == "nt" else ""
 
 
 def job(source, out, *args):
@@ -186,7 +188,7 @@ def test_model_view_is_separate_and_cross_checked(tmp_path, pdf, monkeypatch):
     assert {"reference": "gamma", "vision": "gamna"} in spans
     reader = (out / "document.md").read_text()
     assert "### Heading" in reader and "\n# Heading" not in reader and "gamna" in reader
-    assert manifest(out)["vision"]["command"]["name"] == "reader"
+    assert manifest(out)["vision"]["command"]["name"] == "reader" + SUFFIX
     assert SECRET.encode() not in bundle_bytes(out)
 
 
@@ -395,7 +397,8 @@ def test_amend_redoes_only_the_named_pages(tmp_path, pdf):
         amended / "pages/000001/native.txt"
     ).read_bytes()
     assert record["amended_from"]["amended_pages"] == [1]
-    assert record["vision"]["command"]["name"] == "second" and record["vision"]["pages"] == [1]
+    assert record["vision"]["command"]["name"] == "second" + SUFFIX
+    assert record["vision"]["pages"] == [1]
     assert record["settings"]["raster_threshold"] == earlier["settings"]["raster_threshold"]
     fingerprint = record["provenance"]["processing_fingerprint"]
     assert fingerprint != earlier["provenance"]["processing_fingerprint"]
