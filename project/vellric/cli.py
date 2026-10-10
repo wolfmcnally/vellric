@@ -10,7 +10,6 @@ import json
 import os
 import re
 import select
-import shutil
 import signal
 import stat
 import subprocess
@@ -25,18 +24,21 @@ from pathlib import Path
 from . import __version__, vision
 from .runtime import (
     BEHAVIOR,
-    GROUP_FLAGS,
     SCHEMA,
     STATUS_SCHEMA,
+    SUPERVISED,
     WINDOWS,
     JobError,
     contain,
     digest,
     environment,
+    find_program,
     group_rss,
     kill_group,
+    private_directory,
     publication_available,
     publish,
+    remove_tree,
     tree_size,
     validate_bundle,
     write_json,
@@ -210,7 +212,7 @@ def doctor(
     for tool in ("tesseract", "ocrmypdf", "gs"):
         # Ghostscript's console program has its own name on Windows.
         name = "gswin64c" if WINDOWS and tool == "gs" else tool
-        executable = shutil.which(name, path=environment(Path(tempfile.gettempdir()))["PATH"])
+        executable = find_program(name, path=environment(Path(tempfile.gettempdir()))["PATH"])
         entry = {"available": False}
         if executable:
             with tempfile.TemporaryDirectory(prefix="vellric-doctor-") as temp:
@@ -504,7 +506,7 @@ def open_input(name: str):
         named = os.lstat(name)
         if not stat.S_ISREG(named.st_mode) or Path(name).is_junction():
             raise OSError("not regular")
-        fd = os.open(name, os.O_RDONLY | os.O_BINARY)
+        fd = os.open(name, os.O_RDONLY | getattr(os, "O_BINARY", 0))
         if not os.path.samestat(named, os.fstat(fd)):  # The name was swapped for a link.
             os.close(fd)
             raise OSError("not regular")
@@ -595,7 +597,7 @@ def _run_job(options: dict) -> dict:
     if target.exists() or target.is_symlink():
         raise JobError("artifact-invalid", "Destination already exists", stage="publication")
     temp_base = Path(options["temp_dir"]).resolve(strict=True) if options["temp_dir"] else None
-    with tempfile.TemporaryDirectory(prefix="vellric-job-", dir=temp_base) as temp:
+    with private_directory("vellric-job-", temp_base) as temp:
         work = Path(temp).resolve()
         os.chmod(work, 0o700)
         password = ""
@@ -664,7 +666,7 @@ def _run_job(options: dict) -> dict:
                     stdout=log,
                     stderr=log,
                     env=environment(work, options.get("tessdata_dir")),
-                    **GROUP_FLAGS,
+                    **SUPERVISED,
                 )
                 group = contain(process)
                 if config["vision"]:
@@ -828,7 +830,7 @@ def _run_job(options: dict) -> dict:
                     kill_group(group)
                 process.wait()
             if staging is not None and staging.exists():
-                shutil.rmtree(staging)
+                remove_tree(staging)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

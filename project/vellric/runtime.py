@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import contextlib
 import ctypes
 import errno
 import hashlib
 import json
 import os
+import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -19,9 +22,10 @@ STATUS_SCHEMA = "vellric.status/1.0"
 PYMUPDF_VERSION = "1.28.2"
 BEHAVIOR = f"drawbridge-0.4.3-pymupdf-{PYMUPDF_VERSION}/v1"
 WINDOWS = os.name == "nt"
+SUSPENDED = 0x00000004  # CREATE_SUSPENDED: nothing runs until ``contain`` holds the process.
 # The worker leads its own group, so a console interrupt reaches the supervisor alone.
-GROUP_FLAGS = (
-    {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+SUPERVISED = (
+    {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | SUSPENDED}
     if WINDOWS
     else {"start_new_session": True}
 )
@@ -94,13 +98,18 @@ def environment(temp: Path, tessdata_dir: str | None = None) -> dict[str, str]:
 
 def _windows_environment(temp: Path, tessdata_dir: str | None) -> dict[str, str]:
     """The same private environment where the system itself needs a few variables to run."""
-    system = Path(os.environ.get("SystemRoot", r"C:\Windows"))
-    programs = Path(os.environ.get("ProgramFiles", r"C:\Program Files"))
+    from . import _windows
+
+    system, programs = map(Path, _windows.folders())
+
+    def release(folder: Path) -> tuple[int, ...]:
+        return tuple(int(part) for part in re.findall(r"\d+", folder.parent.name))
+
     search = [
         Path(sys.prefix) / "Scripts",
         Path(sys.prefix),
         programs / "Tesseract-OCR",
-        *sorted(programs.glob("gs/gs*/bin"), reverse=True),
+        *sorted(programs.glob("gs/gs*/bin"), key=release, reverse=True),  # Newest release first.
         system / "System32",
         system,
     ]
@@ -112,7 +121,9 @@ def _windows_environment(temp: Path, tessdata_dir: str | None) -> dict[str, str]
         "SystemDrive": system.drive,
         "ComSpec": str(system / "System32" / "cmd.exe"),
         "ProgramFiles": str(programs),
-        "ProgramData": os.environ.get("ProgramData", system.drive + r"\ProgramData"),
+        "ProgramData": system.drive + r"\ProgramData",
+        # A program that looks another one up must not try its current folder first.
+        "NoDefaultCurrentDirectoryInExePath": "1",
         "OMP_THREAD_LIMIT": "1",
         "PYTHONNOUSERSITE": "1",
         "PYTHONDONTWRITEBYTECODE": "1",
@@ -124,6 +135,21 @@ def _windows_environment(temp: Path, tessdata_dir: str | None) -> dict[str, str]
     if tessdata_dir is not None:
         values["TESSDATA_PREFIX"] = tessdata_dir
     return values
+
+
+def find_program(name: str, path: str | None = None) -> str | None:
+    """An engine on the given search path, or on this process's own; never from anywhere else."""
+    if not WINDOWS:
+        return shutil.which(name) if path is None else shutil.which(name, path=path)
+    # Windows' own lookup tries the current folder first, where a set of documents may hold a
+    # program of the same name.
+    suffixes = [""] if Path(name).suffix else [".com", ".exe", ".bat", ".cmd"]
+    for folder in (os.environ.get("PATH", "") if path is None else path).split(os.pathsep):
+        for suffix in suffixes:
+            candidate = Path(folder) / (name + suffix)
+            if folder and Path(folder).is_absolute() and candidate.is_file():
+                return str(candidate)
+    return None
 
 
 def digest(path: Path) -> str:
@@ -150,6 +176,39 @@ def remove(path: Path) -> None:
         except PermissionError:
             time.sleep(0.02)
     path.unlink(missing_ok=True)
+
+
+def remove_tree(path: Path) -> None:
+    """Delete a private folder. On Windows a scanner, or a process that has just ended, can hold
+    a file open for a moment and refuse the deletion, so it is tried again for a bounded time."""
+    if WINDOWS:
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            try:
+                return shutil.rmtree(path)
+            except FileNotFoundError:
+                return
+            except OSError:
+                time.sleep(0.1)
+    shutil.rmtree(path)
+
+
+@contextlib.contextmanager
+def private_directory(prefix: str, base: Path | None):
+    """A workspace only this account can read, removed when the job ends however it ends."""
+    holder = tempfile.TemporaryDirectory(prefix=prefix, dir=base)
+    try:
+        yield holder.name
+    finally:
+        deadline = time.monotonic() + (10 if WINDOWS else 0)
+        while True:
+            try:
+                holder.cleanup()
+                break
+            except OSError:
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(0.1)
 
 
 def tree_size(path: Path) -> int:
@@ -198,13 +257,14 @@ def run_tool(
                 stderr=err,
                 cwd=temp if env is not None else None,
                 env=environment(temp, tessdata_dir) if env is None else env,
+                **({"creationflags": SUSPENDED} if WINDOWS else {}),
             )
         except OSError as exc:
             raise JobError(
                 "dependency-unavailable", "Required executable cannot start", stage=stage
             ) from exc
         started = time.monotonic()
-        group = contain(process) if WINDOWS else None
+        group = contain(process) if WINDOWS else None  # Also lets the suspended program run.
         try:
             while process.poll() is None:
                 if cancel_event is not None and cancel_event.is_set():
@@ -351,8 +411,9 @@ def validate_bundle(root: Path, manifest: dict) -> None:
 def contain(process: subprocess.Popen) -> int:
     """What names a started process together with everything it starts.
 
-    On macOS and Linux that is the process group it leads. On Windows it is a job object, formed
-    as the process starts and before the process can have started anything itself.
+    On macOS and Linux that is the process group it leads. On Windows it is a job object: the
+    process was started suspended, and runs only once the job holds it, so nothing it starts can
+    be outside the job.
     """
     if not WINDOWS:
         return process.pid
@@ -360,22 +421,17 @@ def contain(process: subprocess.Popen) -> int:
 
     job = _windows.contain(process.pid)
     if job is None:
-        if process.poll() is None:
-            process.kill()
-            process.wait()
-            raise JobError(
-                "dependency-unavailable", "A Windows job object is required for supervision"
-            )
-        return 0  # It ended first and left nothing to hold.
+        process.kill()
+        process.wait()
+        raise JobError("dependency-unavailable", "A Windows job object is required for supervision")
     return job
 
 
 def kill_group(group: int) -> None:
     if WINDOWS:
-        if group:
-            from . import _windows
+        from . import _windows
 
-            _windows.end(group)
+        _windows.end(group)
         return
     try:
         os.killpg(group, signal.SIGKILL)
@@ -388,7 +444,7 @@ def group_rss(pid: int) -> int:
     if WINDOWS:
         from . import _windows
 
-        return _windows.working_set(pid) if pid else 0
+        return _windows.working_set(pid)
     if sys.platform.startswith("linux"):
         proc = Path("/proc")
         if not proc.is_dir():

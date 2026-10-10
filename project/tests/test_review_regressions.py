@@ -8,6 +8,7 @@ import signal
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 import pymupdf
 import pytest
@@ -52,9 +53,9 @@ def test_bundle_parent_alias_and_internal_symlink(pdf, tmp_path):
     alias = tmp_path / "alias"
     try:
         alias.symlink_to(tmp_path, target_is_directory=True)
-    except OSError:  # Windows lets only some accounts make links.
+    except OSError:
         assert os.name == "nt"
-        return
+        pytest.skip("This Windows account cannot make links")
     runtime.validate_bundle(alias / "bundle", m)
     text = out / "pages/000001/text.txt"
     original = tmp_path / "same.txt"
@@ -122,7 +123,7 @@ def test_doctor_hashes_requested_actual_data(tmp_path, monkeypatch):
     executable = tmp_path / "tesseract"
     executable.write_bytes(b"synthetic")
     monkeypatch.setattr(
-        cli.shutil, "which", lambda name, **kw: str(executable) if name == "tesseract" else None
+        cli, "find_program", lambda name, **kw: str(executable) if name == "tesseract" else None
     )
 
     def probe(command, **kwargs):
@@ -146,7 +147,7 @@ def test_doctor_hashes_requested_actual_data(tmp_path, monkeypatch):
 def test_doctor_timeout_is_unavailable(tmp_path, monkeypatch):
     executable = tmp_path / "tool"
     executable.write_bytes(b"synthetic")
-    monkeypatch.setattr(cli.shutil, "which", lambda *a, **kw: str(executable))
+    monkeypatch.setattr(cli, "find_program", lambda *a, **kw: str(executable))
 
     def timeout(*a, **kw):
         raise subprocess.TimeoutExpired(a[0], 15)
@@ -318,7 +319,8 @@ def test_early_password_cancellation(pdf, tmp_path, signum):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        **runtime.GROUP_FLAGS,
+        # A break event reaches only a child that leads its own group.
+        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
     )
     try:
         deadline = time.monotonic() + 5
@@ -399,3 +401,56 @@ def test_unqualified_native_engine_refuses(pdf, tmp_path, monkeypatch):
     with pytest.raises(runtime.JobError) as error:
         worker.execute(config(pdf, tmp_path))
     assert error.value.code == "dependency-unavailable"
+
+
+def test_engine_lookup_ignores_the_current_folder(tmp_path, monkeypatch):
+    trusted, received = tmp_path / "trusted", tmp_path / "received"
+    trusted.mkdir()
+    received.mkdir()
+    (trusted / "tesseract.exe").write_bytes(b"engine")
+    for decoy in ("tesseract.cmd", "ocrmypdf.exe"):
+        (received / decoy).write_bytes(b"decoy")
+    monkeypatch.chdir(received)
+    monkeypatch.setattr(runtime, "WINDOWS", True)
+    # Windows' own lookup would try the current folder first; an empty or relative entry of
+    # the search path means that folder too.
+    for path in (str(trusted), os.pathsep.join(["", ".", str(trusted)])):
+        assert runtime.find_program("tesseract", path=path) == str(trusted / "tesseract.exe")
+        assert runtime.find_program("ocrmypdf", path=path) is None
+    monkeypatch.setenv("PATH", str(trusted))
+    assert runtime.find_program("tesseract") == str(trusted / "tesseract.exe")
+    assert runtime.find_program("ocrmypdf") is None
+
+
+def test_windows_refuses_a_swapped_input_and_an_early_python(pdf, tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "WINDOWS", True)
+    with cli.open_input(str(pdf)) as stream:
+        assert stream.read(5) == b"%PDF-"
+    other = tmp_path / "other.pdf"
+    other.write_bytes(pdf.read_bytes())
+    named = os.lstat
+    with monkeypatch.context() as swap:
+        # The name is replaced by another file between the look at it and the open.
+        swap.setattr(cli.os, "lstat", lambda name: named(other if str(name) == str(pdf) else name))
+        with pytest.raises(OSError, match="not regular"):
+            cli.open_input(str(pdf))
+    options = vars(cli.parser().parse_args(["inspect", str(pdf), "--out", str(tmp_path / "out")]))
+    with monkeypatch.context() as early:
+        early.setattr(cli.sys, "version_info", (3, 12, 3, "final", 0))
+        with pytest.raises(runtime.JobError, match="3.12.4") as error:
+            cli._run_job(options)
+    assert error.value.code == "dependency-unavailable" and not (tmp_path / "out").exists()
+
+
+def test_disk_watchdog_skips_a_file_it_cannot_measure(tmp_path, monkeypatch):
+    (tmp_path / "going").write_bytes(b"123")
+    (tmp_path / "staying").write_bytes(b"12345")
+    measure = Path.stat
+
+    def stat(path, **kwargs):
+        if path.name == "going":  # Windows answers this way for a file that is being deleted.
+            raise PermissionError(errno.EACCES, "Injected pending deletion")
+        return measure(path, **kwargs)
+
+    monkeypatch.setattr(Path, "stat", stat)
+    assert runtime.tree_size(tmp_path) == 5

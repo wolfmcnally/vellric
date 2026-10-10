@@ -26,6 +26,7 @@ from .runtime import (
     WINDOWS,
     JobError,
     digest,
+    find_program,
     remove,
     run_tool,
     validate_bundle,
@@ -183,13 +184,18 @@ def render_one(source: Path, number: int, target: Path, options: dict, clip=None
 
 # The first line of ``tesseract --version`` for the release measured on each system. The project
 # publishes no Windows build of the release measured on macOS and Linux.
-QUALIFIED_TESSERACT = "tesseract v5.5.3.20260724" if WINDOWS else "tesseract 5.5.2"
+TESSERACT_RELEASE = "5.5.3" if WINDOWS else "5.5.2"
+QUALIFIED_TESSERACT = (
+    f"tesseract v{TESSERACT_RELEASE}.20260724" if WINDOWS else f"tesseract {TESSERACT_RELEASE}"
+)
+# The built-in table alone: the system's own registrations differ from machine to machine.
+MEDIA_TYPES = mimetypes.MimeTypes()
 
 
 def preflight(
     source: Path, selected: list[int], count: int, options: dict, work: Path, out: Path
 ) -> None:
-    executable = shutil.which("ocrmypdf")
+    executable = find_program("ocrmypdf")
     if executable is None:
         raise JobError("dependency-unavailable", "ocrmypdf unavailable", stage="preflight")
     command = [
@@ -367,7 +373,7 @@ def execute(config: dict) -> dict:
             if engine_facts["engines"]["tesseract"].get("version") != QUALIFIED_TESSERACT:
                 raise JobError(
                     "dependency-unavailable",
-                    f"Unqualified Tesseract version; required {QUALIFIED_TESSERACT.split()[1]}",
+                    f"Unqualified Tesseract version; required {TESSERACT_RELEASE}",
                     stage="recognition",
                 )
             if options["preflight"] == "on" and not engine_facts["engines"]["ocrmypdf"].get(
@@ -816,7 +822,8 @@ def execute(config: dict) -> dict:
                         "path": path.relative_to(root).as_posix(),
                         "size": path.stat().st_size,
                         "sha256": digest(path),
-                        "media_type": mimetypes.guess_type(path)[0] or "application/octet-stream",
+                        "media_type": MEDIA_TYPES.guess_type(path.name)[0]
+                        or "application/octet-stream",
                     }
                 )
         manifest = {

@@ -9,13 +9,13 @@
       "leaves": 5
     },
     "pytest": {
-      "families": 138,
-      "leaves": 198
+      "families": 142,
+      "leaves": 202
     }
   },
   "counts": {
-    "families": 161,
-    "leaves": 221
+    "families": 165,
+    "leaves": 225
   },
   "families": [
     "gate:changed",
@@ -77,9 +77,11 @@
     "pytest:project/tests/test_ocr.py::test_tsv_scoring_grouping_and_malformed",
     "pytest:project/tests/test_review_regressions.py::test_bundle_parent_alias_and_internal_symlink",
     "pytest:project/tests/test_review_regressions.py::test_disk_failure_before_publish_cleans_staging",
+    "pytest:project/tests/test_review_regressions.py::test_disk_watchdog_skips_a_file_it_cannot_measure",
     "pytest:project/tests/test_review_regressions.py::test_doctor_hashes_requested_actual_data",
     "pytest:project/tests/test_review_regressions.py::test_doctor_timeout_is_unavailable",
     "pytest:project/tests/test_review_regressions.py::test_early_password_cancellation",
+    "pytest:project/tests/test_review_regressions.py::test_engine_lookup_ignores_the_current_folder",
     "pytest:project/tests/test_review_regressions.py::test_geometry_against_literal_pdf_ink",
     "pytest:project/tests/test_review_regressions.py::test_gray_render_formats",
     "pytest:project/tests/test_review_regressions.py::test_logo_and_clipped_coverage",
@@ -91,9 +93,11 @@
     "pytest:project/tests/test_review_regressions.py::test_rotated_coverage_preserves_policy",
     "pytest:project/tests/test_review_regressions.py::test_table_failure_retains_fidelity",
     "pytest:project/tests/test_review_regressions.py::test_unqualified_native_engine_refuses",
+    "pytest:project/tests/test_review_regressions.py::test_windows_refuses_a_swapped_input_and_an_early_python",
     "pytest:project/tests/test_vision.py::test_amend_redoes_only_the_named_pages",
     "pytest:project/tests/test_vision.py::test_hosted_provider_request_custody_and_typed_refusals",
     "pytest:project/tests/test_vision.py::test_model_view_is_separate_and_cross_checked",
+    "pytest:project/tests/test_vision.py::test_program_output_keeps_one_line_ending",
     "pytest:project/tests/test_vision.py::test_rejected_transcription_falls_back_to_second_model_then_independent_text",
     "pytest:project/tests/test_vision.py::test_scan_read_only_by_the_model_takes_its_text",
     "pytest:project/tests/test_vision.py::test_vision_settings_refuse_before_any_work",
@@ -180,7 +184,7 @@
     "pytest:tests/test_treatise.py::test_an_external_fact_without_a_retrieval_date_fails",
     "pytest:tests/test_treatise.py::test_the_repository_own_treatises_validate"
   ],
-  "inventory_sha256": "64e3595200379c67a24995719319055cbaed06d6a49c001dcaab6e4c5cc11637",
+  "inventory_sha256": "41a44d78a91e393d6541810e3ba13e5b67c44d98e3934314fb92fe366ef32777",
   "proofs": [
     {
       "family": "pytest:project/tests/test_cli.py::test_help",
@@ -813,10 +817,38 @@
       "source_path": "project/tests/test_review_regressions.py"
     },
     {
+      "family": "pytest:project/tests/test_review_regressions.py::test_engine_lookup_ignores_the_current_folder",
+      "id": "pytest:project/tests/test_review_regressions.py::test_engine_lookup_ignores_the_current_folder",
+      "kind": "pytest",
+      "selector": "project/tests/test_review_regressions.py::test_engine_lookup_ignores_the_current_folder",
+      "source_path": "project/tests/test_review_regressions.py"
+    },
+    {
+      "family": "pytest:project/tests/test_review_regressions.py::test_windows_refuses_a_swapped_input_and_an_early_python",
+      "id": "pytest:project/tests/test_review_regressions.py::test_windows_refuses_a_swapped_input_and_an_early_python",
+      "kind": "pytest",
+      "selector": "project/tests/test_review_regressions.py::test_windows_refuses_a_swapped_input_and_an_early_python",
+      "source_path": "project/tests/test_review_regressions.py"
+    },
+    {
+      "family": "pytest:project/tests/test_review_regressions.py::test_disk_watchdog_skips_a_file_it_cannot_measure",
+      "id": "pytest:project/tests/test_review_regressions.py::test_disk_watchdog_skips_a_file_it_cannot_measure",
+      "kind": "pytest",
+      "selector": "project/tests/test_review_regressions.py::test_disk_watchdog_skips_a_file_it_cannot_measure",
+      "source_path": "project/tests/test_review_regressions.py"
+    },
+    {
       "family": "pytest:project/tests/test_vision.py::test_model_view_is_separate_and_cross_checked",
       "id": "pytest:project/tests/test_vision.py::test_model_view_is_separate_and_cross_checked",
       "kind": "pytest",
       "selector": "project/tests/test_vision.py::test_model_view_is_separate_and_cross_checked",
+      "source_path": "project/tests/test_vision.py"
+    },
+    {
+      "family": "pytest:project/tests/test_vision.py::test_program_output_keeps_one_line_ending",
+      "id": "pytest:project/tests/test_vision.py::test_program_output_keeps_one_line_ending",
+      "kind": "pytest",
+      "selector": "project/tests/test_vision.py::test_program_output_keeps_one_line_ending",
       "source_path": "project/tests/test_vision.py"
     },
     {

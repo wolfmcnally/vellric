@@ -50,7 +50,7 @@ def test_orientation_and_banding_proven_policy(tmp_path, monkeypatch, shape):
         return HEADER + row(95 if angle == 0 else 10, f"Band{band}")
 
     monkeypatch.setattr(runtime, "run_tool", recognise)
-    monkeypatch.setattr(orientation.shutil, "which", lambda name: "/synthetic/" + name)
+    monkeypatch.setattr(orientation, "find_program", lambda name: "/synthetic/" + name)
     result = orientation.recover_page(source, 1)
     assert [angle for band, angle, *_ in seen if band == 0] == [0, 90, 180, 270]
     assert all(angle == 0 for band, angle, *_ in seen if band > 0)
@@ -83,7 +83,7 @@ def test_preflight_refusal_and_page_count_drift(tmp_path, monkeypatch):
     with pymupdf.open() as document:
         document.new_page()
         document.save(source)
-    monkeypatch.setattr(worker.shutil, "which", lambda name: "/synthetic/" + name)
+    monkeypatch.setattr(worker, "find_program", lambda name: "/synthetic/" + name)
 
     def refuse(*a, **kw):
         raise runtime.JobError(

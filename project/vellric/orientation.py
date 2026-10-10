@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import csv
 import io
-import shutil
 import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -27,6 +26,7 @@ from pathlib import Path
 
 from .errors import OcrOperationalError
 from .pdf_tools import band_cuts, page_size, render_page_png
+from .runtime import find_program
 
 ANGLES: tuple[int, ...] = (0, 90, 180, 270)
 # Tesseract refuses an image whose side exceeds 32767 pixels, and PyMuPDF refuses a pixmap over
@@ -78,7 +78,7 @@ def tsv_text_and_score(raw: str) -> tuple[str, float]:
 
 
 def tesseract_executable() -> str:
-    executable = shutil.which("tesseract")
+    executable = find_program("tesseract")
     if executable is None:
         raise OcrOperationalError("tesseract unavailable")
     return executable

@@ -1043,6 +1043,10 @@ families:
   - publication-cleanup
   - eligibility
   - qualification
+  - engine-found-through-relative-search-entry
+  - input-swapped-after-link-check-accepted
+  - early-windows-python-accepted
+  - unmeasurable-file-fails-disk-watchdog
   replacement_lineage: []
   tier: vital
   size: medium
@@ -1111,6 +1115,7 @@ families:
   - page-overrun-discards-run
   - program-not-told-what-the-tool-is-doing
   - failed-first-model-fails-job-despite-fallback
+  - program-carriage-returns-kept
   replacement_lineage: []
   tier: vital
   size: medium

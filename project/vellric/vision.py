@@ -419,8 +419,7 @@ def _command(
         raise _failure("The vision command returned text that is not UTF-8", page) from exc
     finally:
         remove(prompt)
-    # A program on Windows ends its lines the Windows way; the model view has one line ending.
-    return text.replace("\r\n", "\n"), {}
+    return text, {}
 
 
 def transcribe(

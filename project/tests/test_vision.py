@@ -65,7 +65,7 @@ def adapter(tmp_path, name, replies, key="VELLRIC_VISION_PAGE"):
         f"replies = json.loads({json.dumps(json.dumps(replies))})\n"
         f"reply = replies[os.environ[{key!r}]]\n"
         "time.sleep(60 if reply == 'SLEEP' else 0)\n"
-        "sys.stdout.write(reply)\n"
+        "sys.stdout.buffer.write(reply.encode())\n"
     )
     script.chmod(0o755)
     if os.name == "nt":
@@ -190,6 +190,18 @@ def test_model_view_is_separate_and_cross_checked(tmp_path, pdf, monkeypatch):
     assert "### Heading" in reader and "\n# Heading" not in reader and "gamna" in reader
     assert manifest(out)["vision"]["command"]["name"] == "reader" + SUFFIX
     assert SECRET.encode() not in bundle_bytes(out)
+
+
+def test_program_output_keeps_one_line_ending(tmp_path, pdf):
+    # A program on Windows ends its lines with a carriage return and a line feed.
+    replies = {"2": "First line.\r\n\r\nSecond line.\r\n"}
+    out = tmp_path / "out"
+    program = str(adapter(tmp_path, "reader", replies))
+    code, status = job(
+        pdf, out, "--vision-provider", "command", "--vision-command", program, "--ocr", "never"
+    )
+    assert code == 0, status
+    assert (out / "pages/000002/vision.md").read_bytes() == b"First line.\n\nSecond line.\n"
 
 
 def test_scan_read_only_by_the_model_takes_its_text(tmp_path, pdf):

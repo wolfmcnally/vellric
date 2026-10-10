@@ -27,6 +27,11 @@ On `Fake_Math_Doc_watermarked.pdf`, measured against the authors' TeX source:
 - Recovers none of the 250 Greek letters and operator symbols, and no formula: displayed formulas come out as scrambled fragments of look-alike characters.
 - Emits no watermark text, and reports all four pages as recognized.
 
+As of 2026-10-10, the same two conversions on Windows (GitHub-hosted Windows Server 2025, Python 3.13, the 0.2.0 Windows bundle, Tesseract 5.5.3 from the official installer, Ghostscript 10.07.1, the same `eng` and `osd` traineddata by SHA-256):
+
+- `Fake_Doc_watermarked.pdf`: every page's text is byte-for-byte the text macOS produces with Tesseract 5.5.2, so the same 95.8% of words (2702 of 2821).
+- `Fake_Math_Doc_watermarked.pdf`: 98.2% of the words outside mathematics against 98.6% on macOS, and likewise no symbol. Pages 2 and 4 are byte-identical. The two builds score each rotation slightly differently, so on page 1 the near-tie between 0 and 90 degrees falls the other way; page 3 differs in a few fragments of garbled mathematics. One observation cannot say whether the release or the Windows build causes the difference.
+
 ## Vision-model trial
 
 As of 2026-10-07, a vision language model (Claude Opus 5.5) was given only cropped page renders of each fixture, about 1560 pixels on the long side, and asked for verbatim Markdown with LaTeX mathematics. It had no access to the originals. A second run was also given Tesseract's text as a draft.

@@ -35,7 +35,10 @@ jobs:
         with:
           python-version: "3.13"
       - name: Build the bundle
-        run: python project/packaging/windows_bundle.py --out dist
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          New-Item -ItemType Directory measured | Out-Null
+          python project/packaging/windows_bundle.py --out dist | Tee-Object measured\bundle-contents.txt
       - name: Install the bundle with no package index
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
@@ -86,27 +89,33 @@ jobs:
           }
           & "$ghostscript\bin\gswin64c.exe" --version
           "C:\Program Files\Tesseract-OCR" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          & $env:VELLRIC doctor --json
+          $PSNativeCommandUseErrorActionPreference = $true
+          & $env:VELLRIC doctor --json | Out-File measured\doctor.json -Encoding utf8
+          Get-Content measured\doctor.json
+          $engines = (Get-Content measured\doctor.json -Raw | ConvertFrom-Json).engines
+          if ($engines.tesseract.version -ne 'tesseract v5.5.3.20260724') { throw "Tesseract: $($engines.tesseract.version)" }
+          if ($engines.gs.version -ne '10.07.1') { throw "Ghostscript: $($engines.gs.version)" }
+          if ($engines.ocrmypdf.version -ne '17.7.0') { throw "OCRmyPDF: $($engines.ocrmypdf.version)" }
       - name: Run the project tests with the engines present
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
           uv sync --locked --project project --extra ocr --python 3.13
           Set-Location project
-          uv run --no-sync python -X utf8 -m pytest -q
+          # With the engines present nothing may be skipped: a skip would be the engines not found.
+          uv run --no-sync python -X utf8 -m pytest -q -rs | Tee-Object -Variable report
+          if ($report -match 'skipped') { throw 'A test was skipped with the engines installed' }
       - name: Convert the fixtures with the installed tool
         if: success() || failure()
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
-          New-Item -ItemType Directory measured | Out-Null
-          & $env:VELLRIC doctor --json | Out-File measured\doctor.json -Encoding utf8
           foreach ($name in 'Fake_Doc_watermarked', 'Fake_Math_Doc_watermarked') {
             & $env:VELLRIC convert "project\tests\fixtures\$name.pdf" --out "measured\$name" --ocr auto --status-json
           }
-      - name: Keep the bundle and the measured results
+      # The bundle itself is not kept: it holds third-party binaries, and its list of hashes
+      # is enough to tell that a bundle built elsewhere is the one proved here.
+      - name: Keep the measured results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: windows-bundle
-          path: |
-            dist
-            measured
+          name: windows-measured
+          path: measured

@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 import ctypes
+import functools
 import time
+import winreg
 from ctypes import wintypes
 
 kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+ntdll = ctypes.WinDLL("ntdll")
 
 BASIC_PROCESS_ID_LIST = 3
 EXTENDED_LIMIT_INFORMATION = 9
 KILL_ON_JOB_CLOSE = 0x2000
 PROCESS_TERMINATE = 0x0001
 PROCESS_SET_QUOTA = 0x0100
+PROCESS_SUSPEND_RESUME = 0x0800
 PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 ERROR_MORE_DATA = 234
 LISTED = 4096
@@ -103,22 +107,49 @@ _memory = _declare(
 )
 
 
-def contain(pid: int) -> int | None:
-    """A job that holds ``pid`` and its future children; None when it could not be formed.
+_resume = ntdll.NtResumeProcess
+_resume.restype, _resume.argtypes = ctypes.c_long, (wintypes.HANDLE,)
+_windows_folder = _declare(
+    "GetSystemWindowsDirectoryW", wintypes.UINT, wintypes.LPWSTR, wintypes.UINT
+)
 
-    The job ends its members when its last handle closes, so they cannot outlive this process.
+
+@functools.cache
+def folders() -> tuple[str, str]:
+    """The Windows folder and the 64-bit Program Files folder as the system records them.
+
+    The environment's own names for them are whatever the caller chose to set.
+    """
+    buffer = ctypes.create_unicode_buffer(32768)
+    if not _windows_folder(buffer, len(buffer)):
+        raise OSError(ctypes.get_last_error(), "Windows folder query failed")
+    access = winreg.KEY_READ | winreg.KEY_WOW64_64KEY
+    with winreg.OpenKey(
+        winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion", 0, access
+    ) as key:
+        programs = winreg.QueryValueEx(key, "ProgramFilesDir")[0]
+    return buffer.value, programs
+
+
+def contain(pid: int) -> int | None:
+    """Put a process that was started suspended in a job, then let it run.
+
+    The job holds ``pid`` and everything it goes on to start, and ends them when its last handle
+    closes, so they cannot outlive this process. None means the job could not be formed and the
+    process is still suspended.
     """
     job = _create(None, None)
     if not job:
         return None
     limits = ExtendedLimits()
     limits.BasicLimitInformation.LimitFlags = KILL_ON_JOB_CLOSE
-    process = _open(PROCESS_SET_QUOTA | PROCESS_TERMINATE, False, pid)
+    process = _open(PROCESS_SET_QUOTA | PROCESS_TERMINATE | PROCESS_SUSPEND_RESUME, False, pid)
     try:
         if (
             process
             and _set(job, EXTENDED_LIMIT_INFORMATION, ctypes.byref(limits), ctypes.sizeof(limits))
             and _assign(job, process)
+            and _resume(process) == 0
         ):
             return job
     finally:
@@ -143,6 +174,8 @@ def end(job: int, *, wait: float = 5.0) -> None:
         deadline = time.monotonic() + wait
         while _members(job) and time.monotonic() < deadline:
             time.sleep(0.01)
+    except OSError:
+        pass  # The members are ending either way; the caller's own cleanup still has to run.
     finally:
         _close(job)
 

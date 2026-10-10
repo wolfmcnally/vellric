@@ -1,5 +1,7 @@
 # Local release preparation
 
+This record, [RELEASE-PREPARATION.md](RELEASE-PREPARATION.md) and [DOCUMENTATION-AUDIT.md](DOCUMENTATION-AUDIT.md) describe the 0.1.0 candidates and the evidence gathered for them. Version 0.2.0 adds the vision-model pass and Windows support and has not been through this preparation; its commands are the same with the version number changed.
+
 Vellric 0.1.0 and Drawbridge 0.1.0 are prepared as local standalone release candidates. Vellric is AGPL-3.0-only; Drawbridge remains MIT. Publish the fresh audited history and corresponding tested artifacts in coordinated order. Live consumer changes remain separate.
 
 The concrete source/NOTICE/dependency inventory, locked build/install commands, output/privacy audit and publication/consumer sequence are in [RELEASE-PREPARATION.md](RELEASE-PREPARATION.md). Package source includes the dependency lock and exact build constraints. Project wheels contain their own source and notices; dependencies/engines install independently. Local companion evidence retains upstream source archives and actual qualified dependency notices/hashes. A future bundled binary/container offering would require its own matching source/build/NOTICE closure; no such artifact is proposed here.

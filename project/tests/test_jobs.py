@@ -402,16 +402,16 @@ def test_stdin_snapshot_and_progress(simple, tmp_path):
 
 def test_symlink_and_non_pdf_refused(simple, tmp_path):
     linked = tmp_path / "link.pdf"
-    try:
-        linked.symlink_to(simple)
-    except OSError:  # Windows lets only some accounts make links.
-        assert os.name == "nt"
-    else:
-        assert job(linked, tmp_path / "symlink-out", "inspect")[1]["code"] == "pdf-open-operational"
     image = tmp_path / "image.png"
     with pymupdf.open(simple) as document:
         document[0].get_pixmap().save(image)
     assert job(image, tmp_path / "image-out", "inspect")[1]["code"] == "not-pdf"
+    try:
+        linked.symlink_to(simple)
+    except OSError:
+        assert os.name == "nt"
+        pytest.skip("This Windows account cannot make links")
+    assert job(linked, tmp_path / "symlink-out", "inspect")[1]["code"] == "pdf-open-operational"
 
 
 def test_native_exception_frames_are_cleared_under_lock():
@@ -437,7 +437,7 @@ def test_cancellation_reaps_worker_grandchild(simple, tmp_path, monkeypatch):
     marker = tmp_path / "child-pid"
 
     def fake(command, **kwargs):
-        if command[0] == "/bin/ps":
+        if command[0] != sys.executable:  # Only the worker is replaced, not the process listing.
             return original(command, **kwargs)
         script = (
             "import os,subprocess,sys,time;from pathlib import Path;"
