@@ -24,6 +24,7 @@ Independent local Python command-line PDF inspection, fidelity conversion, rende
 ## Project briefs
 
 - [Vellric seed brief and durable CLI design](briefs/BRIEF.md)
+- [Security review](briefs/security-review.md)
 
 ## Project surfaces
 
