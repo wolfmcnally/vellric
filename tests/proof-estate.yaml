@@ -1047,6 +1047,10 @@ families:
   - input-swapped-after-link-check-accepted
   - early-windows-python-accepted
   - unmeasurable-file-fails-disk-watchdog
+  - engine-runs-in-callers-folder
+  - windows-engine-starts-unsuspended
+  - supplied-program-gets-private-environment
+  - doctor-probe-in-callers-folder
   replacement_lineage: []
   tier: vital
   size: medium

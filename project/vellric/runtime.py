@@ -255,7 +255,8 @@ def run_tool(
                 stdin=source,
                 stdout=out,
                 stderr=err,
-                cwd=temp if env is not None else None,
+                # Never the caller's folder, where Windows would look for a program's libraries.
+                cwd=temp,
                 env=environment(temp, tessdata_dir) if env is None else env,
                 **({"creationflags": SUSPENDED} if WINDOWS else {}),
             )

@@ -202,6 +202,7 @@ def doctor(
                 capture_output=True,
                 text=True,
                 timeout=15,
+                cwd=temp,
                 env=environment(temp, tessdata_dir),
             )
             return result.returncode, result.stdout or result.stderr
@@ -215,7 +216,8 @@ def doctor(
         executable = find_program(name, path=environment(Path(tempfile.gettempdir()))["PATH"])
         entry = {"available": False}
         if executable:
-            with tempfile.TemporaryDirectory(prefix="vellric-doctor-") as temp:
+            # The probe runs in this folder, so removal waits out a process that is ending.
+            with private_directory("vellric-doctor-", None) as temp:
                 returncode, output = probe(executable, "--version", Path(temp))
                 lines = output.splitlines()
                 entry["returncode"] = returncode

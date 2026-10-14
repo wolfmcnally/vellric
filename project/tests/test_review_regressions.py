@@ -454,3 +454,65 @@ def test_disk_watchdog_skips_a_file_it_cannot_measure(tmp_path, monkeypatch):
 
     monkeypatch.setattr(Path, "stat", stat)
     assert runtime.tree_size(tmp_path) == 5
+
+
+def test_engines_run_in_their_private_folder_not_the_callers(tmp_path, monkeypatch):
+    received, work = tmp_path / "received", tmp_path / "work"
+    received.mkdir()
+    work.mkdir()
+    # Windows looks for a program's libraries in its current folder, which may hold documents.
+    monkeypatch.chdir(received)
+    folder = runtime.run_tool(
+        [sys.executable, "-I", "-c", "import os; print(os.getcwd())"], timeout=60, temp=work
+    )
+    assert os.path.samefile(folder.strip(), work)
+
+
+def launches(monkeypatch):
+    seen = []
+
+    def popen(command, **kwargs):
+        seen.append(kwargs)
+        raise OSError("Injected: nothing is started")
+
+    monkeypatch.setattr(runtime.subprocess, "Popen", popen)
+    return seen
+
+
+def test_windows_engine_keeps_its_folder_environment_and_suspended_start(tmp_path, monkeypatch):
+    seen = launches(monkeypatch)
+    monkeypatch.setattr(runtime, "WINDOWS", True)
+    private = {"PATH": "C:\\engines"}
+    monkeypatch.setattr(runtime, "environment", lambda temp, tessdata: private | {"at": temp})
+    with pytest.raises(runtime.JobError, match="cannot start"):
+        runtime.run_tool(["C:\\engines\\tesseract.exe"], timeout=1, temp=tmp_path)
+    (launch,) = seen
+    assert launch["cwd"] == tmp_path
+    assert launch["env"] == private | {"at": tmp_path}
+    assert launch.get("creationflags") == runtime.SUSPENDED
+
+
+def test_a_supplied_program_keeps_its_own_environment_and_folder(tmp_path, monkeypatch):
+    seen = launches(monkeypatch)
+    supplied = {"VELLRIC_VISION_PAGE": "1"}
+    with pytest.raises(runtime.JobError, match="cannot start"):
+        runtime.run_tool(["/usr/bin/true"], timeout=1, temp=tmp_path, env=supplied)
+    (launch,) = seen
+    assert launch["cwd"] == tmp_path and launch["env"] is supplied
+
+
+def test_doctor_probes_engines_in_their_private_folder(monkeypatch):
+    seen = []
+
+    def run(command, **kwargs):
+        seen.append(kwargs)
+        raise OSError("Injected: nothing is started")
+
+    monkeypatch.setattr(cli, "find_program", lambda name, path=None: "/engines/" + name)
+    monkeypatch.setattr(cli.subprocess, "run", run)
+    cli.doctor()
+    assert len(seen) == 3
+    for probe in seen:
+        folder = probe.get("cwd")
+        assert folder is not None and folder.name.startswith("vellric-doctor-")
+        assert probe["env"]["HOME"] == str(folder)
