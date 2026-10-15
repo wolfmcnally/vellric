@@ -28,7 +28,7 @@ Independent local Python command-line PDF inspection, fidelity conversion, rende
 
 ## Project surfaces
 
-`project/`: isolated Python CLI scaffold, runtime, manifest/lock and tests. PDF behavior follows the reviewed seed brief; local implementation is authorized. Inherited tooling lives at the root. The public 0.1.0 surface includes standalone complete jobs and Drawbridge process integration. Release and consumer operations require their own current owner authorization.
+`project/`: isolated Python CLI scaffold, runtime, manifest/lock and tests. PDF behavior follows the reviewed seed brief; local implementation is authorized. Inherited tooling lives at the root. The public 0.1.0 surface includes standalone complete jobs and Drawbridge process integration. Release and consumer operations require their own current owner authorization; [releases](policies/releases.md) governs versions, tags, GitHub releases and the Windows bundle.
 
 ## Project conventions
 
@@ -100,6 +100,7 @@ Every applicable policy binds.
 - [Isolation](policies/project-isolation.md)
 - [Simplicity](policies/simplicity-and-consolidation.md)
 - [Greenfield](policies/greenfield-until-released.md)
+- [Releases and Windows bundle](policies/releases.md)
 
 ## Universal repo layout
 
