@@ -304,6 +304,27 @@ families:
   replacement_lineage: []
   tier: vital
   flake_rate: 0.0
+- id: gate-policy-release-version
+  kind: gate
+  selectors:
+  - policy-release-version
+  source_paths:
+  - bin/check
+  - project/packaging/release_version.py
+  covers:
+  - bin/check
+  - project/packaging/release_version.py
+  - project/pyproject.toml
+  contract: A project version already tagged on different project content refuses the gate.
+  risk_class: release-identity
+  oracle: The check's exit status against the live tags and project tree; the shallow-clone and missing-checkout cases refuse.
+  admission: The owner ruled on 2026-10-15 that each version is bound to one commit; the gate refuses a tree whose version is tagged on different project content.
+  nearest_overlap: The release-version pytest family proves the check's cases on synthetic repositories; this gate applies it to the live repository.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
 - id: gate-policy-toolchain-callers
   kind: gate
   selectors:
@@ -389,6 +410,26 @@ families:
   oracle: Named assertions and exact nonzero failure propagation.
   admission: Retain inherited boundary proof or current seed smoke test; do not claim PDF readiness. Initial observed failure count is zero; this is not a long-run flake-rate claim.
   nearest_overlap: No local historical/mutant comparison yet; all selections widen to full.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  flake_rate: 0.0
+- id: hook-hook:-githooks-pre-commit:--bin-python project-packaging-release_version-py --staged
+  kind: hook
+  selectors:
+  - hook:.githooks/pre-commit:./bin/python project/packaging/release_version.py --staged
+  source_paths:
+  - .githooks/pre-commit
+  - project/packaging/release_version.py
+  covers:
+  - .githooks/pre-commit
+  - project/packaging/release_version.py
+  contract: A commit that changes a tagged version's project content without a new version is refused before it is recorded.
+  risk_class: release-identity
+  oracle: The check's exit status and refusal line against the index being committed and the live tags.
+  admission: Independent review found that checking only the pushed tip lets an unbumped intermediate commit reach history; the owner ruled on 2026-10-15 that each version is bound to one commit.
+  nearest_overlap: The staged-mode pytest proof covers the check on synthetic repositories; this hook applies it to every local commit.
   historical_evidence: []
   mutation_evidence: []
   replacement_lineage: []
@@ -1054,6 +1095,39 @@ families:
   replacement_lineage: []
   tier: vital
   size: medium
+  flake_rate: 0.0
+- id: pytest-project-tests-test_release_version-py
+  kind: pytest
+  selectors:
+  - project/tests/test_release_version.py
+  source_paths:
+  - project/tests/test_release_version.py
+  covers:
+  - project/packaging/release_version.py
+  - project/packaging/windows_bundle.py
+  contract: A version whose tag names different project content refuses at commit time, at qualification and in the Windows bundle build; an unknowable tag state refuses too, and the bundle carries only tracked guides.
+  risk_class: release-identity
+  oracle: The refusal text for synthetic Git repositories with real tags, edits, untracked files and a shallow clone, and the absence of any build step.
+  admission: The owner ruled on 2026-10-15 that each version is bound to one commit; nothing else checks the binding.
+  nearest_overlap: The gate family runs the check on the live repository only, where the tagged-and-changed case cannot be exercised without moving a tag.
+  historical_evidence: []
+  mutation_evidence:
+  - tagged-tree-change-accepted
+  - untracked-project-file-ignored
+  - whole-repository-compared
+  - ignored-project-file-counted
+  - any-release-tag-binds
+  - staged-version-read-from-disk
+  - staged-diff-reads-working-tree
+  - hook-location-trusted
+  - missing-checkout-trusted
+  - shallow-clone-trusted
+  - untagged-clone-trusted
+  - bundle-builds-despite-tag
+  - bundle-copies-untracked-guides
+  replacement_lineage: []
+  tier: vital
+  size: small
   flake_rate: 0.0
 - id: pytest-project-tests-test_media-py
   kind: pytest

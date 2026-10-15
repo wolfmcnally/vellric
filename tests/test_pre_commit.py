@@ -34,6 +34,7 @@ def hook_repo(tmp_path: Path) -> tuple[Path, dict[str, str]]:
         "check-log",
         "check-candidate-partition",
         "test-governance",
+        "python",
     ):
         _write_probe(root / "bin" / executable, executable)
     subprocess.run(["git", "init", "-q", "-b", "master", str(root)], check=True)
@@ -67,6 +68,7 @@ def test_pre_commit_runs_structural_governance_after_existing_checks(
         "check-log",
         "check-candidate-partition",
         "test-governance",
+        "python",
     ]
     Path(environment["PRE_COMMIT_LOG"]).write_text("")
     environment["PRE_COMMIT_FAIL"] = "check-log"

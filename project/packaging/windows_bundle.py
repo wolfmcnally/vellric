@@ -5,6 +5,8 @@ has uv, because every wheel is selected for the target and checked against its p
 
     python packaging/windows_bundle.py --out dist
 
+It refuses a version that is already tagged on different content (release_version.py).
+
 It is a convenience for installing on one's own machines. Handing it to anyone else also hands
 them third-party binaries, whose source and notice duties docs/LICENSING.md describes.
 """
@@ -20,6 +22,8 @@ import tempfile
 import time
 import zipfile
 from pathlib import Path
+
+import release_version
 
 PROJECT = Path(__file__).resolve().parent.parent
 EPOCH = 1609459200  # The build time the release procedure fixes, so equal inputs give equal bytes.
@@ -70,11 +74,22 @@ def run(*command: str, cwd: Path = PROJECT) -> str:
     return done.stdout
 
 
+def tracked(folder: str) -> list[str]:
+    """Files Git tracks under a project folder, so nothing ignored rides into the bundle."""
+    listed = subprocess.run(
+        ["git", "-C", str(PROJECT), "ls-files", "-z", "--", folder], capture_output=True, check=True
+    )
+    return [name for name in listed.stdout.decode("utf-8").split("\0") if name]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--python", default="3.13", help="the Python release on the target")
     arguments = parser.parse_args()
+    reason = release_version.problem(PROJECT)
+    if reason:
+        raise SystemExit(f"Refusing to build the bundle: {reason}")
     out = arguments.out.resolve()
     out.mkdir(parents=True, exist_ok=True)
     python = arguments.python
@@ -154,10 +169,13 @@ def main() -> int:
         )
         for name in ("LICENSE", "NOTICE"):
             shutil.copyfile(PROJECT / name, root / name)
-        shutil.copytree(PROJECT / "LICENSES", root / "LICENSES")
+        for name in tracked("LICENSES"):
+            (root / name).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(PROJECT / name, root / name)
         (root / "docs").mkdir()
-        for guide in sorted(path for path in (PROJECT / "docs").iterdir() if path.is_file()):
-            shutil.copyfile(guide, root / "docs" / guide.name)
+        for name in tracked("docs"):
+            if Path(name).parent == Path("docs"):  # The guides, not their sample folders.
+                shutil.copyfile(PROJECT / name, root / name)
         (root / "INSTALL.txt").write_text(
             INSTALL.format(
                 version=version,

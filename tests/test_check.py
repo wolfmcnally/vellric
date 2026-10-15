@@ -122,6 +122,12 @@ case "$1" in
 esac
 """,
     )
+    _write_executable(
+        root / "bin" / "python",
+        """#!/usr/bin/env bash
+printf 'python cwd=%s args=%s\\n' "$PWD" "$*" >> "$CHECK_TEST_LOG"
+""",
+    )
     for executable, label in (
         ("execution-telemetry", "telemetry"),
         ("check-harness-parity", "parity"),
@@ -230,6 +236,7 @@ def test_all_is_default_locked_ordered_and_cwd_independent(
         f"partition cwd={root}",
         f"governance cwd={root} args=validate",
         f"governance cwd={root} args=timing",
+        f"python cwd={root} args=project/packaging/release_version.py",
     ]
     assert "CHECK ALL PASS" in result.stdout
 

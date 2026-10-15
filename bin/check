@@ -148,6 +148,7 @@ run_policy() {
     run_gate policy-candidate-partition ./bin/check-candidate-partition || return $?
     run_gate policy-test-governance ./bin/test-governance validate || return $?
     run_gate policy-test-time ./bin/test-governance timing || return $?
+    run_gate policy-release-version ./bin/python project/packaging/release_version.py || return $?
     echo "CHECK policy PASS"
   )
 }

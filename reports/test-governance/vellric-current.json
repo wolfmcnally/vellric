@@ -1,21 +1,21 @@
 {
   "by_kind": {
     "gate": {
-      "families": 18,
-      "leaves": 18
+      "families": 19,
+      "leaves": 19
     },
     "hook": {
-      "families": 5,
-      "leaves": 5
+      "families": 6,
+      "leaves": 6
     },
     "pytest": {
-      "families": 146,
-      "leaves": 206
+      "families": 152,
+      "leaves": 212
     }
   },
   "counts": {
-    "families": 169,
-    "leaves": 229
+    "families": 177,
+    "leaves": 237
   },
   "families": [
     "gate:changed",
@@ -29,6 +29,7 @@
     "gate:policy-hooks-installed",
     "gate:policy-lessons",
     "gate:policy-log",
+    "gate:policy-release-version",
     "gate:policy-shell-syntax",
     "gate:policy-test-governance",
     "gate:policy-test-time",
@@ -40,6 +41,7 @@
     "hook:.githooks/pre-commit:./bin/check-harness-parity",
     "hook:.githooks/pre-commit:./bin/check-log --staged",
     "hook:.githooks/pre-commit:./bin/check-toolchain-callers",
+    "hook:.githooks/pre-commit:./bin/python project/packaging/release_version.py --staged",
     "hook:.githooks/pre-commit:./bin/test-governance validate",
     "pytest:project/tests/test_cli.py::test_help",
     "pytest:project/tests/test_jobs.py::test_bundle_tampering_refused",
@@ -75,6 +77,12 @@
     "pytest:project/tests/test_ocr.py::test_orientation_and_banding_proven_policy",
     "pytest:project/tests/test_ocr.py::test_preflight_refusal_and_page_count_drift",
     "pytest:project/tests/test_ocr.py::test_tsv_scoring_grouping_and_malformed",
+    "pytest:project/tests/test_release_version.py::test_a_hooks_repository_location_is_honoured",
+    "pytest:project/tests/test_release_version.py::test_a_tagged_version_is_bound_to_its_project_tree",
+    "pytest:project/tests/test_release_version.py::test_an_unknowable_tag_state_refuses",
+    "pytest:project/tests/test_release_version.py::test_the_bundle_builder_refuses_before_building",
+    "pytest:project/tests/test_release_version.py::test_the_bundle_carries_only_tracked_guides",
+    "pytest:project/tests/test_release_version.py::test_the_staged_tree_is_checked_at_commit_time",
     "pytest:project/tests/test_review_regressions.py::test_a_supplied_program_keeps_its_own_environment_and_folder",
     "pytest:project/tests/test_review_regressions.py::test_bundle_parent_alias_and_internal_symlink",
     "pytest:project/tests/test_review_regressions.py::test_disk_failure_before_publish_cleans_staging",
@@ -188,7 +196,7 @@
     "pytest:tests/test_treatise.py::test_an_external_fact_without_a_retrieval_date_fails",
     "pytest:tests/test_treatise.py::test_the_repository_own_treatises_validate"
   ],
-  "inventory_sha256": "c966d95854923a434b7fcc5694306b0db0282c236ae4602d3a628381c2f87d4e",
+  "inventory_sha256": "c415e78a9771f349a471d8a5287e4aeefd8cb0aff6fdc400a8264188f15cdcf9",
   "proofs": [
     {
       "family": "pytest:project/tests/test_cli.py::test_help",
@@ -686,6 +694,48 @@
       "kind": "pytest",
       "selector": "project/tests/test_ocr.py::test_live_processing_fingerprint_excludes_document_page_selection",
       "source_path": "project/tests/test_ocr.py"
+    },
+    {
+      "family": "pytest:project/tests/test_release_version.py::test_a_tagged_version_is_bound_to_its_project_tree",
+      "id": "pytest:project/tests/test_release_version.py::test_a_tagged_version_is_bound_to_its_project_tree",
+      "kind": "pytest",
+      "selector": "project/tests/test_release_version.py::test_a_tagged_version_is_bound_to_its_project_tree",
+      "source_path": "project/tests/test_release_version.py"
+    },
+    {
+      "family": "pytest:project/tests/test_release_version.py::test_the_staged_tree_is_checked_at_commit_time",
+      "id": "pytest:project/tests/test_release_version.py::test_the_staged_tree_is_checked_at_commit_time",
+      "kind": "pytest",
+      "selector": "project/tests/test_release_version.py::test_the_staged_tree_is_checked_at_commit_time",
+      "source_path": "project/tests/test_release_version.py"
+    },
+    {
+      "family": "pytest:project/tests/test_release_version.py::test_a_hooks_repository_location_is_honoured",
+      "id": "pytest:project/tests/test_release_version.py::test_a_hooks_repository_location_is_honoured",
+      "kind": "pytest",
+      "selector": "project/tests/test_release_version.py::test_a_hooks_repository_location_is_honoured",
+      "source_path": "project/tests/test_release_version.py"
+    },
+    {
+      "family": "pytest:project/tests/test_release_version.py::test_an_unknowable_tag_state_refuses",
+      "id": "pytest:project/tests/test_release_version.py::test_an_unknowable_tag_state_refuses",
+      "kind": "pytest",
+      "selector": "project/tests/test_release_version.py::test_an_unknowable_tag_state_refuses",
+      "source_path": "project/tests/test_release_version.py"
+    },
+    {
+      "family": "pytest:project/tests/test_release_version.py::test_the_bundle_builder_refuses_before_building",
+      "id": "pytest:project/tests/test_release_version.py::test_the_bundle_builder_refuses_before_building",
+      "kind": "pytest",
+      "selector": "project/tests/test_release_version.py::test_the_bundle_builder_refuses_before_building",
+      "source_path": "project/tests/test_release_version.py"
+    },
+    {
+      "family": "pytest:project/tests/test_release_version.py::test_the_bundle_carries_only_tracked_guides",
+      "id": "pytest:project/tests/test_release_version.py::test_the_bundle_carries_only_tracked_guides",
+      "kind": "pytest",
+      "selector": "project/tests/test_release_version.py::test_the_bundle_carries_only_tracked_guides",
+      "source_path": "project/tests/test_release_version.py"
     },
     {
       "family": "pytest:project/tests/test_review_regressions.py::test_bundle_parent_alias_and_internal_symlink",
@@ -1710,6 +1760,13 @@
       "source_path": "bin/check:147"
     },
     {
+      "family": "gate:policy-release-version",
+      "id": "gate:policy-release-version",
+      "kind": "gate",
+      "selector": "policy-release-version",
+      "source_path": "bin/check:151"
+    },
+    {
       "family": "gate:policy-shell-syntax",
       "id": "gate:policy-shell-syntax",
       "kind": "gate",
@@ -1792,6 +1849,13 @@
       "kind": "hook",
       "selector": "hook:.githooks/pre-commit:./bin/test-governance validate",
       "source_path": ".githooks/pre-commit:12"
+    },
+    {
+      "family": "hook:.githooks/pre-commit:./bin/python project/packaging/release_version.py --staged",
+      "id": "hook:.githooks/pre-commit:./bin/python project/packaging/release_version.py --staged",
+      "kind": "hook",
+      "selector": "hook:.githooks/pre-commit:./bin/python project/packaging/release_version.py --staged",
+      "source_path": ".githooks/pre-commit:13"
     }
   ],
   "schema": "agentic.proof_baseline.v2"
