@@ -5,7 +5,7 @@ This policy governs how a Vellric version is prepared, tagged and published on G
 ## Authority
 
 - A release needs the owner's current authorization naming the version. Agents prepare it: they bump the version, update the guides, run the gates, build the artifacts locally and draft the release notes.
-- Tags belong to the owner (hard rule 1). An agent never creates, moves or deletes a tag.
+- Tags belong to the owner (hard rule 1). An agent creates a tag only on the owner's explicit, current instruction naming the version, and never moves or deletes one.
 - The owner publishes the GitHub release. An agent runs `gh release create`, uploads an asset or publishes a draft only under an explicit, current instruction naming the version and the artifacts.
 - No release goes to a package index. Nothing in this policy authorizes publishing the Windows bundle anywhere.
 
@@ -57,23 +57,31 @@ Everything below runs on the exact commit that will be tagged:
 ## Windows bundle
 
 - **Build.** Start from the tagged commit, in a full Git checkout with a clean tree. From `project/`, run `python packaging/windows_bundle.py --out dist`. The bundle targets Python 3.13 unless `--python` says otherwise, and the target goes into its name: `vellric-X.Y.Z-windows-x64-py313.zip`. Every dependency comes from `uv.lock` and is checked against its published hash, and the archive's timestamps are fixed, so equal inputs give equal bytes. Only tracked guides and license files go into it. `dist/` is never committed.
-- **Record.** The builder prints a SHA-256 for each wheel and for the ZIP. Keep that list, with the version and the commit, in the local release evidence. It is how a bundle in hand is matched to the one the Windows workflow proved.
+- **Record.** The builder prints a SHA-256 for each wheel and for the ZIP. Keep that list, with the version and the commit, in the local release evidence. It matches a bundle in hand against the Windows workflow's list wheel by wheel. The project's own wheel matches only if both were built on the same kind of system (see State).
 - **Proof.** On every push, the Windows workflow builds the bundle and installs it with no package index. It then runs `doctor`, `inspect` and `render`, installs the qualified engines, runs the tests with no skips allowed, and converts the fixtures. A trial on the target machine is the owner's acceptance, recorded in `user-actions/`. An agent never claims it.
 - **Distribution.** The bundle holds third-party binary wheels without their assembled source and notice closure (`project/docs/LICENSING.md`).
   - The owner's own machines may receive it, and so may colleagues' workspaces inside the owner's organisation (owner ruling, 2026-10-10).
   - It may not be attached to a GitHub release, uploaded as a workflow artifact, placed anywhere public, or given to anyone outside the organisation. That holds until the owner decides otherwise and the closure is assembled.
   - The workflow keeps only measured results. Do not add an upload of the bundle back.
 
-## State as of 2026-10-15
+## State as of 2026-10-16
 
 - **0.1.0:** tag `v0.1.0` at `a2b140a4eda87b4e6cb5925ba5e605031890fb31`. GitHub release published on 2026-10-01 with the wheel and source archive. No Windows bundle existed.
 - **0.2.0:** tag `v0.2.0` at `1fc89991063d29c91f9c96e83d73307b5989d3c2`; no GitHub release.
   - `project/docs/RELEASE.md` records that 0.2.0 has not been through release preparation.
   - User actions `misty-hyena` and `spotted-seagull` block it.
-  - Commits after the tag changed the project while still calling it 0.2.0. On 2026-10-15 those changes became 0.2.1, untagged and unpublished, so 0.2.0 again names only the tagged code.
+  - Commits after the tag changed the project while still calling it 0.2.0. On 2026-10-15 those changes became 0.2.1, so 0.2.0 again names only the tagged code.
+- **0.2.1:** tag `v0.2.1` at `963396fbe51255dd0ed761b6f4c16e2ce8181942`, created on 2026-10-16 on the owner's instruction after qualification on that commit; no GitHub release.
+  - Gates: full gate and both workflows passed.
+  - Builds: wheel and source archive rebuilt byte-identically from the source archive.
+  - macOS (arm64): a fresh locked install ran native and OCR jobs with page text identical to the source tree.
+  - Linux: a fresh locked install in a disposable Ubuntu 24.04 arm64 container, with Tesseract 5.5.2 built from source, ran the same jobs. Native and `Fake_Doc_watermarked.pdf` pages are identical to macOS. `Fake_Math_Doc_watermarked.pdf` pages 1 and 3 differ, the same pages that differ on Windows.
+  - Windows bundle: built from the tagged tree, rebuilt byte-identically, and handed to the owner. Its 29 dependency wheels match the Windows workflow's list for that commit. Its Vellric wheel does not: the copy built on Windows differs from the macOS build.
+  - The same user actions block its release.
 
 ## Open decisions (owner)
 
-1. Whether 0.2.0 is published from its existing tag, and when 0.2.1 is tagged.
+1. Whether 0.2.0 is published from its existing tag, and when 0.2.1 gets a GitHub release.
 2. Whether a release is recorded in `LOG.md`. No release has been so far.
 3. Whether the Windows bundle may be shared outside the owner's organisation (`misty-hyena`).
+4. Whether the Vellric wheel must build byte-identically on every system. The likely cause of the Windows difference is unconfirmed: license and notice files have no fixed line ending in `.gitattributes`, so a Windows checkout may give them CRLF.
