@@ -1,6 +1,6 @@
 ---
 title: Vellric security review
-date: 2026-10-14
+date: 2026-10-16
 status: draft
 scope: Whole-project security review of Vellric at a named revision — attack surface, sinks examined, findings, hardening follow-ups and coverage limits.
 ---
@@ -51,7 +51,7 @@ These are not vulnerabilities in Vellric itself. Each depends on a downstream co
 
 1. **CSV formula injection.** Table cells from the PDF are written verbatim to `pages/NNNNNN/tables/NNNN.csv` (`worker.py` ~728–729). A hostile cell beginning `=`, `+`, `-` or `@` could become a live formula if someone opens the file in a spreadsheet and accepts its warnings. Mitigation: prefix such cells (and cells starting with tab or carriage return) with a single quote, or document that the CSV is data, not a spreadsheet. **Decided:** documented in the artifact contract (`project/docs/CLI.md`); cells stay verbatim.
 2. **Markdown link schemes.** In the structured Markdown view, link targets from the PDF are only percent-encoded for spaces and parentheses (`native.py` ~65–66), so a `javascript:` or `data:` target survives. This matters only if a consumer renders the Markdown to HTML without sanitizing it. Mitigation: emit only `http`, `https` and `mailto` targets as links and render others as plain text, or document that consumers must sanitize. **Decided:** documented in the artifact contract (`project/docs/CLI.md`): every Markdown artifact carries document or model text verbatim, link targets keep their declared scheme, and any consumer rendering Markdown as HTML must sanitize.
-3. **Windows working folder for OCR children.** Tesseract and OCRmyPDF inherit the caller's working folder on Windows when the default environment is used (`runtime.py` ~258). DLL planting there needs an attacker who can already write into that folder, which is outside the hostile-document model. **Fixed:** every engine subprocess, including the `doctor` version probes, now runs in its private workspace folder on all platforms, as the custom-environment path already did; regression tests cover the real launch, the Windows branch and the probes.
+3. **Windows working folder for OCR children.** Tesseract and OCRmyPDF inherit the caller's working folder on Windows when the default environment is used (`runtime.py` ~258). DLL planting there needs an attacker who can already write into that folder, which is outside the hostile-document model. **Fixed in 0.2.1:** every engine subprocess, including the `doctor` version probes, now runs in its private workspace folder on all platforms, as the custom-environment path already did; regression tests cover the real launch, the Windows branch and the probes.
 
 ## 6. Coverage limits and residual risk
 
@@ -62,5 +62,5 @@ These are not vulnerabilities in Vellric itself. Each depends on a downstream co
 
 ## 7. Follow-up
 
-- Confirm the Windows CI run executes the working-folder regression test against the real Windows launch path.
+- Done 2026-10-14: the Windows workflow ran the working-folder regression tests against the real Windows launch path on the fix's commit. All three jobs passed, each with four more tests than the previous run and no new skips.
 - Re-run this review after any change that adds a new input channel (a job file, daemon or network listener), adds XML or metadata parsing, or lets document-derived text reach a filesystem path or subprocess argument.
