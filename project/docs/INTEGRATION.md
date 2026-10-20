@@ -1,5 +1,7 @@
 # Local Drawbridge integration
 
+As of 2026-10-20, Vellric's local candidate accepts its own [Conric configuration subtree](CONFIGURATION.md). A caller may compose shared files with other leaves, validate `vellric` with the leaf-owned schema, and pass the explicit configuration paths to the independently installed CLI. Final invocation validation remains Vellric-owned; caller restrictions use `--local-only`, which files cannot disable. Do not duplicate the vision/provider schema in an orchestration wrapper or resolve credentials into argv. Config paths and credential reference names do not enter the result bundle. Existing complete-job process integration is unchanged. No downstream caller, remote host or service is migrated by this change; publication is held because Conric remains private.
+
 Drawbridge uses the complete-job adapter described here. Vellric is installed independently; live consumer migrations require their own staged qualification.
 
 Invoke a trusted independently installed Vellric executable once per complete job. First probe doctor/schema/behavior. For admission use complete `inspect`; for fidelity use `convert --status-json --expected-sha256 HASH`, passing the caller's CPU grant as `--jobs`. Request `--structure native` when the existing plan enables deterministic native formatting. Preserve current preflight/OCR settings. Never replace complete jobs with per-method subprocess RPC or import Vellric/PyMuPDF into the intended Drawbridge PDF path.

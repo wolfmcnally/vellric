@@ -851,6 +851,9 @@ def execute(config: dict) -> dict:
                     "temp_dir",
                     "tessdata_dir",
                     "vision_command",
+                    "vision_api_key_env",
+                    "config",
+                    "config_root",
                     "amend",
                 }
             },

@@ -2,15 +2,17 @@
 
 Vellric inspects PDFs, preserves exact native text, recovers scans at four rotations, and exports optional native Markdown, page images and layout artifacts. Each CLI invocation owns one complete document job and publishes an inspectable bundle atomically. It requires no Drawbridge, account credentials or model provider.
 
-The current candidate is **0.2.1**, licensed **AGPL-3.0-only**. Public releases use fresh audited histories. Original MIT grants and dependency notices are retained.
+The current candidate is **0.2.2**, licensed **AGPL-3.0-only**. Public releases use fresh audited histories. Original MIT grants and dependency notices are retained.
+
+This local candidate uses private Conric for [composed configuration](project/docs/CONFIGURATION.md). It is not authorized for publication to the existing public upstream; installation requires existing authorized Git access. Public CI and Windows bundle qualification remain open for this dependency shape.
 
 ## Quick start
 
-With Python 3.12+ and uv, from the directory containing the downloaded candidate wheel:
+With Python 3.12+ and uv and existing authorized Git access, from the directory containing the locally built candidate wheel:
 
 ```bash
 uv venv --python 3.12 .venv
-uv pip install --python .venv/bin/python ./vellric-0.1.0-py3-none-any.whl
+uv pip install --python .venv/bin/python ./vellric-0.2.2-py3-none-any.whl
 .venv/bin/vellric --version
 .venv/bin/vellric doctor --json
 .venv/bin/vellric convert input.pdf --ocr never --structure native --out converted --status-json

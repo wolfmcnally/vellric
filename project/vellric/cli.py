@@ -22,6 +22,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from . import __version__, vision
+from .configuration import VISION_DEFAULTS, resolve_options
 from .runtime import (
     BEHAVIOR,
     SCHEMA,
@@ -48,6 +49,12 @@ from .runtime import (
 class Parser(argparse.ArgumentParser):
     def error(self, message):
         raise JobError("usage", message, stage="settings")
+
+    def parse_args(self, args=None, namespace=None):
+        parsed = super().parse_args(args, namespace)
+        if parsed.command == "convert":
+            return argparse.Namespace(**resolve_options(vars(parsed)))
+        return parsed
 
 
 def parser() -> argparse.ArgumentParser:
@@ -97,6 +104,9 @@ def parser() -> argparse.ArgumentParser:
             preflight_timeout_seconds=1800.0,
         )
         if name == "convert":
+            c.add_argument("--config", action="append", help="explicit composed YAML settings file")
+            c.add_argument("--config-root", help="common root confining all configuration files")
+            c.add_argument("--local-only", action="store_true", help="refuse every vision route")
             c.add_argument("--ocr", choices=["auto", "never", "always"], default="auto")
             c.add_argument("--preflight", choices=["on", "off"], default="on")
             c.add_argument("--structure", choices=["none", "native"], default="none")
@@ -111,7 +121,7 @@ def parser() -> argparse.ArgumentParser:
             c.add_argument("--diagnostics", action="store_true")
             c.add_argument(
                 "--vision-provider",
-                choices=list(vision.PROVIDERS),
+                choices=[*vision.PROVIDERS, "none"],
                 help="opt in to a high-quality pass by a vision-capable model",
             )
             c.add_argument("--vision-model", help="model name as the provider knows it")
@@ -143,6 +153,10 @@ def parser() -> argparse.ArgumentParser:
             c.add_argument(
                 "--amend", help="earlier convert result of this input whose other pages are kept"
             )
+            # Absence must remain distinguishable from an explicitly supplied default.
+            for action in c._actions:
+                if action.dest in {f"vision_{key}" for key in VISION_DEFAULTS}:
+                    action.default = argparse.SUPPRESS
         if name == "image":
             c.add_argument("--width", type=int)
             c.add_argument("--height", type=int)
@@ -338,6 +352,10 @@ def validate_options(options: dict) -> None:
 def validate_vision(options: dict) -> None:
     """Vision and amend settings exist on convert only; refuse every contradiction up front."""
     provider = options.get("vision_provider")
+    if provider is not None and options.get("local_only"):
+        raise JobError(
+            "usage", "Local-only conversion forbids every vision provider", stage="settings"
+        )
     if provider is None:
         named = [
             key

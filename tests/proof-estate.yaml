@@ -1175,6 +1175,7 @@ families:
   nearest_overlap: Existing OCR and custody proofs never call a model provider, carry pages from an earlier bundle or handle a provider credential.
   historical_evidence: []
   mutation_evidence:
+  - credential-reference-published
   - model-text-overwrites-native-fidelity
   - vision-pass-ignores-automatic-page-selection
   - truncated-endpoint-reply-accepted
@@ -1197,4 +1198,33 @@ families:
   replacement_lineage: []
   tier: vital
   size: medium
+  flake_rate: 0.0
+
+- id: pytest-project-tests-test_configuration-py
+  kind: pytest
+  selectors:
+  - project/tests/test_configuration.py
+  source_paths:
+  - project/tests/test_configuration.py
+  covers:
+  - project/vellric/configuration.py
+  - project/vellric/cli.py
+  - project/vellric/worker.py
+  - project/pyproject.toml
+  - project/uv.lock
+  - project/docs/CONFIGURATION.md
+  contract: Composed leaf settings retain explicit CLI precedence and provenance, refuse local-only egress before credentials, redact bundle paths/references, and work from a real installed wheel.
+  risk_class: configuration-privacy-and-installed-contract
+  oracle: Fixed synthetic source coordinates, exact settings/refusal codes, absent credential/path bytes and isolated installed-caller output plus pinned wheel dependency metadata.
+  admission: New configuration boundary and private runtime dependency are not reached by prior CLI/OCR/provider tests; four direct proofs exercise composition, policy, artifact and installed-package contracts.
+  nearest_overlap: Existing vision tests cover provider wire behavior and redacted artifacts, but do not load composed files, enforce caller local-only, or install the leaf from a wheel outside checkout.
+  historical_evidence: []
+  mutation_evidence:
+  - explicit-precedence
+  - local-only-before-credentials
+  - config-path-published
+  - installed-leaf-corruption
+  replacement_lineage: []
+  tier: vital
+  size: small
   flake_rate: 0.0

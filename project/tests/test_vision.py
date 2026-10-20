@@ -275,7 +275,8 @@ def test_hosted_provider_request_custody_and_typed_refusals(
     assert (out / "pages/000002/vision.md").read_text() == expected
     assert kind == "bedrock" or record["pages"][1]["vision"]["served_model"] == "served-model"
     assert record["vision"]["declarations"] == ["fair_use"]
-    assert record["settings"]["vision_api_key_env"] == "VISION_TEST_KEY"
+    assert "vision_api_key_env" not in record["settings"]
+    assert b"VISION_TEST_KEY" not in bundle_bytes(out)
     assert SECRET.encode() not in bundle_bytes(out)
     for model, failure in (("cut", "vision-operational"), ("refuse", "vision-refused")):
         target = tmp_path / model

@@ -9,13 +9,13 @@
       "leaves": 6
     },
     "pytest": {
-      "families": 152,
-      "leaves": 212
+      "families": 156,
+      "leaves": 216
     }
   },
   "counts": {
-    "families": 177,
-    "leaves": 237
+    "families": 181,
+    "leaves": 241
   },
   "families": [
     "gate:changed",
@@ -44,6 +44,10 @@
     "hook:.githooks/pre-commit:./bin/python project/packaging/release_version.py --staged",
     "hook:.githooks/pre-commit:./bin/test-governance validate",
     "pytest:project/tests/test_cli.py::test_help",
+    "pytest:project/tests/test_configuration.py::test_composed_leaf_precedence_provenance_and_rejections",
+    "pytest:project/tests/test_configuration.py::test_configured_native_bundle_excludes_paths_and_references",
+    "pytest:project/tests/test_configuration.py::test_installed_wheel_composes_outside_checkout",
+    "pytest:project/tests/test_configuration.py::test_local_only_and_credential_destination_binding",
     "pytest:project/tests/test_jobs.py::test_bundle_tampering_refused",
     "pytest:project/tests/test_jobs.py::test_cancellation_reaps_worker_grandchild",
     "pytest:project/tests/test_jobs.py::test_clip_pixels_and_named_geometry",
@@ -196,7 +200,7 @@
     "pytest:tests/test_treatise.py::test_an_external_fact_without_a_retrieval_date_fails",
     "pytest:tests/test_treatise.py::test_the_repository_own_treatises_validate"
   ],
-  "inventory_sha256": "c415e78a9771f349a471d8a5287e4aeefd8cb0aff6fdc400a8264188f15cdcf9",
+  "inventory_sha256": "0f7ed149587c30d8c874e58cfa5e107228a53e6f2327dbcf6063b100edf50b5d",
   "proofs": [
     {
       "family": "pytest:project/tests/test_cli.py::test_help",
@@ -204,6 +208,34 @@
       "kind": "pytest",
       "selector": "project/tests/test_cli.py::test_help",
       "source_path": "project/tests/test_cli.py"
+    },
+    {
+      "family": "pytest:project/tests/test_configuration.py::test_composed_leaf_precedence_provenance_and_rejections",
+      "id": "pytest:project/tests/test_configuration.py::test_composed_leaf_precedence_provenance_and_rejections",
+      "kind": "pytest",
+      "selector": "project/tests/test_configuration.py::test_composed_leaf_precedence_provenance_and_rejections",
+      "source_path": "project/tests/test_configuration.py"
+    },
+    {
+      "family": "pytest:project/tests/test_configuration.py::test_local_only_and_credential_destination_binding",
+      "id": "pytest:project/tests/test_configuration.py::test_local_only_and_credential_destination_binding",
+      "kind": "pytest",
+      "selector": "project/tests/test_configuration.py::test_local_only_and_credential_destination_binding",
+      "source_path": "project/tests/test_configuration.py"
+    },
+    {
+      "family": "pytest:project/tests/test_configuration.py::test_configured_native_bundle_excludes_paths_and_references",
+      "id": "pytest:project/tests/test_configuration.py::test_configured_native_bundle_excludes_paths_and_references",
+      "kind": "pytest",
+      "selector": "project/tests/test_configuration.py::test_configured_native_bundle_excludes_paths_and_references",
+      "source_path": "project/tests/test_configuration.py"
+    },
+    {
+      "family": "pytest:project/tests/test_configuration.py::test_installed_wheel_composes_outside_checkout",
+      "id": "pytest:project/tests/test_configuration.py::test_installed_wheel_composes_outside_checkout",
+      "kind": "pytest",
+      "selector": "project/tests/test_configuration.py::test_installed_wheel_composes_outside_checkout",
+      "source_path": "project/tests/test_configuration.py"
     },
     {
       "family": "pytest:project/tests/test_jobs.py::test_native_full_job_and_golden",

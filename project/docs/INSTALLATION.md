@@ -1,14 +1,16 @@
-# Install Vellric 0.2.1
+# Install Vellric 0.2.2
+
+As of 2026-10-20 this is a local development candidate with an exact private Conric Git dependency. The wheel's metadata carries that source reference; installation requires the owner's already authorized Git access. There is no public Conric feed or selected redistribution license. Do not publish this candidate to the public upstream or a package index. Public CI and the existing Windows bundle pipeline cannot resolve/package this private Git dependency as currently configured and are unqualified for 0.2.2; no CI credentials, artifact feed or distribution channel is provisioned by this change. The Windows instructions below describe the existing bundle contract, not an available or qualified 0.2.2 bundle. Release/Windows qualification and any wider distribution remain separate work. See [configuration](CONFIGURATION.md).
 
 Vellric needs Python 3.12+, PyMuPDF 1.28.2 and Pillow 12.3.0. macOS and Linux arm64 are qualified, and Windows x64 is supported as described under [Windows](#windows); atomic publication refuses any other platform. English native/full-OCR samples are qualified. Other languages/architectures need their own fixture qualification.
 
 ## Native PDF work
 
-Download the candidate wheel, or extract the matching source archive. In a new directory:
+Build the candidate wheel locally, or use the matching source through existing authorized access. In a new directory:
 
 ```bash
 uv venv --python 3.12 .venv
-uv pip install --python .venv/bin/python ./vellric-0.2.1-py3-none-any.whl
+uv pip install --python .venv/bin/python ./vellric-0.2.2-py3-none-any.whl
 .venv/bin/vellric --version
 .venv/bin/vellric doctor --json
 ```
@@ -18,7 +20,7 @@ From extracted source, replace the wheel argument with `.`. For exact locked ins
 ## Scan OCR
 
 ```bash
-uv pip install --python .venv/bin/python './vellric-0.2.1-py3-none-any.whl[ocr]'
+uv pip install --python .venv/bin/python './vellric-0.2.2-py3-none-any.whl[ocr]'
 .venv/bin/vellric doctor --json
 ```
 
@@ -39,14 +41,14 @@ The directory must contain the requested traineddata. Do not copy the illustrati
 
 Vellric runs natively on 64-bit Windows with Python 3.12.4 or later; earlier Python releases create the private workspace readable by other accounts, and jobs refuse. Native PDF work and a vision-model pass need no Linux subsystem or container, and nothing in them asks for an administrator.
 
-The Windows bundle, `vellric-0.2.1-windows-x64-py313.zip`, holds Vellric, every locked Python dependency of the OCR extra as Windows wheels for Python 3.13, the guides and an `INSTALL.txt`. It installs with no package index. In PowerShell, from the extracted folder:
+A future qualified Windows bundle, `vellric-0.2.2-windows-x64-py313.zip`, would hold Vellric, every locked Python dependency of the OCR extra as Windows wheels for Python 3.13, the guides and an `INSTALL.txt`. That bundle contract installs with no package index; 0.2.2 is not qualified for it. In PowerShell, from a qualified extracted bundle:
 
 ```powershell
 python -m venv "$env:LOCALAPPDATA\vellric"
 ```
 
 ```powershell
-& "$env:LOCALAPPDATA\vellric\Scripts\python.exe" -m pip install --no-index --find-links wheels "vellric[ocr]==0.2.1"
+& "$env:LOCALAPPDATA\vellric\Scripts\python.exe" -m pip install --no-index --find-links wheels "vellric[ocr]==0.2.2"
 ```
 
 ```powershell
@@ -69,3 +71,5 @@ What differs from macOS and Linux:
 - Status and progress are written as UTF-8 whatever the console's code page.
 
 For independently installed Drawbridge, set DRAWBRIDGE_VELLRIC to this environment's absolute executable. No sibling repository or editable Vellric import is needed. See [boundary integration](INTEGRATION.md).
+
+The offline installed-package configuration proof assumes canonical `./bin/setup` has already cached the exact authorized Git source and locked runtime/build dependencies. A missing cache fails closed with the underlying diagnostic; the proof does not fetch an alternate source or turn an unavailable dependency into a product pass.

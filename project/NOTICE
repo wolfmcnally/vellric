@@ -1,6 +1,10 @@
-Vellric 0.2.1 — local release qualification
+Vellric 0.2.2 — local development candidate
 Copyright (c) 2026 Wolf McNally.
 Project grant: AGPL-3.0-only. Full license: LICENSE.
+
+This local candidate depends on private Conric, for which no redistribution
+license has been selected, and PyYAML (MIT). Existing Vellric grants remain
+unchanged. Publication and distribution of this candidate are not authorized.
 
 Adapted Drawbridge source retains its original MIT grant and copyright,
 from an MIT source snapshot:

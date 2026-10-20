@@ -1,6 +1,8 @@
 # Licensing and source
 
-Vellric 0.2.1 is AGPL-3.0-only. [Full GNU text](../LICENSE), [NOTICE](../NOTICE) and the original Drawbridge/Starter MIT grants under LICENSES accompany the wheel/source. Those retained grants remain operative; no commercial Artifex grant is claimed.
+As of 2026-10-20, candidate 0.2.2 adds private Conric, for which no redistribution license has been selected, and PyYAML (MIT) to the runtime closure. Vellric's existing grant and notices are unchanged. The historical qualified inventory below does not qualify this added closure. This candidate is for authorized local development; public publication and Windows bundle distribution are held. No new license rights are asserted for Conric.
+
+Vellric 0.2.2 is AGPL-3.0-only. [Full GNU text](../LICENSE), [NOTICE](../NOTICE) and the original Drawbridge/Starter MIT grants under LICENSES accompany the wheel/source. Those retained grants remain operative; no commercial Artifex grant is claimed.
 
 The project wheel ships Vellric source, docs and notices. PyMuPDF/MuPDF and optional OCR dependencies/system engines install separately and keep their own AGPL/MPL/LGPL/Apache/BSD/MIT and component notices. The exact qualified inventory is [dependencies-qualified.json](dependencies-qualified.json); actual notice texts and source-download hashes are retained in the local release bundle. This is not a wholly permissive OCR stack. The optional `vision` extra installs the MIT-licensed `anthropic` package and its dependencies; that closure is locked in `uv.lock` but is not yet part of the qualified inventory.
 
