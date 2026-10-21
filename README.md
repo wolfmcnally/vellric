@@ -4,11 +4,11 @@ Vellric inspects PDFs, preserves exact native text, recovers scans at four rotat
 
 The current candidate is **0.2.2**, licensed **AGPL-3.0-only**. Public releases use fresh audited histories. Original MIT grants and dependency notices are retained.
 
-This local candidate uses private Conric for [composed configuration](project/docs/CONFIGURATION.md). It is not authorized for publication to the existing public upstream; installation requires existing authorized Git access. Public CI and Windows bundle qualification remain open for this dependency shape.
+As of 2026-10-21, this local candidate pins public MIT-licensed Conric 0.1.0 for [composed configuration](project/docs/CONFIGURATION.md). Vellric publication remains held for a separate release decision. Public CI and Windows bundle qualification remain open for the Git dependency shape.
 
 ## Quick start
 
-With Python 3.12+ and uv and existing authorized Git access, from the directory containing the locally built candidate wheel:
+With Python 3.12+, uv and Git access to the public dependency, from the directory containing the locally built candidate wheel:
 
 ```bash
 uv venv --python 3.12 .venv

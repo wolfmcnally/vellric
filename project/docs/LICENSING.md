@@ -1,6 +1,6 @@
 # Licensing and source
 
-As of 2026-10-20, candidate 0.2.2 adds private Conric, for which no redistribution license has been selected, and PyYAML (MIT) to the runtime closure. Vellric's existing grant and notices are unchanged. The historical qualified inventory below does not qualify this added closure. This candidate is for authorized local development; public publication and Windows bundle distribution are held. No new license rights are asserted for Conric.
+As of 2026-10-21, candidate 0.2.2 uses public Conric 0.1.0 (MIT) and PyYAML (MIT) in the runtime closure. Conric's separately installed wheel carries its MIT license; its public source is pinned exactly in the manifest and lock. Vellric's existing grant and notices are unchanged. The historical qualified inventory below does not qualify this added closure. This candidate is for authorized local development; public publication and Windows bundle distribution are held. Conric's public MIT grant does not qualify Vellric's release artifacts or the Windows dependency bundle.
 
 Vellric 0.2.2 is AGPL-3.0-only. [Full GNU text](../LICENSE), [NOTICE](../NOTICE) and the original Drawbridge/Starter MIT grants under LICENSES accompany the wheel/source. Those retained grants remain operative; no commercial Artifex grant is claimed.
 

@@ -4,7 +4,7 @@ Vellric inspects PDFs, preserves exact native text, recovers scans at four rotat
 
 The current candidate is **0.2.2**, licensed **AGPL-3.0-only**. Public releases use fresh audited histories. Original MIT grants and dependency notices are retained.
 
-This local candidate depends on an exact private Conric Git revision. Installation requires existing authorized source access; publication and Windows bundle qualification are held. See [installation](docs/INSTALLATION.md) and [composed configuration](docs/CONFIGURATION.md). No-config CLI behavior is retained.
+As of 2026-10-21, this local candidate depends on an exact public MIT-licensed Conric 0.1.0 Git revision with a flat package root. Vellric publication remains held for a separate release decision; Windows bundle qualification is still open. See [installation](docs/INSTALLATION.md) and [composed configuration](docs/CONFIGURATION.md). No-config CLI behavior is retained.
 
 ## Quick start
 

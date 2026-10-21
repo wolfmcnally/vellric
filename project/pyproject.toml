@@ -7,7 +7,7 @@ license = "AGPL-3.0-only"
 license-files = ["LICENSE", "LICENSES/*.txt", "NOTICE"]
 readme = "README.md"
 authors = [{ name = "Wolf McNally" }]
-dependencies = ["pymupdf==1.28.2", "pillow==12.3.0", "conric @ git+https://github.com/wolfmcnally/conric-private.git@7dc5dd8415b9cf67aaa5306205fcafb256a54d07#subdirectory=project"]
+dependencies = ["pymupdf==1.28.2", "pillow==12.3.0", "conric @ git+https://github.com/wolfmcnally/conric.git@ed9286297e92b8c049f70eb15a3b5556ed107ff0"]
 
 [project.optional-dependencies]
 ocr = ["ocrmypdf==17.7.0"]

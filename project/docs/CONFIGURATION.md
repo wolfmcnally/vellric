@@ -1,6 +1,6 @@
 # Composed configuration
 
-As of 2026-10-20, local candidate 0.2.2 uses private Conric. Publication, public CI and Windows bundle qualification are held; see [installation](INSTALLATION.md). Invocations without configuration retain their defaults and provider opt-in behavior.
+As of 2026-10-21, local candidate 0.2.2 uses public MIT-licensed Conric 0.1.0. Vellric publication remains held; public CI and Windows bundle qualification remain open; see [installation](INSTALLATION.md). Invocations without configuration retain their defaults and provider opt-in behavior.
 
 `convert --config FILE` loads explicit UTF-8 YAML through Conric. Repeat the flag for later overrides. `include: [base.yaml]` loads relative bases before the including file. Mappings merge recursively; lists and null replace. Files are confined to the first explicit file's parent; `--config-root DIRECTORY` allows files in sibling directories under a common root. There is no ambient discovery, dotenv loading or environment interpolation. Conric owns include/parser safety and resource limits. A missing `vellric` subtree is a usage error. Other top-level subtrees belong to other leaves and are ignored.
 

@@ -1,12 +1,12 @@
 # Install Vellric 0.2.2
 
-As of 2026-10-20 this is a local development candidate with an exact private Conric Git dependency. The wheel's metadata carries that source reference; installation requires the owner's already authorized Git access. There is no public Conric feed or selected redistribution license. Do not publish this candidate to the public upstream or a package index. Public CI and the existing Windows bundle pipeline cannot resolve/package this private Git dependency as currently configured and are unqualified for 0.2.2; no CI credentials, artifact feed or distribution channel is provisioned by this change. The Windows instructions below describe the existing bundle contract, not an available or qualified 0.2.2 bundle. Release/Windows qualification and any wider distribution remain separate work. See [configuration](CONFIGURATION.md).
+As of 2026-10-21 this is a local development candidate with an exact public MIT-licensed Conric 0.1.0 Git dependency, pinned to commit ed9286297e92b8c049f70eb15a3b5556ed107ff0 at https://github.com/wolfmcnally/conric.git. The package lives at the repository root; no subdirectory selector is used. The wheel's metadata carries that source reference. Vellric publication remains held for a separate release decision: do not publish this candidate to the public upstream or a package index. Public CI and the existing Windows bundle pipeline remain unqualified for this Git dependency shape in 0.2.2; no credentials, artifact feed or distribution channel is provisioned by this change. The Windows instructions below describe the existing bundle contract, not an available or qualified 0.2.2 bundle. Release/Windows qualification and any wider distribution remain separate work. See [configuration](CONFIGURATION.md).
 
 Vellric needs Python 3.12+, PyMuPDF 1.28.2 and Pillow 12.3.0. macOS and Linux arm64 are qualified, and Windows x64 is supported as described under [Windows](#windows); atomic publication refuses any other platform. English native/full-OCR samples are qualified. Other languages/architectures need their own fixture qualification.
 
 ## Native PDF work
 
-Build the candidate wheel locally, or use the matching source through existing authorized access. In a new directory:
+Build the candidate wheel locally, or use the matching locally prepared source. In a new directory:
 
 ```bash
 uv venv --python 3.12 .venv
@@ -15,7 +15,7 @@ uv pip install --python .venv/bin/python ./vellric-0.2.2-py3-none-any.whl
 .venv/bin/vellric doctor --json
 ```
 
-From extracted source, replace the wheel argument with `.`. For exact locked installation, export uv.lock and install its hash-pinned requirements as shown in [release preparation](RELEASE-PREPARATION.md), which was written for 0.1.0; use the current version number in its commands. The local proof uses fresh wheel and source installations with those exact pins.
+From extracted source, replace the wheel argument with `.`. For exact locked installation, export uv.lock and install its pinned requirements as shown in [release preparation](RELEASE-PREPARATION.md), which was written for 0.1.0; use the current version number in its commands. The local proof uses fresh wheel and source installations with those exact pins.
 
 ## Scan OCR
 

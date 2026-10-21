@@ -231,7 +231,7 @@ def test_configured_native_bundle_excludes_paths_and_references(tmp_path):
 
 
 def test_installed_wheel_composes_outside_checkout(tmp_path):
-    """Install a real wheel and locked dependencies, including the exact private Git source."""
+    """Install a real wheel and locked dependencies from the exact public Git source."""
     project = Path(__file__).resolve().parents[1]
     uv = shutil.which("uv")
     assert uv is not None
@@ -299,7 +299,7 @@ def test_installed_wheel_composes_outside_checkout(tmp_path):
     assert not Path(observed["vellric"]).is_relative_to(project)
     assert not Path(observed["conric"]).is_relative_to(project.parent.parent / "conric")
     assert any(
-        "conric@git+https://github.com/wolfmcnally/conric-private.git@"
-        "7dc5dd8415b9cf67aaa5306205fcafb256a54d07#subdirectory=project" in "".join(item.split())
+        "conric@git+https://github.com/wolfmcnally/conric.git@"
+        "ed9286297e92b8c049f70eb15a3b5556ed107ff0" == "".join(item.split())
         for item in observed["requirements"]
     )
