@@ -47,7 +47,10 @@ jobs:
           Expand-Archive (Get-Item dist\*.zip).FullName -DestinationPath bundle
           Get-Content bundle\INSTALL.txt
           python -m venv "$env:RUNNER_TEMP\vellric"
-          & "$env:RUNNER_TEMP\vellric\Scripts\python.exe" -m pip install --no-index --find-links bundle\wheels "vellric[ocr]"
+          Push-Location bundle
+          & "$env:RUNNER_TEMP\vellric\Scripts\python.exe" -m pip install --no-index --require-hashes --no-deps -r requirements-wheels.txt
+          & "$env:RUNNER_TEMP\vellric\Scripts\python.exe" -m pip check
+          Pop-Location
           "VELLRIC=$env:RUNNER_TEMP\vellric\Scripts\vellric.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Run the installed tool with no OCR engines
         run: |

@@ -239,19 +239,30 @@ def test_installed_wheel_composes_outside_checkout(tmp_path):
     def run(*argv):
         result = subprocess.run(argv, cwd=tmp_path, capture_output=True, text=True, timeout=120)
         assert result.returncode == 0, (
-            "Offline installed-wheel proof requires cached locked runtime/build dependencies "
-            "from authorized repository setup.\n" + result.stdout + result.stderr
+            "Installed-wheel proof requires the locked public runtime/build sources.\n"
+            + result.stdout
+            + result.stderr
         )
         return result.stdout
 
     wheelhouse = tmp_path / "wheels"
-    run(uv, "build", "--offline", "--wheel", str(project), "--out-dir", str(wheelhouse))
+    run(
+        uv,
+        "build",
+        "--python",
+        sys._base_executable,
+        "--wheel",
+        str(project),
+        "--out-dir",
+        str(wheelhouse),
+    )
     (wheel,) = wheelhouse.glob("*.whl")
     constraints = tmp_path / "locked.txt"
     run(
         uv,
         "export",
-        "--offline",
+        "--python",
+        sys._base_executable,
         "--project",
         str(project),
         "--locked",
@@ -262,13 +273,12 @@ def test_installed_wheel_composes_outside_checkout(tmp_path):
         str(constraints),
     )
     environment = tmp_path / "installed"
-    run(uv, "venv", "--offline", "--python", sys._base_executable, str(environment))
+    run(uv, "venv", "--python", sys._base_executable, str(environment))
     python = environment / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
     run(
         uv,
         "pip",
         "install",
-        "--offline",
         "--python",
         str(python),
         "--constraints",

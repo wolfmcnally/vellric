@@ -1,8 +1,8 @@
 {
-  "scope": "Qualified installed dependencies, not binaries bundled in the Vellric or Drawbridge wheel",
+  "scope": "As of 2026-10-21: actual macOS arm64 locked Vellric runtime with OCR and vision extras, excluding the project itself. These dependency binaries are not bundled in the project wheel. Notice texts are retained in the local release companion; source/engine/install/CI results remain separate gates.",
   "components": [
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
       "name": "annotated-types",
       "version": "0.8.0",
       "license_expression": "MIT",
@@ -18,10 +18,74 @@
         }
       ],
       "native_files": [],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/5f/56/a8120250d128bed162cd73c76d45f6ef9991f3e068f62a8ee060afa3104a/annotated_types-0.8.0.tar.gz",
+        "hash": "sha256:13b2beaad985e05e2d6407ee4c4f35590b11f8d693a258a561055cac8f64cab7",
+        "size": 15893,
+        "upload-time": "2026-07-23T20:16:13.995Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
+      "name": "anthropic",
+      "version": "1.12.0",
+      "license_expression": null,
+      "license": "MIT",
+      "license_classifiers": [
+        "License :: OSI Approved :: MIT License"
+      ],
+      "notice_files": [
+        {
+          "path": "anthropic-1.12.0.dist-info/licenses/LICENSE",
+          "sha256": "8bf96984ff8bcfae7e48cae76a529e8a25317ba9e02abf7fd3cc64fdf95657a6",
+          "bytes": 1056
+        },
+        {
+          "path": "anthropic/_vendor/httpx_aiohttp/LICENSE",
+          "sha256": "154759c1e9eb58e42643ee43ec59d556def4d1d702d911a484c469e02f85dd5d",
+          "bytes": 1493
+        },
+        {
+          "path": "anthropic/_vendor/httpx_aiohttp/NOTICE.md",
+          "sha256": "90f45e20cf0b5c730d956ad93d3cd68ab4466b9c7490ac2a1999c8dcbd521562",
+          "bytes": 1705
+        }
+      ],
+      "native_files": [],
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/9e/12/8d257f79868dca43175b1860618273ef52bb6c241bef29adf8808c8836ec/anthropic-1.12.0.tar.gz",
+        "hash": "sha256:a54f6a63e3a4ad94acca6fc9528da531a523bfc846d304d02d7f190d6b7c9b48",
+        "size": 1556079,
+        "upload-time": "2026-10-07T17:57:19.831Z"
+      }
+    },
+    {
+      "environment": "vellric-ocr-vision",
+      "name": "anyio",
+      "version": "4.15.1",
+      "license_expression": "MIT",
+      "license": null,
+      "license_classifiers": [],
+      "notice_files": [
+        {
+          "path": "anyio-4.15.1.dist-info/licenses/LICENSE",
+          "sha256": "5361ac9dc58f2ef5fd2e9b09c68297c17f04950909bbc8023bdb82eacf22c2b0",
+          "bytes": 1081
+        }
+      ],
+      "native_files": [],
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/a9/d2/f4d173e22df740bc37b1db102b386ba719b66e95b0f0d751f556b387e6d2/anyio-4.15.1.tar.gz",
+        "hash": "sha256:9f28306018cbd6d329e64a36d58256edff76dd996fe423bc957326e578b82a94",
+        "size": 276966,
+        "upload-time": "2026-09-05T10:42:39.44Z"
+      }
+    },
+    {
+      "environment": "vellric-ocr-vision",
       "name": "cffi",
       "version": "2.1.1",
       "license_expression": "MIT-0",
@@ -37,10 +101,16 @@
       "native_files": [
         "_cffi_backend.cpython-312-darwin.so"
       ],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/9e/ef/008a1939e372c06329a3fce4279c02f328488f3526744906eeec3da7ad5f/cffi-2.1.1.tar.gz",
+        "hash": "sha256:dd31f52ea1086513bb9df30f8fcee9b8918323ae067a3d5b78bc826a000712be",
+        "size": 530807,
+        "upload-time": "2026-08-03T21:21:18.939Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
       "name": "charset-normalizer",
       "version": "3.5.2",
       "license_expression": null,
@@ -57,10 +127,41 @@
         "charset_normalizer/cd.cpython-312-darwin.so",
         "charset_normalizer/md.cpython-312-darwin.so"
       ],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/33/1c/f41d4e74c28ab327ff3acd36053f7ea506c55872d7a90b0fa71aa3ab0c89/charset_normalizer-3.5.2.tar.gz",
+        "hash": "sha256:39de2a259fc954455c57274dc94c79d5842774e1247a016aff30bc0efed0f4ef",
+        "size": 172659,
+        "upload-time": "2026-09-30T04:39:23.398Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
+      "name": "conric",
+      "version": "0.1.0",
+      "license_expression": "MIT",
+      "license": null,
+      "license_classifiers": [],
+      "notice_files": [
+        {
+          "path": "conric-0.1.0.dist-info/licenses/LICENSE",
+          "sha256": "2bc7d883055c7cfffc6a9f448ef06163584e32ab5a5b7fa7d12daa58416472ff",
+          "bytes": 1069
+        }
+      ],
+      "native_files": [],
+      "distributed_in_project_wheel": false,
+      "direct_source": {
+        "url": "https://github.com/wolfmcnally/conric.git",
+        "vcs_info": {
+          "vcs": "git",
+          "commit_id": "ed9286297e92b8c049f70eb15a3b5556ed107ff0",
+          "requested_revision": "ed9286297e92b8c049f70eb15a3b5556ed107ff0"
+        }
+      }
+    },
+    {
+      "environment": "vellric-ocr-vision",
       "name": "cryptography",
       "version": "50.0.2",
       "license_expression": "Apache-2.0 OR BSD-3-Clause",
@@ -86,10 +187,16 @@
       "native_files": [
         "cryptography/hazmat/bindings/_rust.abi3.so"
       ],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/9d/af/182eb91b0df3fe75c4d9f26fe70684569566745f6ba7e5c9c73a862c5252/cryptography-50.0.2.tar.gz",
+        "hash": "sha256:7b46165bb56eb4704e2eaaf86f3c940d19154535d9b0ca7d6d590b04060e00d5",
+        "size": 880623,
+        "upload-time": "2026-09-30T15:30:04.884Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
       "name": "defusedxml",
       "version": "0.7.1",
       "license_expression": null,
@@ -105,10 +212,16 @@
         }
       ],
       "native_files": [],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/0f/d5/c66da9b79e5bdb124974bfe172b4daf3c984ebd9c2a06e2b8a4dc7331c72/defusedxml-0.7.1.tar.gz",
+        "hash": "sha256:1bb3032db185915b62d7c6209c5a8792be6a32ab2fedacc84e01b52c51aa3e69",
+        "size": 75520,
+        "upload-time": "2021-03-08T10:59:26.269Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
       "name": "deprecation",
       "version": "2.1.0",
       "license_expression": null,
@@ -124,10 +237,41 @@
         }
       ],
       "native_files": [],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/5a/d3/8ae2869247df154b64c1884d7346d412fed0c49df84db635aab2d1c40e62/deprecation-2.1.0.tar.gz",
+        "hash": "sha256:72b3bde64e5d778694b0cf68178aed03d15e15477116add3fb773e581f9518ff",
+        "size": 173788,
+        "upload-time": "2020-04-20T14:23:38.738Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
+      "name": "docstring_parser",
+      "version": "0.18.0",
+      "license_expression": null,
+      "license": "MIT",
+      "license_classifiers": [
+        "License :: OSI Approved :: MIT License"
+      ],
+      "notice_files": [
+        {
+          "path": "docstring_parser-0.18.0.dist-info/licenses/LICENSE.md",
+          "sha256": "dfe514a337ae8417abd31a8af707bbd6172b03e5430bb083e145899ea97a3eea",
+          "bytes": 1084
+        }
+      ],
+      "native_files": [],
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/e0/4d/f332313098c1de1b2d2ff91cf2674415cc7cddab2ca1b01ae29774bd5fdf/docstring_parser-0.18.0.tar.gz",
+        "hash": "sha256:292510982205c12b1248696f44959db3cdd1740237a968ea1e2e7a900eeb2015",
+        "size": 29341,
+        "upload-time": "2026-04-14T04:09:19.867Z"
+      }
+    },
+    {
+      "environment": "vellric-ocr-vision",
       "name": "fonttools",
       "version": "4.66.1",
       "license_expression": null,
@@ -153,10 +297,16 @@
         "fontTools/qu2cu/qu2cu.cpython-312-darwin.so",
         "fontTools/varLib/iup.cpython-312-darwin.so"
       ],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/87/b6/126c659ab7e0e03e01a5f5d223abf7b2c0691ae92718085a212a3924a2a3/fonttools-4.66.1.tar.gz",
+        "hash": "sha256:64967c6ddb0d4c610dfd8cb1485981b2d27972ddfb7d4bbbd9e199d2a089c450",
+        "size": 3694174,
+        "upload-time": "2026-09-29T16:11:53.706Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
       "name": "fpdf2",
       "version": "2.8.9",
       "license_expression": "LGPL-3.0-only",
@@ -164,21 +314,120 @@
       "license_classifiers": [],
       "notice_files": [
         {
-          "path": "fpdf/data/color_profiles/sRGB2014.icc.LICENSE",
-          "sha256": "5ed7fe3efa59b84b47fa22f5c67c9e9934ab9f07961a0d795812282347b88196",
-          "bytes": 801
-        },
-        {
           "path": "fpdf2-2.8.9.dist-info/licenses/LICENSE",
           "sha256": "f97bc4bb9b7ae8a653941073678b5c7775e8de44a01c3bcc21e7cdc148b90e61",
           "bytes": 7632
         }
       ],
       "native_files": [],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/12/23/84dbe637708c2690972eff5df233a7c9f8d4bde809f714839dc1b08f5e5e/fpdf2-2.8.9.tar.gz",
+        "hash": "sha256:5b0b3786f5236a2b3cc83c1fee567df17ddd314f8c4e13d820d8f09b617ab4f0",
+        "size": 380865,
+        "upload-time": "2026-09-29T13:11:54.506Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
+      "name": "h11",
+      "version": "0.16.0",
+      "license_expression": null,
+      "license": "MIT",
+      "license_classifiers": [
+        "License :: OSI Approved :: MIT License"
+      ],
+      "notice_files": [
+        {
+          "path": "h11-0.16.0.dist-info/licenses/LICENSE.txt",
+          "sha256": "37db5bb85926db28a427a25867f10b1232003aea1be69ccb851138adb8e6f361",
+          "bytes": 1124
+        }
+      ],
+      "native_files": [],
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/01/ee/02a2c011bdab74c6fb3c75474d40b3052059d95df7e73351460c8588d963/h11-0.16.0.tar.gz",
+        "hash": "sha256:4e35b956cf45792e4caa5885e69fba00bdbc6ffafbfa020300e549b208ee5ff1",
+        "size": 101250,
+        "upload-time": "2025-04-24T03:35:25.427Z"
+      }
+    },
+    {
+      "environment": "vellric-ocr-vision",
+      "name": "httpcore2",
+      "version": "2.13.1",
+      "license_expression": "BSD-3-Clause",
+      "license": null,
+      "license_classifiers": [
+        "License :: OSI Approved :: BSD License"
+      ],
+      "notice_files": [
+        {
+          "path": "httpcore2-2.13.1.dist-info/licenses/LICENSE.md",
+          "sha256": "c4df125c807b0613501e943a5c92496dd11d2c16604ce396097a8dde396304d9",
+          "bytes": 1599
+        }
+      ],
+      "native_files": [],
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/cb/f3/1db7aa2bc2524062192bb0e0323969492d1883152a232fe36eea65f4e35c/httpcore2-2.13.1.tar.gz",
+        "hash": "sha256:e0aa977abe17e69a3b820a24542a6fa88702676d83880b8d194dcd18408e5103",
+        "size": 68071,
+        "upload-time": "2026-09-23T07:47:22.372Z"
+      }
+    },
+    {
+      "environment": "vellric-ocr-vision",
+      "name": "httpx2",
+      "version": "2.13.1",
+      "license_expression": "BSD-3-Clause",
+      "license": null,
+      "license_classifiers": [
+        "License :: OSI Approved :: BSD License"
+      ],
+      "notice_files": [
+        {
+          "path": "httpx2-2.13.1.dist-info/licenses/LICENSE.md",
+          "sha256": "7e7d6dbaf7fe160d39fd6e84fd02c33cab96bcbea34d36998d545bceb4a19c30",
+          "bytes": 1589
+        }
+      ],
+      "native_files": [],
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/d5/44/474bef2a0e9d90f1715d32cb98b0738695ca17ba324095fb2497ed7fbd59/httpx2-2.13.1.tar.gz",
+        "hash": "sha256:e48744a19e3af5ee48313d0ce5fe941d5422fae5705ea922a4aabf94d7800dfa",
+        "size": 100405,
+        "upload-time": "2026-09-23T07:47:23.052Z"
+      }
+    },
+    {
+      "environment": "vellric-ocr-vision",
+      "name": "idna",
+      "version": "3.20",
+      "license_expression": "BSD-3-Clause",
+      "license": null,
+      "license_classifiers": [],
+      "notice_files": [
+        {
+          "path": "idna-3.20.dist-info/licenses/LICENSE.md",
+          "sha256": "1a9a4f0e3d479a27240ddd59a9137a66ab4a0f9dfdc8ca6188cc0bfd85187f04",
+          "bytes": 1541
+        }
+      ],
+      "native_files": [],
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/f5/08/8eea9d4b8302028f3abb2c0813953f7aec26d33b7a8960ed760e65ff29fa/idna-3.20.tar.gz",
+        "hash": "sha256:a7db850025b95ded1eae8a46181a1a6c56c92c96f0e2b005d9ff8dc0210cab44",
+        "size": 216463,
+        "upload-time": "2026-09-17T14:11:04.752Z"
+      }
+    },
+    {
+      "environment": "vellric-ocr-vision",
       "name": "img2pdf",
       "version": "0.6.3",
       "license_expression": null,
@@ -194,10 +443,41 @@
         }
       ],
       "native_files": [],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/8e/97/ca44c467131b93fda82d2a2f21b738c8bcf63b5259e3b8250e928b8dd52a/img2pdf-0.6.3.tar.gz",
+        "hash": "sha256:219518020f5bd242bdc46493941ea3f756f664c2e86f2454721e74353f58cd95",
+        "size": 120350,
+        "upload-time": "2025-11-05T20:51:57.558Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
+      "name": "jiter",
+      "version": "0.17.0",
+      "license_expression": "MIT",
+      "license": null,
+      "license_classifiers": [],
+      "notice_files": [
+        {
+          "path": "jiter-0.17.0.dist-info/licenses/LICENSE",
+          "sha256": "7c7134b9f7b978c03fca875517cf398db91f19bbb8109b6685e742aa3f57468e",
+          "bytes": 1091
+        }
+      ],
+      "native_files": [
+        "jiter/jiter.cpython-312-darwin.so"
+      ],
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/9c/1f/8176d92e001f86505424b41664032ae26a882bc9ca41a32c803f373f9195/jiter-0.17.0.tar.gz",
+        "hash": "sha256:03e432f226a453851079fb84cd17c6da9991eab723e28d716f14ae3d906e0c12",
+        "size": 229037,
+        "upload-time": "2026-09-12T15:14:14.253Z"
+      }
+    },
+    {
+      "environment": "vellric-ocr-vision",
       "name": "lxml",
       "version": "6.1.3",
       "license_expression": null,
@@ -224,10 +504,16 @@
         "lxml/objectify.cpython-312-darwin.so",
         "lxml/sax.cpython-312-darwin.so"
       ],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/23/ad/28ecd7cb894d172f3c9c80a075eeeb2017ac62e3632cee05a5f9493547eb/lxml-6.1.3.tar.gz",
+        "hash": "sha256:45222d94ddd511536f3b2f7d9deae3b2339b4ce0f075f1ca25703b07cad9dd21",
+        "size": 4211198,
+        "upload-time": "2026-09-02T14:48:02.287Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
       "name": "markdown-it-py",
       "version": "4.2.0",
       "license_expression": null,
@@ -248,10 +534,16 @@
         }
       ],
       "native_files": [],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/06/ff/7841249c247aa650a76b9ee4bbaeae59370dc8bfd2f6c01f3630c35eb134/markdown_it_py-4.2.0.tar.gz",
+        "hash": "sha256:04a21681d6fbb623de53f6f364d352309d4094dd4194040a10fd51833e418d49",
+        "size": 82454,
+        "upload-time": "2026-05-07T12:08:28.36Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
       "name": "mdurl",
       "version": "0.1.2",
       "license_expression": null,
@@ -267,10 +559,16 @@
         }
       ],
       "native_files": [],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz",
+        "hash": "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba",
+        "size": 8729,
+        "upload-time": "2022-08-14T12:40:10.846Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
       "name": "ocrmypdf",
       "version": "17.7.0",
       "license_expression": "MPL-2.0",
@@ -284,10 +582,16 @@
         }
       ],
       "native_files": [],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/0e/f4/7d8fcd1f255ce098ecb8daf40ae20eb3fd940ac0f40c5bc22f10711352f6/ocrmypdf-17.7.0.tar.gz",
+        "hash": "sha256:c0a351910e8fee09bdbfee6cc7ba0299b9d561bba42afbbf4df29edcc7d58bc6",
+        "size": 7431306,
+        "upload-time": "2026-06-18T02:59:40.938Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
       "name": "packaging",
       "version": "26.3",
       "license_expression": "Apache-2.0 OR BSD-2-Clause",
@@ -308,23 +612,19 @@
           "path": "packaging-26.3.dist-info/licenses/LICENSE.BSD",
           "sha256": "b70e7e9b742f1cc6f948b34c16aa39ffece94196364bc88ff0d2180f0028fac5",
           "bytes": 1344
-        },
-        {
-          "path": "packaging/licenses/__init__.py",
-          "sha256": "590d12eee73ddbec53b4e9ee5bfc64d9cb3aacb4940e8ebcba260757ce56740b",
-          "bytes": 7859
-        },
-        {
-          "path": "packaging/licenses/_spdx.py",
-          "sha256": "596ec35e2ca0ebcba9fd8343ff0a51625af548786257815f24b41f7e08613314",
-          "bytes": 51122
         }
       ],
       "native_files": [],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz",
+        "hash": "sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79",
+        "size": 313412,
+        "upload-time": "2026-08-04T18:15:28.737Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
       "name": "pdfminer.six",
       "version": "20260107",
       "license_expression": "MIT",
@@ -338,10 +638,16 @@
         }
       ],
       "native_files": [],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/34/a4/5cec1112009f0439a5ca6afa8ace321f0ab2f48da3255b7a1c8953014670/pdfminer_six-20260107.tar.gz",
+        "hash": "sha256:96bfd431e3577a55a0efd25676968ca4ce8fd5b53f14565f85716ff363889602",
+        "size": 8512094,
+        "upload-time": "2026-01-07T13:29:12.937Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
       "name": "pi_heif",
       "version": "1.4.0",
       "license_expression": null,
@@ -366,10 +672,16 @@
         "pi_heif/.dylibs/libde265.0.2.0.dylib",
         "pi_heif/.dylibs/libheif.1.23.0.dylib"
       ],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/6a/a2/70168b601b41bdf5726dfc8dc110eb4052a2e851fed9c9bdae95910e401d/pi_heif-1.4.0.tar.gz",
+        "hash": "sha256:e1199d9d41d9ecc877cf3ae7322ff099f6404574f2e62da47590cd4ecb9ec554",
+        "size": 17125614,
+        "upload-time": "2026-06-10T16:03:53.207Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
       "name": "pikepdf",
       "version": "10.16.0",
       "license_expression": "MPL-2.0",
@@ -447,10 +759,16 @@
         "pikepdf/.dylibs/libqpdf.30.4.2.dylib",
         "pikepdf/_core.cpython-312-darwin.so"
       ],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/32/80/0fb229f1d4772f102af425975b302c9de1b177b3e191ed7f7ffe24a02e98/pikepdf-10.16.0.tar.gz",
+        "hash": "sha256:d9541429f079f7838f2856fea5c2ad165885693cdb36894e73d40d1b845d2e11",
+        "size": 9924107,
+        "upload-time": "2026-09-29T22:48:57.412Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
       "name": "pillow",
       "version": "12.3.0",
       "license_expression": "MIT-CMU",
@@ -491,10 +809,16 @@
         "PIL/_imagingtk.cpython-312-darwin.so",
         "PIL/_webp.cpython-312-darwin.so"
       ],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/1c/3d/bb7fca845737cf9d7dbde16ed1843984665ff2e0a518f5db43e77ec540b9/pillow-12.3.0.tar.gz",
+        "hash": "sha256:3b8182a766685eaa002637e28b4ec8d6b18819a0c71f579bf0dbaa5830297cce",
+        "size": 47025035,
+        "upload-time": "2026-07-01T11:56:38.965Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
       "name": "pluggy",
       "version": "1.6.0",
       "license_expression": null,
@@ -510,10 +834,16 @@
         }
       ],
       "native_files": [],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/f9/e2/3e91f31a7d2b083fe6ef3fa267035b518369d9511ffab804f839851d2779/pluggy-1.6.0.tar.gz",
+        "hash": "sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3",
+        "size": 69412,
+        "upload-time": "2025-05-15T12:30:07.975Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
       "name": "pycparser",
       "version": "3.0",
       "license_expression": "BSD-3-Clause",
@@ -527,10 +857,16 @@
         }
       ],
       "native_files": [],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/1b/7d/92392ff7815c21062bea51aa7b87d45576f649f16458d78b7cf94b9ab2e6/pycparser-3.0.tar.gz",
+        "hash": "sha256:600f49d217304a5902ac3c37e1281c9fe94e4d0489de643a9504c5cdfdfc6b29",
+        "size": 103492,
+        "upload-time": "2026-01-21T14:26:51.89Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
       "name": "pydantic",
       "version": "2.13.5",
       "license_expression": "MIT",
@@ -544,10 +880,16 @@
         }
       ],
       "native_files": [],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/53/ef/fc4f868f4e2cee79f863883abffceff107875f569b848507319842d2a681/pydantic-2.13.5.tar.gz",
+        "hash": "sha256:51a9c5f7b2f8e636f04c6cada605d9b6a3bf1348fdf945a3d8869b19bba0ee08",
+        "size": 845750,
+        "upload-time": "2026-08-28T14:04:00.916Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
       "name": "pydantic_core",
       "version": "2.46.5",
       "license_expression": "MIT",
@@ -563,10 +905,16 @@
       "native_files": [
         "pydantic_core/_pydantic_core.cpython-312-darwin.so"
       ],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/af/f9/8a06bea35ef8daf588f707784c973a7046e0034c8d8cfb08828eeffb8b75/pydantic_core-2.46.5.tar.gz",
+        "hash": "sha256:10416c15b8839ecc4ef4d0885da76da6fd0f67333a0eb8aff6d93c4b8f2910fc",
+        "size": 472262,
+        "upload-time": "2026-08-28T10:01:31.677Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
       "name": "Pygments",
       "version": "2.21.0",
       "license_expression": "BSD-2-Clause",
@@ -585,10 +933,16 @@
         }
       ],
       "native_files": [],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/49/2e/ced460408999b33da6b31b0021b0f37d329e202d4169aeb164493778f25b/pygments-2.21.0.tar.gz",
+        "hash": "sha256:610ca751c9bc2492b38eb9a38a7fbc93edbbb2d7182edaf34e66ae493dee5c8c",
+        "size": 5005329,
+        "upload-time": "2026-08-17T08:02:48.824Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
       "name": "pymupdf",
       "version": "1.28.2",
       "license_expression": null,
@@ -607,10 +961,16 @@
         "pymupdf/libmupdf.dylib",
         "pymupdf/libmupdfcpp.so"
       ],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/a3/fb/b6761fa2d5266f2cdb24c3b91f4023070ab7848381417678e7a289a1d52a/pymupdf-1.28.2.tar.gz",
+        "hash": "sha256:5e0be7908a715aa20333caddd73f1d6f01e4cd0c26e869fa2dd0b7f344da2249",
+        "size": 87903557,
+        "upload-time": "2026-08-06T21:43:23.321Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
+      "environment": "vellric-ocr-vision",
       "name": "pypdfium2",
       "version": "5.13.0",
       "license_expression": null,
@@ -716,204 +1076,16 @@
       "native_files": [
         "pypdfium2_raw/libpdfium.dylib"
       ],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/ec/78/a52cb80611339ec95f35c7a10d7bfe7a6f97f3b50a35a9f94283d062512e/pypdfium2-5.13.0.tar.gz",
+        "hash": "sha256:7ca2d8e31bd8d0d40c496416b7d8bea423388669ffd494929f50e8c3a82326b8",
+        "size": 273639,
+        "upload-time": "2026-08-13T10:58:15.837Z"
+      }
     },
     {
-      "environment": "vellric-ocr",
-      "name": "rich",
-      "version": "15.0.0",
-      "license_expression": null,
-      "license": "MIT",
-      "license_classifiers": [
-        "License :: OSI Approved :: MIT License"
-      ],
-      "notice_files": [
-        {
-          "path": "rich-15.0.0.dist-info/licenses/LICENSE",
-          "sha256": "deed7c17a4318158190a3ea239cc879a5a50271cebb98ae7025f48fbe58dca15",
-          "bytes": 1056
-        }
-      ],
-      "native_files": [],
-      "distributed_in_project_wheel": false
-    },
-    {
-      "environment": "vellric-ocr",
-      "name": "typing-inspection",
-      "version": "0.4.4",
-      "license_expression": "MIT",
-      "license": null,
-      "license_classifiers": [],
-      "notice_files": [
-        {
-          "path": "typing_inspection-0.4.4.dist-info/licenses/LICENSE",
-          "sha256": "804b59b25f2c31bd278f9202a19ae49a3945aa2664387e2d0a128c7cacc61ec3",
-          "bytes": 1090
-        }
-      ],
-      "native_files": [],
-      "distributed_in_project_wheel": false
-    },
-    {
-      "environment": "vellric-ocr",
-      "name": "typing_extensions",
-      "version": "4.16.0",
-      "license_expression": "PSF-2.0",
-      "license": null,
-      "license_classifiers": [],
-      "notice_files": [
-        {
-          "path": "typing_extensions-4.16.0.dist-info/licenses/LICENSE",
-          "sha256": "3b2f81fe21d181c499c59a256c8e1968455d6689d269aa85373bfb6af41da3bf",
-          "bytes": 13936
-        }
-      ],
-      "native_files": [],
-      "distributed_in_project_wheel": false
-    },
-    {
-      "environment": "vellric-ocr",
-      "name": "uharfbuzz",
-      "version": "0.56.2",
-      "license_expression": null,
-      "license": "Apache License 2.0",
-      "license_classifiers": [],
-      "notice_files": [
-        {
-          "path": "uharfbuzz-0.56.2.dist-info/licenses/LICENSE",
-          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
-          "bytes": 11357
-        }
-      ],
-      "native_files": [
-        "uharfbuzz/_harfbuzz.abi3.so",
-        "uharfbuzz/_harfbuzz_test.abi3.so"
-      ],
-      "distributed_in_project_wheel": false
-    },
-    {
-      "environment": "drawbridge-runtime",
-      "name": "et_xmlfile",
-      "version": "2.0.0",
-      "license_expression": null,
-      "license": "MIT",
-      "license_classifiers": [
-        "License :: OSI Approved :: MIT License"
-      ],
-      "notice_files": [
-        {
-          "path": "et_xmlfile-2.0.0.dist-info/LICENCE.python",
-          "sha256": "4ccdaaebc0f44b83720ec0399bb7ab329adce067dd62f73c5535a2dc05628ab2",
-          "bytes": 14688
-        },
-        {
-          "path": "et_xmlfile-2.0.0.dist-info/LICENCE.rst",
-          "sha256": "0c84bb42f5d367e5ebf9fc2dde35b16141df5ee0fdc189250858bc6c5560f69e",
-          "bytes": 1131
-        }
-      ],
-      "native_files": [],
-      "distributed_in_project_wheel": false
-    },
-    {
-      "environment": "drawbridge-runtime",
-      "name": "olefile",
-      "version": "0.47",
-      "license_expression": null,
-      "license": "BSD",
-      "license_classifiers": [
-        "License :: OSI Approved :: BSD License"
-      ],
-      "notice_files": [
-        {
-          "path": "olefile-0.47.dist-info/LICENSE.txt",
-          "sha256": "cf1498d5b834b3758a89d06d224a1502c54a28b3a852f46130b761deaa4890d1",
-          "bytes": 2846
-        },
-        {
-          "path": "olefile/LICENSE.txt",
-          "sha256": "0c349bed31cd2af10983a8d95e7455e2d15744b98585b55941ca35bd70f5bcd7",
-          "bytes": 2915
-        },
-        {
-          "path": "olefile/doc/License.html",
-          "sha256": "0dbceed92e36dbdc11d21154b2b4c40b7e0d766c0c12d6e704df3edca8974ff9",
-          "bytes": 3833
-        },
-        {
-          "path": "olefile/doc/License.md",
-          "sha256": "17cc0185ea7dac964e318ad80b7000bd65c09485c3fdec8617c7422ea54a9105",
-          "bytes": 3191
-        }
-      ],
-      "native_files": [],
-      "distributed_in_project_wheel": false
-    },
-    {
-      "environment": "drawbridge-runtime",
-      "name": "openpyxl",
-      "version": "3.1.5",
-      "license_expression": null,
-      "license": "MIT",
-      "license_classifiers": [
-        "License :: OSI Approved :: MIT License"
-      ],
-      "notice_files": [
-        {
-          "path": "openpyxl-3.1.5.dist-info/LICENCE.rst",
-          "sha256": "0c84bb42f5d367e5ebf9fc2dde35b16141df5ee0fdc189250858bc6c5560f69e",
-          "bytes": 1131
-        }
-      ],
-      "native_files": [],
-      "distributed_in_project_wheel": false
-    },
-    {
-      "environment": "drawbridge-runtime",
-      "name": "pillow",
-      "version": "12.3.0",
-      "license_expression": "MIT-CMU",
-      "license": null,
-      "license_classifiers": [],
-      "notice_files": [
-        {
-          "path": "pillow-12.3.0.dist-info/licenses/LICENSE",
-          "sha256": "dda12a98c1979cf3d94df1cff45d27a4cb3f04a60c76f76902ac54cac03ec0ce",
-          "bytes": 70307
-        }
-      ],
-      "native_files": [
-        "PIL/.dylibs/libXau.6.dylib",
-        "PIL/.dylibs/libavif.16.4.2.dylib",
-        "PIL/.dylibs/libbrotlicommon.1.2.0.dylib",
-        "PIL/.dylibs/libbrotlidec.1.2.0.dylib",
-        "PIL/.dylibs/libfreetype.6.dylib",
-        "PIL/.dylibs/libharfbuzz.0.dylib",
-        "PIL/.dylibs/libjpeg.62.4.0.dylib",
-        "PIL/.dylibs/liblcms2.2.dylib",
-        "PIL/.dylibs/liblzma.5.dylib",
-        "PIL/.dylibs/libopenjp2.2.5.4.dylib",
-        "PIL/.dylibs/libpng16.16.dylib",
-        "PIL/.dylibs/libsharpyuv.0.dylib",
-        "PIL/.dylibs/libtiff.6.dylib",
-        "PIL/.dylibs/libwebp.7.dylib",
-        "PIL/.dylibs/libwebpdemux.2.dylib",
-        "PIL/.dylibs/libwebpmux.3.dylib",
-        "PIL/.dylibs/libxcb.1.1.0.dylib",
-        "PIL/.dylibs/libz.1.3.1.zlib-ng.dylib",
-        "PIL/_avif.cpython-312-darwin.so",
-        "PIL/_imaging.cpython-312-darwin.so",
-        "PIL/_imagingcms.cpython-312-darwin.so",
-        "PIL/_imagingft.cpython-312-darwin.so",
-        "PIL/_imagingmath.cpython-312-darwin.so",
-        "PIL/_imagingmorph.cpython-312-darwin.so",
-        "PIL/_imagingtk.cpython-312-darwin.so",
-        "PIL/_webp.cpython-312-darwin.so"
-      ],
-      "distributed_in_project_wheel": false
-    },
-    {
-      "environment": "drawbridge-runtime",
+      "environment": "vellric-ocr-vision",
       "name": "PyYAML",
       "version": "6.0.3",
       "license_expression": null,
@@ -931,26 +1103,169 @@
       "native_files": [
         "yaml/_yaml.cpython-312-darwin.so"
       ],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/05/8e/961c0007c59b8dd7729d542c61a4d537767a59645b82a0b521206e1e25c2/pyyaml-6.0.3.tar.gz",
+        "hash": "sha256:d76623373421df22fb4cf8817020cbb7ef15c725b9d5e45f17e189bfc384190f",
+        "size": 130960,
+        "upload-time": "2025-09-25T21:33:16.546Z"
+      }
     },
     {
-      "environment": "drawbridge-runtime",
-      "name": "xlrd",
-      "version": "2.0.2",
+      "environment": "vellric-ocr-vision",
+      "name": "rich",
+      "version": "15.0.0",
       "license_expression": null,
-      "license": "BSD",
+      "license": "MIT",
       "license_classifiers": [
-        "License :: OSI Approved :: BSD License"
+        "License :: OSI Approved :: MIT License"
       ],
       "notice_files": [
         {
-          "path": "xlrd-2.0.2.dist-info/LICENSE",
-          "sha256": "b5a5dbce60265e305a815a6cb83ed07f24519d8ba644f2a307994488bced8815",
-          "bytes": 3771
+          "path": "rich-15.0.0.dist-info/licenses/LICENSE",
+          "sha256": "deed7c17a4318158190a3ea239cc879a5a50271cebb98ae7025f48fbe58dca15",
+          "bytes": 1056
         }
       ],
       "native_files": [],
-      "distributed_in_project_wheel": false
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/c0/8f/0722ca900cc807c13a6a0c696dacf35430f72e0ec571c4275d2371fca3e9/rich-15.0.0.tar.gz",
+        "hash": "sha256:edd07a4824c6b40189fb7ac9bc4c52536e9780fbbfbddf6f1e2502c31b068c36",
+        "size": 230680,
+        "upload-time": "2026-04-12T08:24:00.75Z"
+      }
+    },
+    {
+      "environment": "vellric-ocr-vision",
+      "name": "sniffio",
+      "version": "1.3.1",
+      "license_expression": null,
+      "license": "MIT OR Apache-2.0",
+      "license_classifiers": [
+        "License :: OSI Approved :: MIT License",
+        "License :: OSI Approved :: Apache Software License"
+      ],
+      "notice_files": [
+        {
+          "path": "sniffio-1.3.1.dist-info/LICENSE",
+          "sha256": "652c878488d1456361e08c3f8607fd7ba59892a14103d15cce4ff93c85b5cc8b",
+          "bytes": 185
+        },
+        {
+          "path": "sniffio-1.3.1.dist-info/LICENSE.APACHE2",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358
+        },
+        {
+          "path": "sniffio-1.3.1.dist-info/LICENSE.MIT",
+          "sha256": "3e6dae555eb92787fc82d1d48355677f454c7f65aeb38d3f9e72bf9a3daf034b",
+          "bytes": 1046
+        }
+      ],
+      "native_files": [],
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/a2/87/a6771e1546d97e7e041b6ae58d80074f81b7d5121207425c964ddf5cfdbd/sniffio-1.3.1.tar.gz",
+        "hash": "sha256:f4324edc670a0f49750a81b895f35c3adb843cca46f0530f79fc1babb23789dc",
+        "size": 20372,
+        "upload-time": "2024-02-25T23:20:04.057Z"
+      }
+    },
+    {
+      "environment": "vellric-ocr-vision",
+      "name": "truststore",
+      "version": "0.10.4",
+      "license_expression": "MIT",
+      "license": null,
+      "license_classifiers": [],
+      "notice_files": [
+        {
+          "path": "truststore-0.10.4.dist-info/licenses/LICENSE",
+          "sha256": "33be7b7e8fa4fd19b1760e1a8ed8a668bdab852c91b692dd41424bcb725a9fca",
+          "bytes": 1086
+        }
+      ],
+      "native_files": [],
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/53/a3/1585216310e344e8102c22482f6060c7a6ea0322b63e026372e6dcefcfd6/truststore-0.10.4.tar.gz",
+        "hash": "sha256:9d91bd436463ad5e4ee4aba766628dd6cd7010cf3e2461756b3303710eebc301",
+        "size": 26169,
+        "upload-time": "2025-08-12T18:49:02.73Z"
+      }
+    },
+    {
+      "environment": "vellric-ocr-vision",
+      "name": "typing-inspection",
+      "version": "0.4.4",
+      "license_expression": "MIT",
+      "license": null,
+      "license_classifiers": [],
+      "notice_files": [
+        {
+          "path": "typing_inspection-0.4.4.dist-info/licenses/LICENSE",
+          "sha256": "804b59b25f2c31bd278f9202a19ae49a3945aa2664387e2d0a128c7cacc61ec3",
+          "bytes": 1090
+        }
+      ],
+      "native_files": [],
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/a3/26/b09b8010994eccc3c09092e6b34058f36a460eea2d4c3e8b910c695975a0/typing_inspection-0.4.4.tar.gz",
+        "hash": "sha256:547274fa6b0a561ccf549cc9524b999a578e737d015d8709d021f9d0d13bea47",
+        "size": 76928,
+        "upload-time": "2026-08-12T12:37:25.997Z"
+      }
+    },
+    {
+      "environment": "vellric-ocr-vision",
+      "name": "typing_extensions",
+      "version": "4.16.0",
+      "license_expression": "PSF-2.0",
+      "license": null,
+      "license_classifiers": [],
+      "notice_files": [
+        {
+          "path": "typing_extensions-4.16.0.dist-info/licenses/LICENSE",
+          "sha256": "3b2f81fe21d181c499c59a256c8e1968455d6689d269aa85373bfb6af41da3bf",
+          "bytes": 13936
+        }
+      ],
+      "native_files": [],
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/f6/cc/6253133b5bb138fc3306cebfbda2c520f545d36b5be2c7255cc528bb45d6/typing_extensions-4.16.0.tar.gz",
+        "hash": "sha256:dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5",
+        "size": 113555,
+        "upload-time": "2026-07-02T08:40:05.92Z"
+      }
+    },
+    {
+      "environment": "vellric-ocr-vision",
+      "name": "uharfbuzz",
+      "version": "0.56.2",
+      "license_expression": null,
+      "license": "Apache License 2.0",
+      "license_classifiers": [],
+      "notice_files": [
+        {
+          "path": "uharfbuzz-0.56.2.dist-info/licenses/LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+          "bytes": 11357
+        }
+      ],
+      "native_files": [
+        "uharfbuzz/_harfbuzz.abi3.so",
+        "uharfbuzz/_harfbuzz_test.abi3.so"
+      ],
+      "distributed_in_project_wheel": false,
+      "source_sdist": {
+        "url": "https://files.pythonhosted.org/packages/90/cb/b87e1e470e43c6d0b8edd9b5ed968c4465c3de5391a0f253edb0df1a9f18/uharfbuzz-0.56.2.tar.gz",
+        "hash": "sha256:303cd60c329bc4d88053ca03eb752476b51ca023944051c33710534dbc4fdac6",
+        "size": 39630560,
+        "upload-time": "2026-09-21T11:30:12.36Z"
+      }
     }
   ]
 }

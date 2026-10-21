@@ -1,8 +1,8 @@
 # Install Vellric 0.2.2
 
-As of 2026-10-21 this is a local development candidate with an exact public MIT-licensed Conric 0.1.0 Git dependency, pinned to commit ed9286297e92b8c049f70eb15a3b5556ed107ff0 at https://github.com/wolfmcnally/conric.git. The package lives at the repository root; no subdirectory selector is used. The wheel's metadata carries that source reference. Vellric publication remains held for a separate release decision: do not publish this candidate to the public upstream or a package index. Public CI and the existing Windows bundle pipeline remain unqualified for this Git dependency shape in 0.2.2; no credentials, artifact feed or distribution channel is provisioned by this change. The Windows instructions below describe the existing bundle contract, not an available or qualified 0.2.2 bundle. Release/Windows qualification and any wider distribution remain separate work. See [configuration](CONFIGURATION.md).
+As of 2026-10-21 this version uses an exact public MIT-licensed Conric 0.1.0 Git dependency, pinned to commit ed9286297e92b8c049f70eb15a3b5556ed107ff0 at https://github.com/wolfmcnally/conric.git. The package lives at the repository root; no subdirectory selector is used. The wheel's metadata carries that source reference. The source integration is public; tagged release artifacts require repository release qualification. No package-index publication is authorized. A release requires passing exact-commit public CI and the Windows bundle pipeline, as recorded in the matching GitHub release. The Windows instructions describe the internal bundle contract; this project wheel/source release distributes no Windows bundle. No credentials or artifact feed are provisioned. See [configuration](CONFIGURATION.md).
 
-Vellric needs Python 3.12+, PyMuPDF 1.28.2 and Pillow 12.3.0. macOS and Linux arm64 are qualified, and Windows x64 is supported as described under [Windows](#windows); atomic publication refuses any other platform. English native/full-OCR samples are qualified. Other languages/architectures need their own fixture qualification.
+Vellric needs Python 3.12+, PyMuPDF 1.28.2 and Pillow 12.3.0. Earlier fixture evidence qualifies macOS and Linux arm64; current release CI/install results are recorded with their observed architectures in the matching GitHub release. Windows x64 automation and still-pending desktop acceptance are distinct, as described under [Windows](#windows); atomic publication refuses any other platform. English native/full-OCR samples are qualified. Other languages/architectures need their own fixture qualification.
 
 ## Native PDF work
 
@@ -15,7 +15,7 @@ uv pip install --python .venv/bin/python ./vellric-0.2.2-py3-none-any.whl
 .venv/bin/vellric doctor --json
 ```
 
-From extracted source, replace the wheel argument with `.`. For exact locked installation, export uv.lock and install its pinned requirements as shown in [release preparation](RELEASE-PREPARATION.md), which was written for 0.1.0; use the current version number in its commands. The local proof uses fresh wheel and source installations with those exact pins.
+From extracted source, replace the wheel argument with `.`. For exact locked installation, export uv.lock and install its pinned requirements as shown in [release preparation](RELEASE-PREPARATION.md), using its current Git-aware registry-hash and exact-source procedure. The local proof uses fresh wheel and source installations with those exact pins.
 
 ## Scan OCR
 
@@ -41,21 +41,25 @@ The directory must contain the requested traineddata. Do not copy the illustrati
 
 Vellric runs natively on 64-bit Windows with Python 3.12.4 or later; earlier Python releases create the private workspace readable by other accounts, and jobs refuse. Native PDF work and a vision-model pass need no Linux subsystem or container, and nothing in them asks for an administrator.
 
-A future qualified Windows bundle, `vellric-0.2.2-windows-x64-py313.zip`, would hold Vellric, every locked Python dependency of the OCR extra as Windows wheels for Python 3.13, the guides and an `INSTALL.txt`. That bundle contract installs with no package index; 0.2.2 is not qualified for it. In PowerShell, from a qualified extracted bundle:
+An internally built Windows bundle, `vellric-0.2.2-windows-x64-py313.zip`, holds Vellric, every locked Python dependency of the OCR extra as Windows wheels for Python 3.13, the guides and an `INSTALL.txt`. That bundle contract installs with no package index. Its exact-commit automated proof is a release gate; desktop owner acceptance remains open and no Windows bundle is included in this public release. In PowerShell, run these commands from inside the qualified extracted bundle directory:
 
 ```powershell
 python -m venv "$env:LOCALAPPDATA\vellric"
 ```
 
 ```powershell
-& "$env:LOCALAPPDATA\vellric\Scripts\python.exe" -m pip install --no-index --find-links wheels "vellric[ocr]==0.2.2"
+& "$env:LOCALAPPDATA\vellric\Scripts\python.exe" -m pip install --no-index --require-hashes --no-deps -r requirements-wheels.txt
+```
+
+```powershell
+& "$env:LOCALAPPDATA\vellric\Scripts\python.exe" -m pip check
 ```
 
 ```powershell
 & "$env:LOCALAPPDATA\vellric\Scripts\vellric.exe" doctor
 ```
 
-Build the bundle on any system that has uv by running `python packaging/windows_bundle.py --out dist` from the project directory. Build it in a full Git checkout: the builder refuses a version that is already tagged on different content, and refuses when it cannot read the tags. It takes each dependency at the version in `uv.lock`, selects the Windows wheel for the target Python and checks it against its published hash. The bundle is for installing on one's own machines; [licensing](LICENSING.md) says what passing it to others involves. It does not carry the `anthropic` package, so the `anthropic` vision provider is refused from a bundle install.
+Build the bundle with Python 3.12+, uv and Git by running `python packaging/windows_bundle.py --out dist` from the project directory. Build it in a full Git checkout: the builder refuses a version that is already tagged on different content, and refuses when it cannot read the tags. Registry wheels are selected for the target Python at the locked versions and checked against their published hashes. The Conric wheel is built from the exact locked Git commit; SOURCE.txt records that source. Every bundled wheel is hashed in requirements-wheels.txt and in the printed build list. The bundle is for installing on one's own machines; [licensing](LICENSING.md) says what passing it to others involves. It does not carry the `anthropic` package, so the `anthropic` vision provider is refused from a bundle install.
 
 Tesseract and Ghostscript are separate programs that need an administrator to install. Windows accepts Tesseract **5.5.3** from the project's official installer, `tesseract-ocr-w64-setup-5.5.3.20260724.exe`, because the project publishes no Windows build of 5.5.2; a scanned page may therefore read slightly differently on Windows than on macOS or Linux. Ghostscript is `gs10071w64.exe` (10.07.1). Run each installer in the ordinary way and keep its default folder under Program Files; the Ghostscript installer raises a window even when asked to run silently. Vellric looks for engines only in those folders, the Python environment it runs from and the Windows system folders, which it takes from the system and not from environment variables. It never looks in the current folder or on the user's PATH, and where two Ghostscript releases are installed it uses the newer. Without them a vision-model pass still works with `--ocr never --vision-cross-check off`; a scanned page then has no independent reading, so nothing checks the model's transcription of it.
 
@@ -72,4 +76,4 @@ What differs from macOS and Linux:
 
 For independently installed Drawbridge, set DRAWBRIDGE_VELLRIC to this environment's absolute executable. No sibling repository or editable Vellric import is needed. See [boundary integration](INTEGRATION.md).
 
-The offline installed-package configuration proof assumes canonical `./bin/setup` has already cached the exact authorized Git source and locked runtime/build dependencies. A missing cache fails closed with the underlying diagnostic; the proof does not fetch an alternate source or turn an unavailable dependency into a product pass.
+The installed-package configuration proof builds a real wheel and installs the exact locked public runtime sources into a fresh environment, using the executing Python version. It may access public package/Git sources; an unavailable source fails closed rather than substituting another dependency. The separate Windows bundle carries a locally built wheel of the exact locked Conric commit, records that source in SOURCE.txt, and installs every bundled wheel by its recorded hash with dependency resolution disabled. Run pip check afterward; the installed package metadata remains unchanged and no Git access is needed for that bundle installation.

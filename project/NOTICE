@@ -1,11 +1,11 @@
-Vellric 0.2.2 — local development candidate
+Vellric 0.2.2
 Copyright (c) 2026 Wolf McNally.
 Project grant: AGPL-3.0-only. Full license: LICENSE.
 
-This local candidate depends on public Conric 0.1.0 (MIT) and PyYAML (MIT).
+This version depends on public Conric 0.1.0 (MIT) and PyYAML (MIT).
 Their separately installed packages retain their own grants and notices.
-Existing Vellric grants remain unchanged. Vellric publication and distribution
-of this candidate remain held for a separate release decision.
+Existing Vellric grants remain unchanged. The source integration is public;
+tagged release artifacts remain gated by repository release qualification.
 
 Adapted Drawbridge source retains its original MIT grant and copyright,
 from an MIT source snapshot:
@@ -31,3 +31,9 @@ Distributing a future bundled environment requires the matching component
 source/build/NOTICE material for those actual binaries; do not infer that
 an inspected upstream source tag is the complete bundled-native build source.
 See docs/RELEASE-PREPARATION.md for the concrete delivery route.
+
+Release scope (operator ruling, 2026-10-21): the project wheel and source
+archive are authorized for qualified Conric, native and OCR use only after
+all other mandatory release gates pass. Cloud-vision human acceptance is
+OPEN and UNQUALIFIED. The exception does not close real-provider tests or
+authorize provider calls, credentials, or Windows binary distribution.

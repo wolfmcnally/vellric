@@ -1,5 +1,7 @@
 # Prepared standalone release route
 
+As of 2026-10-21, preparation of the Conric-adopting candidate retains the existing audited public repository and its history. The initial 0.1.0 publication narrative below is historical and does not authorize recreating a repository or rewriting history. Current release qualification follows the release policy; source publication does not establish that tags, package assets, CI or human criteria have passed.
+
 The local candidates are Vellric 0.1.0 (AGPL-3.0-only) and Drawbridge 0.1.0 (MIT). The owner selected Drawbridge 0.1.0 for its first public release; the public repository starts a fresh history; private development history remains separately retained. This preparation publishes nothing and changes no live consumer. The release route publishes each project wheel with its matching source archive, lock, build constraints and notices. Engines and Python dependencies install independently. The Vellric wheel contains Python source/docs/notices and no PDF-engine/OCR/codec/data binaries. There is no theoretical license-choice hold.
 
 ## Source and notices
@@ -10,15 +12,48 @@ Those dependencies are not redistributed in the project wheel/source release rou
 
 ## Reproducible build and locked installation
 
-From extracted Vellric source, with Python 3.12 and uv available:
+The original 0.1.0 evidence below remains historical. For the current Conric-adopting candidate, use this Git-aware installation route from extracted source, with Python 3.12+, uv and Git available. A VCS reference cannot be installed with registry `--require-hashes`; keep registry hash checks and install the exact exported Git reference separately.
 
 ```bash
 uv lock --check
+```
+
+```bash
 SOURCE_DATE_EPOCH=1609459200 uv build . --python 3.12 --build-constraints build-constraints.txt --out-dir dist
+```
+
+```bash
 uv export --locked --no-dev --extra ocr --no-emit-project --format requirements-txt --output-file requirements-ocr.txt
+```
+
+```bash
+python - <<'PY'
+from pathlib import Path
+lines = Path("requirements-ocr.txt").read_text().splitlines(keepends=True)
+source = [line for line in lines if line.startswith("conric @ git+")]
+assert len(source) == 1, "Expected the one locked Conric Git source"
+Path("requirements-conric.txt").write_text("".join(source))
+Path("requirements-registry.txt").write_text("".join(line for line in lines if line not in source))
+PY
+```
+
+```bash
 uv venv --python 3.12 /absolute/isolated/vellric-env
-uv pip install --python /absolute/isolated/vellric-env/bin/python --require-hashes -r requirements-ocr.txt
-uv pip install --python /absolute/isolated/vellric-env/bin/python --no-deps dist/vellric-0.1.0-py3-none-any.whl
+```
+
+```bash
+uv pip install --python /absolute/isolated/vellric-env/bin/python --require-hashes --no-deps -r requirements-registry.txt
+```
+
+```bash
+uv pip install --python /absolute/isolated/vellric-env/bin/python --no-deps -r requirements-conric.txt
+```
+
+```bash
+uv pip install --python /absolute/isolated/vellric-env/bin/python --no-deps dist/vellric-0.2.2-py3-none-any.whl
+```
+
+```bash
 /absolute/isolated/vellric-env/bin/vellric doctor --json
 ```
 
@@ -41,3 +76,7 @@ The public repositories start with fresh single-root histories. Private developm
 3. With separate live-consumer authorization, install Vellric independently in staging, verify doctor/schema/behavior/engine/data identities and configure DRAWBRIDGE_VELLRIC, CPU capacity and measured input/page/memory/deadline limits. Record both full commits and artifact hashes. Invalidate affected conversion caches explicitly and prove representative native/mixed/blocked/large inputs before changing stores.
 4. Existing consumers that own PyMuPDF objects retain their own dependency obligations and the real PDF_LOCK/pdf_locked exports. Migrate their concrete native-object callers separately before removing those dependencies; audit each consumer distribution. The exact local consumer inventory/transition sequence is retained in the release companion evidence. No live installation/store/AWS change follows from these local candidates.
 5. Production sizing, additional target architectures/languages and hard host/container containment remain deployment qualification. They do not block the qualified local standalone release route. The process watchdog is not a hostile-document sandbox; forced supervisor termination remains a documented containment limitation.
+
+## v0.2.2 scoped release authority (2026-10-21)
+
+As of 2026-10-21, the operator approved v0.2.2’s `vellric-0.2.2-py3-none-any.whl` and `vellric-0.2.2.tar.gz` for qualified Conric, native and OCR use, conditional on every other mandatory release gate passing. **Cloud-vision human acceptance remains OPEN and UNQUALIFIED.** This one-release exception does not close the real-provider tests, authorize provider calls or credentials, qualify cloud-vision output, or permit Windows binary distribution. The exact owner ruling is recorded in `policies/releases.md`; retain this qualification limit in the GitHub release notes.

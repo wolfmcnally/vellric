@@ -43,6 +43,45 @@ jobs:
           ln -s "$RUNNER_TEMP/ocr/bin/tesseract" project/.venv/bin/tesseract
       - name: Qualify the exact source tree
         run: ./bin/check all
+      - name: Qualify a fresh installed wheel with native and OCR jobs
+        env:
+          SOURCE_DATE_EPOCH: "1609459200"
+        run: |
+          set -euo pipefail
+          uv build project --wheel --python 3.12 --build-constraints project/build-constraints.txt --out-dir "$RUNNER_TEMP/release-wheels"
+          UV_PROJECT_ENVIRONMENT="$RUNNER_TEMP/release-installed" uv sync --locked --no-dev --extra ocr --no-install-project --project project --python 3.12
+          uv pip install --python "$RUNNER_TEMP/release-installed/bin/python" --no-deps "$RUNNER_TEMP/release-wheels/"*.whl
+          ln -s "$RUNNER_TEMP/ocr/bin/tesseract" "$RUNNER_TEMP/release-installed/bin/tesseract"
+          mkdir -p .kickoff/check-all/installed-release
+          "$RUNNER_TEMP/release-installed/bin/vellric" doctor --json > .kickoff/check-all/installed-release/doctor.json
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/release-installed/bin/vellric" convert "$GITHUB_WORKSPACE/project/tests/fixtures/Fake_Doc_watermarked.pdf" --out native --ocr never --preflight off --local-only --status-json > "$GITHUB_WORKSPACE/.kickoff/check-all/installed-release/native-status.json"
+          "$RUNNER_TEMP/release-installed/bin/vellric" convert "$GITHUB_WORKSPACE/project/tests/fixtures/Fake_Doc_watermarked.pdf" --out ocr-document --ocr auto --preflight on --local-only --status-json > "$GITHUB_WORKSPACE/.kickoff/check-all/installed-release/ocr-document-status.json"
+          "$RUNNER_TEMP/release-installed/bin/vellric" convert "$GITHUB_WORKSPACE/project/tests/fixtures/Fake_Math_Doc_watermarked.pdf" --out ocr-math --ocr auto --preflight on --local-only --status-json > "$GITHUB_WORKSPACE/.kickoff/check-all/installed-release/ocr-math-status.json"
+          "$RUNNER_TEMP/release-installed/bin/python" - <<'PY'
+          from pathlib import Path
+          import hashlib, json, os, tomllib
+          import vellric
+          root = Path(os.environ["GITHUB_WORKSPACE"])
+          evidence = root / ".kickoff/check-all/installed-release"
+          assert not Path(vellric.__file__).resolve().is_relative_to(root / "project")
+          doctor = json.loads((evidence / "doctor.json").read_text())
+          expected_version = tomllib.loads((root / "project/pyproject.toml").read_text())["project"]["version"]
+          assert doctor["tool"]["version"] == expected_version
+          assert doctor["engines"]["tesseract"]["version"] == "tesseract 5.5.2"
+          assert doctor["engines"]["ocrmypdf"]["version"] == "17.7.0"
+          assert doctor["engines"]["pymupdf"]["version"] == "1.28.2"
+          assert doctor["engines"]["gs"]["available"] and not doctor["missing_languages"]
+          for status_name, fixture in [
+              ("native-status.json", "Fake_Doc_watermarked.pdf"),
+              ("ocr-document-status.json", "Fake_Doc_watermarked.pdf"),
+              ("ocr-math-status.json", "Fake_Math_Doc_watermarked.pdf"),
+          ]:
+              status = json.loads((evidence / status_name).read_text())
+              assert status["status"] == status["code"] == "complete"
+              assert status["stage"] == "published" and status["page_count"] == 4
+              assert status["source_sha256"] == hashlib.sha256((root / "project/tests/fixtures" / fixture).read_bytes()).hexdigest()
+          PY
       - name: Retain gate receipts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

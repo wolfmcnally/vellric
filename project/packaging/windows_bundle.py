@@ -1,7 +1,8 @@
 """Build the self-contained Windows bundle: Vellric, its locked dependencies and install notes.
 
-The bundle installs on 64-bit Windows with no package index. It can be built on any system that
-has uv, because every wheel is selected for the target and checked against its published hash:
+The bundle installs on 64-bit Windows without network resolution. Build it with Python 3.12+,
+uv and Git. Registry wheels use published hashes; Conric is built from its exact locked commit.
+Every local wheel's hash is recorded in the bundle:
 
     python packaging/windows_bundle.py --out dist
 
@@ -16,10 +17,14 @@ from __future__ import annotations
 import argparse
 import hashlib
 import os
+import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
+import tomllib
+import urllib.parse
 import zipfile
 from pathlib import Path
 
@@ -27,6 +32,7 @@ import release_version
 
 PROJECT = Path(__file__).resolve().parent.parent
 EPOCH = 1609459200  # The build time the release procedure fixes, so equal inputs give equal bytes.
+PIP_TOOL = "pip==26.2.2"
 
 INSTALL = """\
 Vellric {version} for Windows x64, Python {python}
@@ -35,7 +41,8 @@ Everything Vellric needs from Python is in the wheels folder; no package index i
 In PowerShell, from the folder this file is in:
 
     python -m venv "{home}"
-    & "{home}\\Scripts\\python.exe" -m pip install --no-index --find-links wheels "{requirement}"
+    & "{home}\\Scripts\\python.exe" -m pip install --no-index --require-hashes --no-deps -r requirements-wheels.txt
+    & "{home}\\Scripts\\python.exe" -m pip check
     & "{home}\\Scripts\\vellric.exe" doctor
 
 Then run it as:
@@ -80,6 +87,46 @@ def tracked(folder: str) -> list[str]:
         ["git", "-C", str(PROJECT), "ls-files", "-z", "--", folder], capture_output=True, check=True
     )
     return [name for name in listed.stdout.decode("utf-8").split("\0") if name]
+
+
+def materialize_conric(selected: Path, wheels: Path) -> str:
+    """Build the exact locked public source; leave registry requirements hash-checked."""
+    lock = tomllib.loads((PROJECT / "uv.lock").read_text(encoding="utf-8"))
+    package = next(item for item in lock["package"] if item["name"] == "conric")
+    source = urllib.parse.urlsplit(package["source"]["git"])
+    commit = source.fragment
+    if not re.fullmatch(r"[0-9a-f]{40}", commit) or urllib.parse.parse_qs(source.query) != {
+        "rev": [commit]
+    }:
+        raise SystemExit("Conric bundle source must be an exact flat-root Git commit")
+    url = urllib.parse.urlunsplit(source._replace(query="", fragment=""))
+    requirement = f"conric @ git+{url}@{commit}"
+    lines = selected.read_text(encoding="utf-8").splitlines(keepends=True)
+    references = [line for line in lines if line.startswith("conric @")]
+    if [line.strip() for line in references] != [requirement]:
+        raise SystemExit("Selected Conric source does not match the exact lock")
+    run(
+        "uv",
+        "tool",
+        "run",
+        "--from",
+        PIP_TOOL,
+        "--python",
+        sys.executable,
+        "pip",
+        "wheel",
+        "--no-deps",
+        "--build-constraint",
+        "build-constraints.txt",
+        "--wheel-dir",
+        str(wheels),
+        requirement,
+    )
+    expected = wheels / f"conric-{package['version']}-py3-none-any.whl"
+    if not expected.is_file() or list(wheels.glob("conric-*.whl")) != [expected]:
+        raise SystemExit("Conric source did not produce one portable pure-Python wheel")
+    selected.write_text("".join(line for line in lines if line not in references), encoding="utf-8")
+    return requirement
 
 
 def main() -> int:
@@ -146,11 +193,16 @@ def main() -> int:
             "--output-file",
             str(selected),
         )
-        # Each wheel is checked against its published hash as it arrives.
+        conric_source = materialize_conric(selected, wheels)
+        # Each registry wheel is checked against its published hash as it arrives.
         run(
             "uv",
             "tool",
             "run",
+            "--from",
+            PIP_TOOL,
+            "--python",
+            sys.executable,
             "pip",
             "download",
             "--require-hashes",
@@ -167,6 +219,13 @@ def main() -> int:
             "--requirement",
             str(selected),
         )
+        # Install every recorded wheel without resolving direct Git metadata on the target.
+        wheel_requirements = [
+            f"./wheels/{item.name} --hash=sha256:{hashlib.sha256(item.read_bytes()).hexdigest()}\n"
+            for item in sorted(wheels.glob("*.whl"))
+        ]
+        (root / "requirements-wheels.txt").write_text("".join(wheel_requirements), encoding="utf-8")
+        (root / "SOURCE.txt").write_text(conric_source + "\n", encoding="utf-8")
         for name in ("LICENSE", "NOTICE"):
             shutil.copyfile(PROJECT / name, root / name)
         for name in tracked("LICENSES"):
@@ -181,7 +240,6 @@ def main() -> int:
                 version=version,
                 python=python,
                 home="$env:LOCALAPPDATA\\vellric",
-                requirement=f"vellric[ocr]=={version}",
                 **ENGINES,
             ),
             encoding="utf-8",

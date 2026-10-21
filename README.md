@@ -2,9 +2,11 @@
 
 Vellric inspects PDFs, preserves exact native text, recovers scans at four rotations, and exports optional native Markdown, page images and layout artifacts. Each CLI invocation owns one complete document job and publishes an inspectable bundle atomically. It requires no Drawbridge, account credentials or model provider.
 
-The current candidate is **0.2.2**, licensed **AGPL-3.0-only**. Public releases use fresh audited histories. Original MIT grants and dependency notices are retained.
+The current candidate is **0.2.2**, licensed **AGPL-3.0-only**. Public source history retains its audited root and subsequent qualified commits. Original MIT grants and dependency notices are retained.
 
-As of 2026-10-21, this local candidate pins public MIT-licensed Conric 0.1.0 for [composed configuration](project/docs/CONFIGURATION.md). Vellric publication remains held for a separate release decision. Public CI and Windows bundle qualification remain open for the Git dependency shape.
+As of 2026-10-21, this version pins public MIT-licensed Conric 0.1.0 for [composed configuration](project/docs/CONFIGURATION.md). The source integration is public. A tagged release requires exact-commit public CI, Windows bundle qualification and the other [release checks](policies/releases.md); the matching GitHub release records the observed results.
+
+As of 2026-10-21, the operator approved v0.2.2’s `vellric-0.2.2-py3-none-any.whl` and `vellric-0.2.2.tar.gz` for qualified Conric, native and OCR use, conditional on every other mandatory release gate passing. **Cloud-vision human acceptance remains OPEN and UNQUALIFIED.** This one-release exception does not close the real-provider tests, authorize provider calls or credentials, qualify cloud-vision output, or permit Windows binary distribution.
 
 ## Quick start
 
