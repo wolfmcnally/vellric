@@ -50,7 +50,7 @@ uv pip install --python /absolute/isolated/vellric-env/bin/python --no-deps -r r
 ```
 
 ```bash
-uv pip install --python /absolute/isolated/vellric-env/bin/python --no-deps dist/vellric-0.2.2-py3-none-any.whl
+uv pip install --python /absolute/isolated/vellric-env/bin/python --no-deps dist/vellric-0.2.3-py3-none-any.whl
 ```
 
 ```bash
@@ -80,3 +80,5 @@ The public repositories start with fresh single-root histories. Private developm
 ## v0.2.2 scoped release authority (2026-10-21)
 
 As of 2026-10-21, the operator approved v0.2.2’s `vellric-0.2.2-py3-none-any.whl` and `vellric-0.2.2.tar.gz` for qualified Conric, native and OCR use, conditional on every other mandatory release gate passing. **Cloud-vision human acceptance remains OPEN and UNQUALIFIED.** This one-release exception does not close the real-provider tests, authorize provider calls or credentials, qualify cloud-vision output, or permit Windows binary distribution. The exact owner ruling is recorded in `policies/releases.md`; retain this qualification limit in the GitHub release notes.
+
+Before any future 0.2.3 tag, reconcile the local-candidate labels and candidate paragraphs in NOTICE, INSTALLATION, LICENSING, RELEASE and both READMEs with the exact newly authorized release scope. Keep every unresolved acceptance criterion explicit. Rebuild and qualify the changed package bytes and renew required review/gates before publishing; current local hashes and the historical 0.2.2 exception do not qualify that later artifact.

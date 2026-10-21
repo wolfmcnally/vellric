@@ -2,7 +2,9 @@
 
 Vellric inspects PDFs, preserves exact native text, recovers scans at four rotations, and exports optional native Markdown, page images and layout artifacts. Each CLI invocation owns one complete document job and publishes an inspectable bundle atomically. It requires no Drawbridge, account credentials or model provider; an opt-in vision pass can add a model's reading of chosen pages.
 
-The current candidate is **0.2.2**, licensed **AGPL-3.0-only**. Public source history retains its audited root and subsequent qualified commits. Original MIT grants and dependency notices are retained.
+The current candidate is **0.2.3**, licensed **AGPL-3.0-only**. Public source history retains its audited root and subsequent qualified commits. Original MIT grants and dependency notices are retained.
+
+Candidate 0.2.3 is a local macOS native-RSS watchdog correction. Its installed-package and regression qualification is in progress; exact caller-sandbox acceptance and public publication are not claimed. The released 0.2.2 artifacts remain unchanged.
 
 As of 2026-10-21, this version depends on an exact public MIT-licensed Conric 0.1.0 Git revision with a flat package root. The source integration is public. A tagged release requires exact-commit CI and Windows qualification; the matching GitHub release records the observed results. See [installation](docs/INSTALLATION.md) and [composed configuration](docs/CONFIGURATION.md). No-config CLI behavior is retained.
 
@@ -14,7 +16,7 @@ With Python 3.12+ and uv and existing authorized Git access, from the directory 
 
 ```bash
 uv venv --python 3.12 .venv
-uv pip install --python .venv/bin/python ./vellric-0.2.2-py3-none-any.whl
+uv pip install --python .venv/bin/python ./vellric-0.2.3-py3-none-any.whl
 .venv/bin/vellric --version
 .venv/bin/vellric doctor --json
 .venv/bin/vellric convert input.pdf --ocr never --structure native --out converted --status-json

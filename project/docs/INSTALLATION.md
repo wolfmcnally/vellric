@@ -1,4 +1,4 @@
-# Install Vellric 0.2.2
+# Install Vellric 0.2.3 (local candidate)
 
 As of 2026-10-21 this version uses an exact public MIT-licensed Conric 0.1.0 Git dependency, pinned to commit ed9286297e92b8c049f70eb15a3b5556ed107ff0 at https://github.com/wolfmcnally/conric.git. The package lives at the repository root; no subdirectory selector is used. The wheel's metadata carries that source reference. The source integration is public; tagged release artifacts require repository release qualification. No package-index publication is authorized. A release requires passing exact-commit public CI and the Windows bundle pipeline, as recorded in the matching GitHub release. The Windows instructions describe the internal bundle contract; this project wheel/source release distributes no Windows bundle. No credentials or artifact feed are provisioned. See [configuration](CONFIGURATION.md).
 
@@ -10,7 +10,7 @@ Build the candidate wheel locally, or use the matching locally prepared source. 
 
 ```bash
 uv venv --python 3.12 .venv
-uv pip install --python .venv/bin/python ./vellric-0.2.2-py3-none-any.whl
+uv pip install --python .venv/bin/python ./vellric-0.2.3-py3-none-any.whl
 .venv/bin/vellric --version
 .venv/bin/vellric doctor --json
 ```
@@ -20,7 +20,7 @@ From extracted source, replace the wheel argument with `.`. For exact locked ins
 ## Scan OCR
 
 ```bash
-uv pip install --python .venv/bin/python './vellric-0.2.2-py3-none-any.whl[ocr]'
+uv pip install --python .venv/bin/python './vellric-0.2.3-py3-none-any.whl[ocr]'
 .venv/bin/vellric doctor --json
 ```
 
@@ -41,7 +41,7 @@ The directory must contain the requested traineddata. Do not copy the illustrati
 
 Vellric runs natively on 64-bit Windows with Python 3.12.4 or later; earlier Python releases create the private workspace readable by other accounts, and jobs refuse. Native PDF work and a vision-model pass need no Linux subsystem or container, and nothing in them asks for an administrator.
 
-An internally built Windows bundle, `vellric-0.2.2-windows-x64-py313.zip`, holds Vellric, every locked Python dependency of the OCR extra as Windows wheels for Python 3.13, the guides and an `INSTALL.txt`. That bundle contract installs with no package index. Its exact-commit automated proof is a release gate; desktop owner acceptance remains open and no Windows bundle is included in this public release. In PowerShell, run these commands from inside the qualified extracted bundle directory:
+An internally built Windows bundle, `vellric-0.2.3-windows-x64-py313.zip`, holds Vellric, every locked Python dependency of the OCR extra as Windows wheels for Python 3.13, the guides and an `INSTALL.txt`. That bundle contract installs with no package index. Its exact-commit automated proof is a release gate; desktop owner acceptance remains open and no Windows bundle is included in this public release. In PowerShell, run these commands from inside the qualified extracted bundle directory:
 
 ```powershell
 python -m venv "$env:LOCALAPPDATA\vellric"
@@ -77,3 +77,5 @@ What differs from macOS and Linux:
 For independently installed Drawbridge, set DRAWBRIDGE_VELLRIC to this environment's absolute executable. No sibling repository or editable Vellric import is needed. See [boundary integration](INTEGRATION.md).
 
 The installed-package configuration proof builds a real wheel and installs the exact locked public runtime sources into a fresh environment, using the executing Python version. It may access public package/Git sources; an unavailable source fails closed rather than substituting another dependency. The separate Windows bundle carries a locally built wheel of the exact locked Conric commit, records that source in SOURCE.txt, and installs every bundled wheel by its recorded hash with dependency resolution disabled. Run pip check afterward; the installed package metadata remains unchanged and no Git access is needed for that bundle installation.
+
+On macOS, candidate 0.2.3 samples the supervised process group through native libproc resident-byte queries, without executing ps. Doctor tests the complete observer on a fresh private process group. Missing, denied, short or persistently truncated observations refuse supervision instead of silently disabling memory enforcement. The existing sampled memory/disk/deadline controls remain; they can overshoot and are not a hard sandbox. Exact caller-sandbox acceptance of this candidate remains open; no sandbox profile or network policy is changed.

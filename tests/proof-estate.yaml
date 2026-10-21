@@ -1002,6 +1002,31 @@ families:
   tier: vital
   size: small
   flake_rate: 0.0
+- id: pytest-project-tests-test_darwin-py
+  kind: pytest
+  selectors:
+  - project/tests/test_darwin.py
+  source_paths:
+  - project/tests/test_darwin.py
+  covers:
+  - project/vellric/_darwin.py
+  - project/vellric/runtime.py
+  - project/vellric/cli.py
+  contract: Native resident-byte ABI, fail-closed group observation and truthful owned-group capability reporting.
+  risk_class: memory-supervision
+  oracle: Fixed kernel ABI byte values, typed refusal and completed owned-probe cleanup.
+  admission: Native denied, short, truncated and raced replies cannot be reached by successful real PDF jobs.
+  nearest_overlap: Real job limits prove termination; these cases independently exercise native observation failures and doctor reporting.
+  historical_evidence: []
+  mutation_evidence:
+  - rss-zero
+  - doctor-false-positive
+  - doctor-zero-accepted
+  - empty-esrch-refused
+  replacement_lineage: []
+  tier: vital
+  size: small
+  flake_rate: 0.0
 - id: pytest-project-tests-test_jobs-py
   kind: pytest
   selectors:
@@ -1023,6 +1048,7 @@ families:
   mutation_evidence:
   - ignored-settings
   - missing-threshold
+  - leader-only
   replacement_lineage: []
   tier: vital
   size: medium

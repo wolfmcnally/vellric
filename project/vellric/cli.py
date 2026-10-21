@@ -31,6 +31,7 @@ from .runtime import (
     WINDOWS,
     JobError,
     contain,
+    darwin_rss_available,
     digest,
     environment,
     find_program,
@@ -191,7 +192,7 @@ def doctor(
             or (
                 Path("/proc").is_dir()
                 if sys.platform.startswith("linux")
-                else Path("/bin/ps").is_file()
+                else darwin_rss_available()
             ),
             "disk": "private-workspace watchdog; can overshoot",
             "raster": "pre-render byte admission",

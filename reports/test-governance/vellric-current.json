@@ -9,13 +9,13 @@
       "leaves": 6
     },
     "pytest": {
-      "families": 156,
-      "leaves": 216
+      "families": 158,
+      "leaves": 219
     }
   },
   "counts": {
-    "families": 181,
-    "leaves": 241
+    "families": 183,
+    "leaves": 244
   },
   "families": [
     "gate:changed",
@@ -48,6 +48,8 @@
     "pytest:project/tests/test_configuration.py::test_configured_native_bundle_excludes_paths_and_references",
     "pytest:project/tests/test_configuration.py::test_installed_wheel_composes_outside_checkout",
     "pytest:project/tests/test_configuration.py::test_local_only_and_credential_destination_binding",
+    "pytest:project/tests/test_darwin.py::test_doctor_native_probe_reaps_its_group_and_reports_denial",
+    "pytest:project/tests/test_darwin.py::test_native_group_observation_refuses_unknown_memory",
     "pytest:project/tests/test_jobs.py::test_bundle_tampering_refused",
     "pytest:project/tests/test_jobs.py::test_cancellation_reaps_worker_grandchild",
     "pytest:project/tests/test_jobs.py::test_clip_pixels_and_named_geometry",
@@ -200,7 +202,7 @@
     "pytest:tests/test_treatise.py::test_an_external_fact_without_a_retrieval_date_fails",
     "pytest:tests/test_treatise.py::test_the_repository_own_treatises_validate"
   ],
-  "inventory_sha256": "0f7ed149587c30d8c874e58cfa5e107228a53e6f2327dbcf6063b100edf50b5d",
+  "inventory_sha256": "4db70c34e163067db4d0ecdaa356c0a540b4ac1a9adad5c880942b9fd79867b2",
   "proofs": [
     {
       "family": "pytest:project/tests/test_cli.py::test_help",
@@ -236,6 +238,20 @@
       "kind": "pytest",
       "selector": "project/tests/test_configuration.py::test_installed_wheel_composes_outside_checkout",
       "source_path": "project/tests/test_configuration.py"
+    },
+    {
+      "family": "pytest:project/tests/test_darwin.py::test_native_group_observation_refuses_unknown_memory",
+      "id": "pytest:project/tests/test_darwin.py::test_native_group_observation_refuses_unknown_memory",
+      "kind": "pytest",
+      "selector": "project/tests/test_darwin.py::test_native_group_observation_refuses_unknown_memory",
+      "source_path": "project/tests/test_darwin.py"
+    },
+    {
+      "family": "pytest:project/tests/test_darwin.py::test_doctor_native_probe_reaps_its_group_and_reports_denial",
+      "id": "pytest:project/tests/test_darwin.py::test_doctor_native_probe_reaps_its_group_and_reports_denial",
+      "kind": "pytest",
+      "selector": "project/tests/test_darwin.py::test_doctor_native_probe_reaps_its_group_and_reports_denial",
+      "source_path": "project/tests/test_darwin.py"
     },
     {
       "family": "pytest:project/tests/test_jobs.py::test_native_full_job_and_golden",
@@ -508,6 +524,13 @@
       "id": "pytest:project/tests/test_jobs.py::test_supervisor_refuses_failed_worker[memory]",
       "kind": "pytest",
       "selector": "project/tests/test_jobs.py::test_supervisor_refuses_failed_worker[memory]",
+      "source_path": "project/tests/test_jobs.py"
+    },
+    {
+      "family": "pytest:project/tests/test_jobs.py::test_supervisor_refuses_failed_worker",
+      "id": "pytest:project/tests/test_jobs.py::test_supervisor_refuses_failed_worker[descendant-memory]",
+      "kind": "pytest",
+      "selector": "project/tests/test_jobs.py::test_supervisor_refuses_failed_worker[descendant-memory]",
       "source_path": "project/tests/test_jobs.py"
     },
     {

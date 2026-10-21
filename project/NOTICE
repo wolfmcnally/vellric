@@ -1,4 +1,4 @@
-Vellric 0.2.2
+Vellric 0.2.3 — local candidate
 Copyright (c) 2026 Wolf McNally.
 Project grant: AGPL-3.0-only. Full license: LICENSE.
 
@@ -32,8 +32,12 @@ source/build/NOTICE material for those actual binaries; do not infer that
 an inspected upstream source tag is the complete bundled-native build source.
 See docs/RELEASE-PREPARATION.md for the concrete delivery route.
 
-Release scope (operator ruling, 2026-10-21): the project wheel and source
+Historical v0.2.2 release scope (operator ruling, 2026-10-21): the project wheel and source
 archive are authorized for qualified Conric, native and OCR use only after
 all other mandatory release gates pass. Cloud-vision human acceptance is
 OPEN and UNQUALIFIED. The exception does not close real-provider tests or
 authorize provider calls, credentials, or Windows binary distribution.
+
+Candidate 0.2.3 is a local native macOS RSS observer correction. Its
+publication and exact caller-sandbox acceptance are not claimed. The
+v0.2.2 exception above does not authorize this candidate release.

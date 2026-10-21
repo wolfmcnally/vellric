@@ -232,23 +232,35 @@ def test_bundle_tampering_refused(simple, tmp_path):
 
 
 @pytest.mark.parametrize(
-    "fault", ["crash", "timeout", "memory", "missing", "corrupt", "shape", "mismatched-exit"]
+    "fault",
+    [
+        "crash",
+        "timeout",
+        "memory",
+        "descendant-memory",
+        "missing",
+        "corrupt",
+        "shape",
+        "mismatched-exit",
+    ],
 )
 def test_supervisor_refuses_failed_worker(simple, tmp_path, monkeypatch, fault):
     original = cli.subprocess.Popen
 
     def fake(command, **kwargs):
-        if command[0] == "/bin/ps":
-            return original(command, **kwargs)
         config = command[-1]
         script = (
-            "import json,sys,time,os;from pathlib import Path;"
+            "import json,sys,time,os,subprocess;from pathlib import Path;"
             "c=json.loads(Path(sys.argv[1]).read_text());"
         )
         scripts = {
             "crash": "os.kill(os.getpid(),9)",
             "timeout": "time.sleep(10)",
             "memory": "x=bytearray(200*1024*1024);time.sleep(10)",
+            "descendant-memory": (
+                "p=subprocess.Popen([sys.executable,'-I','-c',"
+                "'import time; x=bytearray(200*1024*1024); time.sleep(10)']);p.wait()"
+            ),
             "missing": "pass",
             "corrupt": 'Path(c["result"]).write_text("bad")',
             "shape": 'Path(c["result"]).write_text(json.dumps({"status": [], "exit_code": 0}))',
@@ -282,7 +294,7 @@ def test_supervisor_refuses_failed_worker(simple, tmp_path, monkeypatch, fault):
         "deadline"
         if fault == "timeout"
         else "resource-limit"
-        if fault == "memory"
+        if fault in {"memory", "descendant-memory"}
         else "internal-error"
     )
     assert error.value.code == expected
@@ -437,7 +449,7 @@ def test_cancellation_reaps_worker_grandchild(simple, tmp_path, monkeypatch):
     marker = tmp_path / "child-pid"
 
     def fake(command, **kwargs):
-        if command[0] != sys.executable:  # Only the worker is replaced, not the process listing.
+        if command[0] != sys.executable:  # Only the owned worker launch is replaced.
             return original(command, **kwargs)
         script = (
             "import os,subprocess,sys,time;from pathlib import Path;"

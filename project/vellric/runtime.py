@@ -461,13 +461,23 @@ def group_rss(pid: int) -> int:
             except (FileNotFoundError, ProcessLookupError):
                 continue  # A process disappeared between enumeration and measurement.
         return total
-    if not Path("/bin/ps").is_file():
-        raise JobError("dependency-unavailable", "/bin/ps is required for RSS supervision")
-    result = subprocess.run(
-        ["/bin/ps", "-axo", "pgid=,rss="], capture_output=True, text=True, check=True
-    )
-    return sum(
-        int(row.split()[1]) * 1024
-        for row in result.stdout.splitlines()
-        if len(row.split()) == 2 and row.split()[0] == str(pid)
-    )
+    if sys.platform == "darwin":
+        from . import _darwin
+
+        try:
+            return _darwin.group_rss(pid)
+        except OSError as error:
+            raise JobError(
+                "dependency-unavailable",
+                "Native macOS RSS supervision is unavailable",
+                stage="supervision",
+            ) from error
+    raise JobError("dependency-unavailable", "RSS supervision is unavailable on this platform")
+
+
+def darwin_rss_available() -> bool:
+    if sys.platform != "darwin":
+        return False
+    from . import _darwin
+
+    return _darwin.available()
