@@ -299,7 +299,7 @@ def test_installed_wheel_composes_outside_checkout(tmp_path):
     assert not Path(observed["vellric"]).is_relative_to(project)
     assert not Path(observed["conric"]).is_relative_to(project.parent.parent / "conric")
     assert any(
-        "conric@git+https://github.com/wolfmcnally/conric.git@"
+        "conric@git+https://github.com/wolfmcnally/conric-private.git@"
         "7dc5dd8415b9cf67aaa5306205fcafb256a54d07#subdirectory=project" in "".join(item.split())
         for item in observed["requirements"]
     )
