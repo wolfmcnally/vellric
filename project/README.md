@@ -4,11 +4,11 @@ Vellric inspects PDFs, preserves exact native text, recovers scans at four rotat
 
 The current candidate is **0.2.3**, licensed **AGPL-3.0-only**. Public source history retains its audited root and subsequent qualified commits. Original MIT grants and dependency notices are retained.
 
-Candidate 0.2.3 is a local macOS native-RSS watchdog correction. Its installed-package and regression qualification is in progress; exact caller-sandbox acceptance and public publication are not claimed. The released 0.2.2 artifacts remain unchanged.
+Version 0.2.3 replaces the macOS process-listing watchdog with native process-group resident-memory queries. Memory, disk and deadline limits remain sampled controls, and network containment belongs to the caller. The matching release notes must record measured platform and caller-profile qualification; cloud-vision human acceptance remains OPEN and UNQUALIFIED. The released 0.2.2 artifacts remain unchanged.
 
 As of 2026-10-21, this version depends on an exact public MIT-licensed Conric 0.1.0 Git revision with a flat package root. The source integration is public. A tagged release requires exact-commit CI and Windows qualification; the matching GitHub release records the observed results. See [installation](docs/INSTALLATION.md) and [composed configuration](docs/CONFIGURATION.md). No-config CLI behavior is retained.
 
-As of 2026-10-21, the operator approved v0.2.2’s `vellric-0.2.2-py3-none-any.whl` and `vellric-0.2.2.tar.gz` for qualified Conric, native and OCR use, conditional on every other mandatory release gate passing. **Cloud-vision human acceptance remains OPEN and UNQUALIFIED.** This one-release exception does not close the real-provider tests, authorize provider calls or credentials, qualify cloud-vision output, or permit Windows binary distribution.
+Historical v0.2.2 ruling: as of 2026-10-21, the operator approved v0.2.2’s `vellric-0.2.2-py3-none-any.whl` and `vellric-0.2.2.tar.gz` for qualified Conric, native and OCR use, conditional on every other mandatory release gate passing. **Cloud-vision human acceptance remains OPEN and UNQUALIFIED.** This one-release exception does not close the real-provider tests, authorize provider calls or credentials, qualify cloud-vision output, or permit Windows binary distribution.
 
 ## Quick start
 

@@ -1,4 +1,4 @@
-Vellric 0.2.3 — local candidate
+Vellric 0.2.3
 Copyright (c) 2026 Wolf McNally.
 Project grant: AGPL-3.0-only. Full license: LICENSE.
 
@@ -38,6 +38,9 @@ all other mandatory release gates pass. Cloud-vision human acceptance is
 OPEN and UNQUALIFIED. The exception does not close real-provider tests or
 authorize provider calls, credentials, or Windows binary distribution.
 
-Candidate 0.2.3 is a local native macOS RSS observer correction. Its
-publication and exact caller-sandbox acceptance are not claimed. The
-v0.2.2 exception above does not authorize this candidate release.
+Version 0.2.3 uses host libproc for macOS process-group RSS observation.
+Memory, disk and deadline limits are sampled and can overshoot; this
+watchdog is not a network or filesystem sandbox. Read the matching release
+notes for measured platform and caller-profile qualification. Cloud-vision
+human acceptance remains OPEN and UNQUALIFIED; no provider acceptance or
+Windows binary redistribution is implied.
