@@ -52,6 +52,29 @@ critical_risks:
     rationale: Local implementation is not deployed or published; packaging is qualified locally.
     activation_trigger: Adding distribution/deployment commands requires direct deployment proofs.
 families:
+- id: pytest-project-tests-test_citations-py
+  kind: pytest
+  selectors:
+  - project/tests/test_citations.py
+  source_paths:
+  - project/tests/test_citations.py
+  covers:
+  - project/vellric/citations.py
+  - project/vellric/runtime.py
+  - project/vellric/worker.py
+  - project/docs/PAGE-CITATIONS.md
+  - project/docs/document.schema.json
+  contract: Exact original PDF digest and physical ordinals produce standard anchors and a mandatory independently reconstructible citation mapping, without changing fidelity text or assigning PDF identity to raster images.
+  risk_class: public-page-identity-and-schema
+  oracle: Independent consumer string reconstruction, original text bytes, exact typed refusal boundaries, JSON schema and actual bounded renderer/sanitizer outputs.
+  admission: New digest-bound citation metadata and HTML navigation output are not exercised by prior document success tests; negative tampering and hostile presentation cases distinguish authoritative identity from rendered hints. No production-only test seam is added.
+  nearest_overlap: Existing job tests prove text and publication custody but do not enforce citation identity, image exclusions, canonical markup or renderer/sanitizer limitations.
+  historical_evidence: []
+  mutation_evidence: []
+  replacement_lineage: []
+  tier: vital
+  size: medium
+  flake_rate: 0.0
 - id: gate-changed
   kind: gate
   selectors:

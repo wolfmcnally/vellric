@@ -224,7 +224,12 @@ def test_scoped_edit_preserves_extensions_comments_and_timeouts(tmp_path: Path) 
         ),
     }
     # Independent oracle: provider-recommended starting effort per model (As of 2026-09-23).
-    starting_effort = {"opus": "medium", "sol": "medium", "fable": "high", "astra": "high"}
+    starting_effort = {
+        "opus": "medium",
+        "sol": "medium",
+        "fable": "high",
+        "astra": "high",
+    }
     for (preset, review), expected in matrices.items():
         options = () if review == "same-harness" else ("--review", review)
         result = run_manager(config, "apply-preset", preset, *options)
@@ -582,6 +587,104 @@ class TestGeneratedInvocationRecipes:
             _, result = rendered(tmp_path, venue=venue, model=model, effort=effort)
             assert result.returncode != 0
 
+    def test_source_review_profile_narrows_shared_recipe(self, tmp_path: Path) -> None:
+        for role in ("reviewer", "critic"):
+            command, result = rendered(
+                tmp_path, role=role, extra=("--tool-profile", "source-review")
+            )
+            assert result.returncode == 0, result.stderr
+            for flag in ("--tools", "--allowedTools"):
+                assert command[command.index(flag) + 1] == "Read,Grep,Glob"
+            assert command.count("--strict-mcp-config") == 1
+            assert command[command.index("--disallowedTools") + 1] == "mcp__*"
+            assert json.loads(command[command.index("--mcp-config") + 1]) == {"mcpServers": {}}
+            assert command[command.index("--permission-mode") + 1] == "dontAsk"
+            assert "SOURCE-ONLY" in command[command.index("-p") + 1]
+
+    def test_source_review_profile_rejects_other_roles_and_venues(self, tmp_path: Path) -> None:
+        for venue, model, role in (
+            ("claude", "opus", "coder"),
+            ("claude", "opus", "planner"),
+            ("codex", "astra", "reviewer"),
+        ):
+            _, result = rendered(
+                tmp_path,
+                venue=venue,
+                model=model,
+                role=role,
+                extra=("--tool-profile", "source-review"),
+            )
+            assert result.returncode != 0
+            assert "requires a Claude reviewer or critic" in result.stderr
+
+    def test_source_review_controls_refuse_generator_drift_before_spawn(
+        self, tmp_path: Path
+    ) -> None:
+        import pytest
+
+        # Exercise the exact production pre-spawn guard, with no child/model call.
+        function = next(
+            node
+            for node in ast.parse(MANAGER.read_text()).body
+            if isinstance(node, ast.FunctionDef) and node.name == "validate_source_review_controls"
+        )
+
+        def refuse(message: str) -> None:
+            raise ValueError(message)
+
+        namespace = {"die": refuse}
+        exec(
+            compile(ast.Module(body=[function], type_ignores=[]), str(MANAGER), "exec"),
+            namespace,
+        )
+        validate = namespace["validate_source_review_controls"]
+        command, result = rendered(tmp_path, extra=("--tool-profile", "source-review"))
+        assert result.returncode == 0, result.stderr
+        validate(command)
+        for flag in (
+            "--tools",
+            "--allowedTools",
+            "--disallowedTools",
+            "--mcp-config",
+            "--permission-mode",
+        ):
+            index = command.index(flag)
+            omitted = command[:index] + command[index + 2 :]
+            broadened = command.copy()
+            broadened[index + 1] = "default"
+            duplicate = command + [flag, command[index + 1]]
+            for invalid in (omitted, broadened, duplicate):
+                with pytest.raises(ValueError, match="source-review requires"):
+                    validate(invalid)
+        without_strict = [token for token in command if token != "--strict-mcp-config"]
+        with pytest.raises(ValueError, match="strict-mcp-config"):
+            validate(without_strict)
+        for override in ("--dangerously-skip-permissions", "--settings=other.json"):
+            with pytest.raises(ValueError, match="overrides"):
+                validate(command + [override])
+
+    def test_source_review_watch_records_profile_without_model(self, tmp_path: Path) -> None:
+        argv_file = tmp_path / "argv.txt"
+        telemetry = tmp_path / "timing.jsonl"
+        cli = fake_cli(
+            tmp_path,
+            "claude",
+            f"printf '%s\\n' \"$@\" > {shlex.quote(str(argv_file))}\n"
+            + 'printf \'%s\\n\' \'{"type":"result","result":"OK",'
+            + '"usage":{"input_tokens":0,"output_tokens":0}}\'\n',
+        )
+        result = run_manager(
+            seeded_config(tmp_path),
+            *watch_arguments(tmp_path, extra_watch=("--tool-profile", "source-review")),
+            cli=cli,
+            extra_env={"KICKOFF_TIMING_LOG": str(telemetry)},
+        )
+        assert result.returncode == 0, result.stderr
+        argv = argv_file.read_text().splitlines()
+        assert argv[argv.index("--tools") + 1] == "Read,Grep,Glob"
+        assert argv[argv.index("--disallowedTools") + 1] == "mcp__*"
+        assert read_record(telemetry)["tool_profile"] == "source-review"
+
 
 # --- The dispatch-open/amend lifecycle and the candidate the watcher observes --
 
@@ -894,7 +997,9 @@ def _assert_primary_routing_and_usage(tmp_path: Path) -> None:
     original = quota_config.read_bytes()
     attempted = tmp_path / "model-called"
     fake = fake_cli(
-        tmp_path, "claude", f"from pathlib import Path\nPath({str(attempted)!r}).touch()\n"
+        tmp_path,
+        "claude",
+        f"from pathlib import Path\nPath({str(attempted)!r}).touch()\n",
     )
     saturated["openai"]["windows"]["week"]["utilization"] = 95
     refusal = run_manager(

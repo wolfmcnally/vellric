@@ -1,3 +1,13 @@
+# Vellric 0.2.4 page-anchor release preparation
+
+This version adds standard exact-PDF/physical-page citations and the [consumer mapping](PAGE-CITATIONS.md), with bundle envelope 1.1. Native/OCR fidelity, provider/network policy and watchdog behavior are unchanged. Publication requires the exact candidate's normal gates, CI, isolated installs, license and reproducibility checks; matching public release notes record actual outcomes. Cloud-vision human acceptance remains OPEN and UNQUALIFIED and is outside this release's advertised capabilities. Earlier one-release exceptions do not transfer.
+
+## Current human-check applicability
+
+For release-policy qualification item 5, the advertised 0.2.4 capabilities are physical PDF citations, native extraction and OCR. The pending vision action blocks releases advertising the vision pass; that capability remains OPEN and UNQUALIFIED and is outside this release's advertised scope. Existing optional command reference and explicitly historical records do not establish current cloud-vision acceptance. This release invokes no earlier cloud-vision exception and closes no provider criterion. Matching public notes and packaged notices must retain this scope; advertising cloud vision would require its own satisfied acceptance dependency.
+
+## Historical preparation records
+
 # Local release preparation
 
 This record, [RELEASE-PREPARATION.md](RELEASE-PREPARATION.md) and [DOCUMENTATION-AUDIT.md](DOCUMENTATION-AUDIT.md) describe the 0.1.0 candidates and the evidence gathered for them. Version 0.2.0 adds the vision-model pass and Windows support; 0.2.1 runs OCR engines in their private folder on every platform and documents that artifact text is untrusted. Neither has been through this preparation; its commands are the same with the version number changed.

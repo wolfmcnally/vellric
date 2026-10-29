@@ -17,7 +17,9 @@ import tempfile
 import time
 from pathlib import Path
 
-SCHEMA = "vellric.document/1.0"
+from .citations import validate_citations
+
+SCHEMA = "vellric.document/1.1"
 STATUS_SCHEMA = "vellric.status/1.0"
 PYMUPDF_VERSION = "1.28.2"
 BEHAVIOR = f"drawbridge-0.4.3-pymupdf-{PYMUPDF_VERSION}/v1"
@@ -369,9 +371,15 @@ def validate_bundle(root: Path, manifest: dict) -> None:
     if (
         type(count) is not int
         or count < 1
+        or not isinstance(pages, list)
+        or any(not isinstance(p, dict) or type(p.get("number")) is not int for p in pages)
         or [p.get("number") for p in pages] != list(range(1, count + 1))
     ):
         raise JobError("artifact-invalid", "Manifest page count/order mismatch")
+    try:
+        validate_citations(manifest)
+    except (ValueError, KeyError, TypeError, AttributeError) as exc:
+        raise JobError("artifact-invalid", "Invalid page citation mapping") from exc
     seen = set()
     for entry in manifest.get("files", []):
         rel = entry["path"]

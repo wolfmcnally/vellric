@@ -1,6 +1,6 @@
 [project]
 name = "vellric"
-version = "0.2.3"
+version = "0.2.4"
 description = "Independent local PDF inspection, fidelity conversion, rendering and OCR."
 requires-python = ">=3.12"
 license = "AGPL-3.0-only"
@@ -27,7 +27,7 @@ packages = ["vellric"]
 allow-direct-references = true
 
 [dependency-groups]
-dev = ["pyyaml>=6.0,<7", "pytest>=8.0", "ruff>=0.6", "anthropic==1.12.0"]
+dev = ["pyyaml>=6.0,<7", "pytest>=8.0", "ruff>=0.6", "anthropic==1.12.0", "markdown-it-py==4.2.0", "bleach==6.3.0", "jsonschema==4.26.0"]
 
 [tool.uv]
 required-version = ">=0.9.26"

@@ -447,14 +447,21 @@ def validate_document(document: Any) -> MutableMapping[str, Any]:
     return document
 
 
-BUILTIN_MODEL_PINS = (MODELS, CLAUDE_MODELS.copy(), CODEX_MODELS.copy(), MODEL_EFFORTS.copy())
+BUILTIN_MODEL_PINS = (
+    MODELS,
+    CLAUDE_MODELS.copy(),
+    CODEX_MODELS.copy(),
+    MODEL_EFFORTS.copy(),
+)
 
 
 def install_targets(document: dict[str, Any]) -> None:
     global MODELS
     MODELS = BUILTIN_MODEL_PINS[0]
     for table, original in zip(
-        (CLAUDE_MODELS, CODEX_MODELS, MODEL_EFFORTS), BUILTIN_MODEL_PINS[1:], strict=True
+        (CLAUDE_MODELS, CODEX_MODELS, MODEL_EFFORTS),
+        BUILTIN_MODEL_PINS[1:],
+        strict=True,
     ):
         table.clear()
         table.update(original)
@@ -882,6 +889,7 @@ def build_claude_command(
     max_turns: int,
     schema_kind: str | None,
     resume_session: str | None,
+    tool_profile: str | None = None,
 ) -> list[str]:
     """The production `claude -p` invocation.
 
@@ -900,7 +908,7 @@ def build_claude_command(
             "--permission-mode",
             "dontAsk",
             "--allowedTools",
-            claude_tools(role),
+            "Read,Grep,Glob" if tool_profile == "source-review" else claude_tools(role),
             "--output-format",
             "stream-json",
             "--verbose",
@@ -908,6 +916,18 @@ def build_claude_command(
             str(max_turns),
         )
     )
+    if tool_profile == "source-review":
+        command.extend(
+            (
+                "--tools",
+                "Read,Grep,Glob",
+                "--disallowedTools",
+                "mcp__*",
+                "--strict-mcp-config",
+                "--mcp-config",
+                '{"mcpServers":{}}',
+            )
+        )
     if schema_kind:
         # Claude takes the schema inline; Codex takes a file. The asymmetry is
         # the vendors', not ours.
@@ -974,7 +994,19 @@ def build_watch_command(
     prompt = Path(arguments.prompt_file).read_text(encoding="utf-8")
     if not prompt.strip():
         die(f"prompt file is empty: {arguments.prompt_file}")
-    prompt += research_directive(arguments.role, document.get("research_budgets"))
+    tool_profile = getattr(arguments, "tool_profile", None)
+    if tool_profile is not None and (
+        arguments.venue != "claude" or arguments.role not in {"reviewer", "critic"}
+    ):
+        die("source-review tool profile requires a Claude reviewer or critic")
+    if tool_profile == "source-review":
+        prompt += (
+            "\nThis invocation is SOURCE-ONLY: Read/Grep/Glob built-ins only. "
+            "No shell, writes, delegation, web or MCP tools. Report unavailable evidence; "
+            "do not ask for broader access. This narrows ambient research tools.\n"
+        )
+    else:
+        prompt += research_directive(arguments.role, document.get("research_budgets"))
     effort = None if arguments.effort == "default" else arguments.effort
     model, effort = validate_model_fields(
         {"model": arguments.model, **({"effort": effort} if effort else {})},
@@ -1018,6 +1050,7 @@ def build_watch_command(
             max_turns=document["role_timeouts"]["roles"][arguments.role]["claude_max_turns"],
             schema_kind=schema_kind,
             resume_session=arguments.resume_session,
+            tool_profile=tool_profile,
         )
     if model not in CODEX_MODELS:
         die(f"model '{model}' does not route to the codex CLI")
@@ -1421,12 +1454,19 @@ def verify_preflight_receipt(path: Path) -> dict[str, Any]:
         expected_role = baseline["roles"][role]
         allowed = (
             workflow.adviser_choices(
-                workflow.settings(config), document["harness"], resolution["primary_model"], role
+                workflow.settings(config),
+                document["harness"],
+                resolution["primary_model"],
+                role,
             )
             if role in {"reviewer", "critic"}
             else []
         )
-        fallback_role = {**expected_role, "model": selected.get("model"), "effort": None}
+        fallback_role = {
+            **expected_role,
+            "model": selected.get("model"),
+            "effort": None,
+        }
         causes = [
             cause
             for cause in resolution["fallbacks"]
@@ -1532,6 +1572,41 @@ def option_value(command: list[str], names: tuple[str, ...]) -> str | None:
     return None
 
 
+def validate_source_review_controls(command: list[str]) -> None:
+    """Refuse generator drift before spawn; this is tool inventory, not file isolation."""
+    expected = {
+        "--tools": "Read,Grep,Glob",
+        "--disallowedTools": "mcp__*",
+        "--allowedTools": "Read,Grep,Glob",
+        "--mcp-config": '{"mcpServers":{}}',
+        "--permission-mode": "dontAsk",
+    }
+    for flag, value in expected.items():
+        positions = [
+            i for i, token in enumerate(command) if token == flag or token.startswith(flag + "=")
+        ]
+        if (
+            len(positions) != 1
+            or command[positions[0]] != flag
+            or positions[0] + 1 >= len(command)
+            or command[positions[0] + 1] != value
+        ):
+            die(f"source-review requires exactly {flag} {value}")
+    if command.count("--strict-mcp-config") != 1:
+        die("source-review requires --strict-mcp-config")
+    forbidden = {
+        "--dangerously-skip-permissions",
+        "--allow-dangerously-skip-permissions",
+        "--settings",
+        "--setting-sources",
+        "--bare",
+        "--safe-mode",
+        "--restricted",
+    }
+    if any(token.split("=", 1)[0] in forbidden for token in command):
+        die("source-review forbids permission/settings overrides")
+
+
 def validate_watch_routing(arguments: argparse.Namespace, command: list[str]) -> int:
     """Re-derive the routing contract from the generated argv.
 
@@ -1582,6 +1657,8 @@ def validate_watch_routing(arguments: argparse.Namespace, command: list[str]) ->
                 f"watch metadata declares effort={effort}, but command must include "
                 f"-c 'model_reasoning_effort=\"{effort}\"'"
             )
+    if getattr(arguments, "tool_profile", None) == "source-review":
+        validate_source_review_controls(cli_arguments)
     return program_index
 
 
@@ -2481,6 +2558,7 @@ def watch(arguments: argparse.Namespace, document: MutableMapping[str, Any]) -> 
         "venue": arguments.venue,
         "model": arguments.model,
         "effort": arguments.effort,
+        "tool_profile": getattr(arguments, "tool_profile", None),
         **observations,
         "started_at": started_iso,
         "ended_at": utc_now(),
@@ -2676,6 +2754,11 @@ def build_parser() -> argparse.ArgumentParser:
             "--authority-mode", choices=("primary", "delegated"), default="delegated"
         )
         parser.add_argument("--effort", default="default", choices=("default", *EFFORTS))
+        parser.add_argument(
+            "--tool-profile",
+            choices=("source-review",),
+            help="Claude review only: fixed Read/Grep/Glob inventory; no MCP",
+        )
         parser.add_argument("--prompt-file", required=True)
         parser.add_argument("--result-file")
         parser.add_argument("--required-output-file")

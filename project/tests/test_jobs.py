@@ -55,9 +55,12 @@ def test_native_full_job_and_golden(rich_pdf, tmp_path):
     m = manifest(out)
     assert m["page_count"] == 2 and m["outstanding_candidates"] == []
     assert (out / "pages/000001/structured.md").read_text() == EXPECTED
-    assert (
-        out / "structured.md"
-    ).read_text() == f"# Report\n\n## Page 1\n\n{EXPECTED}\n\n## Page 2\n\nA plain second page.\n"
+    assert (out / "structured.md").read_text() == (
+        f'# Report\n\n<a id="vellric-pdf-{runtime.digest(rich_pdf)}-page-000001"></a>\n\n'
+        f"## Page 1\n\n{EXPECTED}\n\n"
+        f'<a id="vellric-pdf-{runtime.digest(rich_pdf)}-page-000002"></a>\n\n'
+        "## Page 2\n\nA plain second page.\n"
+    )
     with pymupdf.open(rich_pdf) as document:
         assert [(out / f"pages/{n:06d}/native.txt").read_text() for n in (1, 2)] == [
             p.get_text("text") for p in document

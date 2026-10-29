@@ -1,5 +1,11 @@
 # Local Drawbridge integration
 
+## Standard PDF citations in 0.2.4
+
+The [page-citation contract](PAGE-CITATIONS.md) adds mandatory PDF digest/physical-ordinal anchors in bundle schema `vellric.document/1.1`. Consumers rebuilding Markdown from per-page text must preserve or reconstruct validated `pages[].anchor`; verifying root `document.md` without consuming its body is insufficient. Physical numbering includes empty pages. Status schema and executable isolation are unchanged. The new validator rejects old 1.0 bundles/amend bases; image jobs carry the new envelope without PDF citation fields. Qualify the installed executable/envelope and renderer before adoption. Cloud-vision acceptance remains OPEN and UNQUALIFIED; this release does not advertise or qualify it.
+
+## Existing process boundary
+
 As of 2026-10-21, Vellric 0.2.3 accepts its own [Conric configuration subtree](CONFIGURATION.md). A caller may compose shared files with other leaves, validate `vellric` with the leaf-owned schema, and pass the explicit configuration paths to the independently installed CLI. Final invocation validation remains Vellric-owned; caller restrictions use `--local-only`, which files cannot disable. Do not duplicate the vision/provider schema in an orchestration wrapper or resolve credentials into argv. Config paths and credential reference names do not enter the result bundle. Existing complete-job process integration is unchanged. No downstream caller, remote host or service is migrated by this change; the source integration is public, while tagged release artifacts and downstream migration remain gated by their separate qualification.
 
 Drawbridge uses the complete-job adapter described here. Vellric is installed independently; live consumer migrations require their own staged qualification.

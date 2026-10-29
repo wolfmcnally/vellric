@@ -2,9 +2,9 @@
 
 Vellric inspects PDFs, preserves exact native text, recovers scans at four rotations, and exports optional native Markdown, page images and layout artifacts. Each CLI invocation owns one complete document job and publishes an inspectable bundle atomically. It requires no Drawbridge, account credentials or model provider.
 
-The current candidate is **0.2.3**, licensed **AGPL-3.0-only**. Public source history retains its audited root and subsequent qualified commits. Original MIT grants and dependency notices are retained.
+The current candidate is **0.2.4**, licensed **AGPL-3.0-only**. Public source history retains its audited root and subsequent qualified commits. Original MIT grants and dependency notices are retained.
 
-Version 0.2.3 replaces the macOS process-listing watchdog with native process-group resident-memory queries. Memory, disk and deadline limits remain sampled controls, and network containment belongs to the caller. The matching release notes must record measured platform and caller-profile qualification; cloud-vision human acceptance remains OPEN and UNQUALIFIED. The released 0.2.2 artifacts remain unchanged.
+Version 0.2.4 adds standard citable physical PDF page anchors and a versioned per-page mapping for independent consumers. It retains exact native/OCR text, sampled memory/disk/deadline guards and caller-owned network containment. The bundle envelope is now vellric.document/1.1. See the [page-citation guide](project/docs/PAGE-CITATIONS.md) for reconstruction and renderer limits; cloud-vision human acceptance remains OPEN and UNQUALIFIED and is not advertised or qualified by this release.
 
 As of 2026-10-21, this version pins public MIT-licensed Conric 0.1.0 for [composed configuration](project/docs/CONFIGURATION.md). The source integration is public. A tagged release requires exact-commit public CI, Windows bundle qualification and the other [release checks](policies/releases.md); the matching GitHub release records the observed results.
 
@@ -16,7 +16,7 @@ With Python 3.12+, uv and Git access to the public dependency, from the director
 
 ```bash
 uv venv --python 3.12 .venv
-uv pip install --python .venv/bin/python ./vellric-0.2.3-py3-none-any.whl
+uv pip install --python .venv/bin/python ./vellric-0.2.4-py3-none-any.whl
 .venv/bin/vellric --version
 .venv/bin/vellric doctor --json
 .venv/bin/vellric convert input.pdf --ocr never --structure native --out converted --status-json

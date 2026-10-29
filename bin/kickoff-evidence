@@ -557,7 +557,8 @@ def validate_candidate_manifest(value: Any) -> None:
         raise EvidenceError("candidate manifest identifier does not match its entries")
 
 
-def validate_run_dir(run_dir: Path) -> dict[str, Any]:
+def validate_run_bundle(run_dir: Path) -> dict[str, Any]:
+    """Read and verify a frozen run without selecting it as this process's active run."""
     run = load_json(run_dir / "run.json")
     if not isinstance(run, dict) or run.get("schema_version") != SCHEMA_VERSION:
         raise EvidenceError("invalid run metadata schema")
@@ -599,9 +600,6 @@ def validate_run_dir(run_dir: Path) -> dict[str, Any]:
         raise EvidenceError("run metadata has an unknown review lane")
     if run.get("evidence_lane") not in EVIDENCE_LANES:
         raise EvidenceError("run metadata has an unknown evidence lane")
-    pinned = (run_dir / "tools" / "kickoff-evidence").resolve()
-    if SCRIPT_PATH != pinned:
-        raise EvidenceError(f"active run must use pinned tool: {pinned}")
     bundle = run.get("tool_bundle")
     if (
         not isinstance(bundle, dict)
@@ -631,6 +629,14 @@ def validate_run_dir(run_dir: Path) -> dict[str, Any]:
             or hashlib.sha256(target.read_bytes()).hexdigest() != item["sha256"]
         ):
             raise EvidenceError(f"pinned tool changed: {relative.as_posix()}")
+    return run
+
+
+def validate_run_dir(run_dir: Path) -> dict[str, Any]:
+    run = validate_run_bundle(run_dir)
+    pinned = (run_dir / "tools" / "kickoff-evidence").resolve()
+    if SCRIPT_PATH != pinned:
+        raise EvidenceError(f"active run must use pinned tool: {pinned}")
     return run
 
 
@@ -2175,6 +2181,131 @@ def command_start_advice(arguments: argparse.Namespace) -> None:
             arguments.run_dir / f"advice-plan-{record['attempt']}.json", {"plan_sha256": plan_id}
         )
     print("ADVICE LAUNCH RECORDED")
+
+
+def require_owned_reconciliation_evidence(paths: list[Path]) -> None:
+    for path in paths:
+        if path.is_symlink():
+            raise EvidenceError("reconciliation evidence is not owned by the current account")
+        try:
+            owner = path.stat().st_uid
+        except FileNotFoundError as exc:
+            raise EvidenceError(f"missing reconciliation evidence: {path.name}") from exc
+        if owner != os.geteuid():
+            raise EvidenceError("reconciliation evidence is not owned by the current account")
+
+
+def command_reconcile_unstarted_plan(arguments: argparse.Namespace) -> None:
+    """Append only a validated, terminally rejected PLAN preclaim; never launch or retry."""
+    source = arguments.source_run.resolve()
+    run = validate_run_bundle(source)
+    root = Path(run["repository_root"]).resolve()
+    if root != Path.cwd().resolve() or not source.is_relative_to(root / ".kickoff"):
+        raise EvidenceError("reconciliation requires the current checkout's own .kickoff run")
+    registration_path = arguments.registration.resolve()
+    if registration_path.parent != source:
+        raise EvidenceError("reconciliation registration must belong to the source run")
+    registration = load_json(registration_path)
+    validate_role_record(registration, run)
+    if run["workflow"]["mode"] != "primary" or registration["operation"] != "role.plan-review":
+        raise EvidenceError("reconciliation is limited to primary PLAN preclaims")
+    expected = validate_candidate_id(arguments.expected_claim, "expected claim digest")
+    claim_path = source / f"advice-launch-reviewer-{registration['attempt']}.json"
+    claim = load_json(claim_path)
+    if advisory.digest(claim) != expected or (
+        claim.get("run"),
+        claim.get("operation"),
+        claim.get("attempt"),
+    ) != (str(source), registration["operation"], registration["attempt"]):
+        raise EvidenceError("reconciliation claim does not match registration and expected digest")
+    ledger = advisory.budget_path(root, run["phase"])
+    paths = [
+        root,
+        source,
+        source / "run.json",
+        registration_path,
+        claim_path,
+        ledger,
+        source / "role-attempts.jsonl",
+        source / "role-dispatch.jsonl",
+    ]
+    require_owned_reconciliation_evidence(paths)
+    with ledger.open("r+", encoding="utf-8") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        rows = [json.loads(line) for line in handle if line.strip()]
+        if advisory.active_launches(rows).count(claim) != 1:
+            raise EvidenceError("preclaim is absent, ambiguous or already reconciled")
+        if load_jsonl(source / "role-attempts.jsonl").count(registration) != 1:
+            raise EvidenceError("preclaim registration is not uniquely recorded")
+        terminal_rows, opened, omissions = role_dispatch_ledger(source)
+        key = (registration["operation"], registration["attempt"])
+        raw = [
+            row
+            for row in load_jsonl(source / "role-dispatch.jsonl")
+            if (row.get("operation"), row.get("attempt")) == key
+        ]
+        terminal = [row for row in terminal_rows if (row["operation"], row["attempt"]) == key]
+        if (
+            opened
+            or omissions
+            or len(raw) != 2
+            or [row.get("state") for row in raw] != ["opened", "rejected"]
+            or len(terminal) != 1
+        ):
+            raise EvidenceError("preclaim needs one joined opened/rejected terminal dispatch")
+        rejected = terminal[0]
+        if (
+            rejected["accepted"]
+            or rejected["idle_telemetry"] != "not-dispatched"
+            or (
+                rejected["wait_span_id"] is not None
+                or rejected["dispatch_candidate_id"] != rejected["return_candidate_id"]
+                or rejected["dispatch_candidate_id"] is None
+            )
+        ):
+            raise EvidenceError("preclaim has spawned, uncertain or mismatched dispatch evidence")
+        validate_dispatch_span(
+            run,
+            registration,
+            rejected["intelligence_span_id"],
+            "intelligence",
+            run["telemetry_root_span_id"],
+        )
+        span = closed_span(
+            engine_root=root,
+            trace_id=run["telemetry_trace_id"],
+            span_id=rejected["intelligence_span_id"],
+        )
+        if span["outcome"] != "error" or span.get("exit_code") != 127:
+            raise EvidenceError("preclaim lacks the manager's closed prelaunch rejection span")
+        if any(
+            item.get("parent_span_id") == rejected["intelligence_span_id"]
+            for item in closed_spans(engine_root=root, trace_id=run["telemetry_trace_id"])
+        ):
+            raise EvidenceError("preclaim has child execution evidence")
+        if any(
+            report.get("span_id") == rejected["intelligence_span_id"]
+            for report in load_json(source / "advisory-reports.json")
+        ):
+            raise EvidenceError("preclaim already has review output")
+        event = {
+            "not_started": claim,
+            "reconciliation": {
+                "kind": "rejected-plan-preclaim/1",
+                "at": now(),
+                "claim_sha256": expected,
+                "registration_sha256": hashlib.sha256(registration_path.read_bytes()).hexdigest(),
+                "dispatch_sha256": hashlib.sha256(
+                    (source / "role-dispatch.jsonl").read_bytes()
+                ).hexdigest(),
+                "intelligence_span_id": rejected["intelligence_span_id"],
+            },
+        }
+        handle.seek(0, os.SEEK_END)
+        handle.write(json.dumps(event, sort_keys=True) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    print(json.dumps(event, sort_keys=True))
 
 
 def command_ingest_advice(arguments: argparse.Namespace) -> None:
@@ -5181,6 +5312,11 @@ def build_parser() -> argparse.ArgumentParser:
     add_run_dir(start_advice)
     start_advice.add_argument("--registration", type=Path, required=True)
     start_advice.set_defaults(handler=command_start_advice)
+    reconcile = subparsers.add_parser("reconcile-unstarted-plan")
+    reconcile.add_argument("--source-run", type=Path, required=True)
+    reconcile.add_argument("--registration", type=Path, required=True)
+    reconcile.add_argument("--expected-claim", required=True)
+    reconcile.set_defaults(handler=command_reconcile_unstarted_plan)
     accept_primary = subparsers.add_parser("accept-primary")
     add_run_dir(accept_primary)
     accept_primary.add_argument("--input", type=Path, required=True)

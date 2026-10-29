@@ -1,5 +1,13 @@
 # Prepared standalone release route
 
+## Current 0.2.4 contract and version scope
+
+Version 0.2.4 provides standard physical PDF citation anchors and the [1.0 citation contract](PAGE-CITATIONS.md) inside complete-bundle envelope 1.1. The current release policy requires a new immutable X.Y.Z and exact qualified tag/artifacts; it does not assign compatibility classes to patch/minor increments. The still-unamended pre-stable development regime explicitly permits direct schema replacement. Therefore this version is a permitted project version, not a claim of backward-compatible SemVer behavior. Existing 1.0 bundles/amend bases refuse; consumers explicitly upgrade the independently installed executable/envelope and rerun from original PDF bytes. No legacy schema branch is added.
+
+The current advertised scope is anchors, native PDF and OCR. Cloud-vision human acceptance stays OPEN and UNQUALIFIED; no prior one-release exception is inherited. Existing optional API documentation is reference material, not a new qualification or promotion. The historical sample viewer remains the 0.1.0 review, not a depiction of current anchor output. Runtime dependencies and licensing are unchanged; renderer/sanitizer/schema validators are dev-only and their binaries are not shipped in project artifacts. Matching release notes record actual gates, CI, installed-package and reproducibility results.
+
+## Historical route and retained commands
+
 As of 2026-10-21, preparation of the Conric-adopting candidate retains the existing audited public repository and its history. The initial 0.1.0 publication narrative below is historical and does not authorize recreating a repository or rewriting history. Current release qualification follows the release policy; source publication does not establish that tags, package assets, CI or human criteria have passed.
 
 The local candidates are Vellric 0.1.0 (AGPL-3.0-only) and Drawbridge 0.1.0 (MIT). The owner selected Drawbridge 0.1.0 for its first public release; the public repository starts a fresh history; private development history remains separately retained. This preparation publishes nothing and changes no live consumer. The release route publishes each project wheel with its matching source archive, lock, build constraints and notices. Engines and Python dependencies install independently. The Vellric wheel contains Python source/docs/notices and no PDF-engine/OCR/codec/data binaries. There is no theoretical license-choice hold.
@@ -50,7 +58,7 @@ uv pip install --python /absolute/isolated/vellric-env/bin/python --no-deps -r r
 ```
 
 ```bash
-uv pip install --python /absolute/isolated/vellric-env/bin/python --no-deps dist/vellric-0.2.3-py3-none-any.whl
+uv pip install --python /absolute/isolated/vellric-env/bin/python --no-deps dist/vellric-0.2.4-py3-none-any.whl
 ```
 
 ```bash

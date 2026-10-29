@@ -20,7 +20,7 @@ TREE_ID = ROOT / "bin" / "kickoff-tree-id"
 UV = shutil.which("uv")
 assert UV is not None
 sys.path.insert(0, str(ROOT / "lib"))
-from agentic_starter import workflow  # noqa: E402
+from agentic_starter import advisory, workflow  # noqa: E402
 from agentic_starter.execution_telemetry import (  # noqa: E402
     attach_review_metrics,
     closed_span,
@@ -865,6 +865,198 @@ def test_primary_mode_kickoff_records_advice_dispositions_and_stale_acceptance(
     repository: Path, tmp_path: Path
 ) -> None:
     _assert_complete_synthetic_kickoff(repository, tmp_path / "primary", phase="1", primary=True)
+
+
+def _review_preclaim_fixture(repository: Path, name: str, *, preclaim: bool) -> tuple[Path, Path]:
+    directory = repository / ".kickoff"
+    directory.mkdir(exist_ok=True)
+    target = directory / name
+    initialize(repository, target, mode="primary", phase="1", follow_up_route="initial")
+    plan = directory / "plan.md"
+    plan.write_text("# Synthetic source review\n")
+    result = run("capture-plan", "--run-dir", str(target), "--plan", str(plan))
+    assert result.returncode == 0, result.stderr
+    metadata = json.loads((target / "run.json").read_text())
+    selected = metadata["workflow"]["roles"]["reviewer"]
+    registration = target / "registration.json"
+    arguments = [
+        "register-role-attempt",
+        "--run-dir",
+        str(target),
+        "--operation",
+        "role.plan-review",
+        "--attempt",
+        "1",
+        "--role",
+        "reviewer",
+        "--harness",
+        "claude",
+        "--model",
+        selected["model"],
+        "--reason",
+        "reexecution",
+        "--cause",
+        "Synthetic concrete correction",
+        "--output",
+        str(registration),
+    ]
+    if selected["effort"]:
+        arguments += ["--effort", selected["effort"]]
+    result = run(*arguments)
+    assert result.returncode == 0, result.stderr
+    if preclaim:
+        result = run("start-advice", "--run-dir", str(target), "--registration", str(registration))
+        assert result.returncode == 0, result.stderr
+    executable = directory / "claude"
+    marker = directory / "spawned.txt"
+    executable.write_text(
+        f"#!{sys.executable}\nimport json,sys\nfrom pathlib import Path\n"
+        "if sys.argv[1:] == ['--version']:\n print('fixture-cli'); raise SystemExit(0)\n"
+        f"with Path({str(marker)!r}).open('a') as out: out.write('spawned\\n')\n"
+        "print(json.dumps({'type':'result','result':json.dumps({'summary':'synthetic','findings':[]})}))\n"
+    )
+    executable.chmod(0o755)
+    environment = os.environ.copy()
+    environment["KICKOFF_CLI_CLAUDE"] = str(executable)
+    environment["KICKOFF_CONFIG_FILE"] = str(directory / "fixture-config.yaml")
+    command = [
+        str(target / "tools/kickoff-config"),
+        "watch",
+        "--role",
+        "reviewer",
+        "--venue",
+        "claude",
+        "--model",
+        selected["model"],
+        "--effort",
+        selected["effort"] or "default",
+        "--authority-mode",
+        "primary",
+        "--tool-profile",
+        "source-review",
+        "--phase",
+        "1",
+        "--prompt-file",
+        str(plan),
+        "--result-file",
+        str(target / "result.json"),
+        "--telemetry-role-registration",
+        str(registration),
+    ]
+    observed = subprocess.run(
+        command, cwd=repository, env=environment, capture_output=True, text=True, timeout=20
+    )
+    assert observed.returncode == (2 if preclaim else 0), observed.stderr
+    if preclaim:
+        assert "advisory invocation already launched" in observed.stderr
+    return target, registration
+
+
+def _reconcile_preclaim(repository: Path, target: Path, registration: Path, *, digest=None):
+    claim = json.loads((target / "advice-launch-reviewer-1.json").read_text())
+    return run(
+        "reconcile-unstarted-plan",
+        "--source-run",
+        str(target),
+        "--registration",
+        str(registration),
+        "--expected-claim",
+        digest or advisory.digest(claim),
+        cwd=repository,
+    )
+
+
+def test_reconcile_never_spawned_plan_preserves_actual_passes_once(repository: Path) -> None:
+    completed, completed_registration = _review_preclaim_fixture(
+        repository, "completed", preclaim=False
+    )
+    marker = repository / ".kickoff/spawned.txt"
+    assert marker.read_text() == "spawned\n"
+    target, registration = _review_preclaim_fixture(repository, "rejected", preclaim=True)
+    assert marker.read_text() == "spawned\n"  # Version probe is not a reviewer launch.
+    ledger = advisory.budget_path(repository, "1")
+    original = ledger.read_bytes()
+    actual = advisory.launches(repository, "1")[0]
+    refusal = _reconcile_preclaim(repository, completed, completed_registration)
+    assert refusal.returncode != 0 and ledger.read_bytes() == original
+    result = _reconcile_preclaim(repository, target, registration)
+    assert result.returncode == 0, result.stderr
+    assert ledger.read_bytes().startswith(original)
+    assert advisory.launches(repository, "1") == [actual]
+    reconciled = ledger.read_bytes()
+    result = _reconcile_preclaim(repository, target, registration)
+    assert result.returncode != 0 and "already reconciled" in result.stderr
+    assert ledger.read_bytes() == reconciled
+    _review_preclaim_fixture(repository, "next-actual", preclaim=False)
+    assert marker.read_text() == "spawned\nspawned\n"
+    assert len(advisory.launches(repository, "1")) == 2
+    with pytest.raises(advisory.AdvisoryError, match="maximum two"):
+        advisory.start(
+            repository,
+            "1",
+            repository / ".kickoff/fourth",
+            "role.plan-review",
+            1,
+            "No new allowance",
+        )
+
+
+def test_reconcile_plan_refuses_uncertain_mismatched_and_nonowned_evidence(
+    repository: Path,
+) -> None:
+    import ast
+    from types import SimpleNamespace
+
+    target, registration = _review_preclaim_fixture(repository, "rejected", preclaim=True)
+    ledger = advisory.budget_path(repository, "1")
+    before = ledger.read_bytes()
+    dispatch = target / "role-dispatch.jsonl"
+    original = dispatch.read_bytes()
+    rows = [json.loads(line) for line in original.splitlines()]
+    accepted = json.loads(json.dumps(rows))
+    accepted[-1].update(state="accepted", accepted=True, idle_telemetry="unavailable")
+    mismatch = json.loads(json.dumps(rows))
+    mismatch[-1]["return_candidate_id"] = "b" * 64
+    for invalid in (rows[:1], accepted, mismatch):
+        dispatch.write_text("".join(json.dumps(row) + "\n" for row in invalid))
+        result = _reconcile_preclaim(repository, target, registration)
+        assert result.returncode != 0 and ledger.read_bytes() == before
+    dispatch.write_bytes(original)
+    for absent in (ledger, dispatch):
+        retained = absent.with_suffix(".retained")
+        absent.rename(retained)
+        try:
+            result = _reconcile_preclaim(repository, target, registration)
+            assert result.returncode != 0
+            assert f"missing reconciliation evidence: {absent.name}" in result.stderr
+            assert "Traceback" not in result.stderr
+        finally:
+            retained.rename(absent)
+        assert ledger.read_bytes() == before
+    assert _reconcile_preclaim(repository, target, registration, digest="0" * 64).returncode != 0
+    foreign = registration.parent / "foreign"
+    foreign.mkdir()
+    foreign_registration = foreign / "registration.json"
+    foreign_registration.write_bytes(registration.read_bytes())
+    assert _reconcile_preclaim(repository, target, foreign_registration).returncode != 0
+    assert _reconcile_preclaim(repository.parent, target, registration).returncode != 0
+    assert ledger.read_bytes() == before
+    # A foreign UID cannot be provisioned here without new grants. Exercise the actual
+    # account check with its UID observation replaced, without chown or identity changes.
+    function = next(
+        node
+        for node in ast.parse(EVIDENCE.read_text()).body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "require_owned_reconciliation_evidence"
+    )
+    namespace = {
+        "Path": Path,
+        "os": SimpleNamespace(geteuid=lambda: os.geteuid() + 1),
+        "EvidenceError": ValueError,
+    }
+    exec(compile(ast.Module(body=[function], type_ignores=[]), str(EVIDENCE), "exec"), namespace)
+    with pytest.raises(ValueError, match="not owned"):
+        namespace["require_owned_reconciliation_evidence"]([registration])
 
 
 def test_child_close_moves_a_stranded_next_marker_only_in_pairs(

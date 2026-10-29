@@ -22,7 +22,7 @@ Authority mode follows [four-canonical-agents.md](four-canonical-agents.md). Pro
 | `SWEEP (<focus>)` | `sweep` | A maintenance pass over the rule surfaces: what was retired, graduated, and left open. |
 | `SWEEP-CODING (<kind>)` | `sweep-coding` | The same longitudinal pass over the coder ↔ critic loop: harvested code-review verdicts and coder failure analyses, reason categories, attributions, corrections. Reads its latest entry the same way. |
 | `SWEEP-PLANNING (<kind>)` | `sweep-planning` | A longitudinal pass over harvested review verdicts: window, coverage, reason categories with counts, attributions, and the corrections applied or filed. The next run reads the latest entry to set its window and compute deltas. |
-| `METHODOLOGY SCOPE` / `METHODOLOGY` | the agent invoking the direct-implementation route ([review-lanes.md](review-lanes.md) § Methodology improvements) | The paired records of one direct methodology change: the scope block written before the work — approved outcome, surfaces in scope, explicit exclusions — and the terminal block written at close, carrying changed paths, independent verdict and resolutions, reviewed candidate, gate results and remaining human criteria. |
+| `METHODOLOGY SCOPE` / `METHODOLOGY` | the agent invoking the direct-implementation route ([review-lanes.md](review-lanes.md) § Methodology improvements) | The paired records of one direct methodology change: the scope block written before the work — approved outcome, surfaces in scope, explicit exclusions — and the terminal block written at close, carrying changed paths, primary self-check, independent review not applicable, exact candidate, gate results and remaining human criteria. |
 
 The `Only finalized evidence may claim exact timing` rule and the START/END formats below govern phase entries. A repository-operation entry has no fixed schema beyond a `## <YYYY-MM-DD HH:MM> — <HEADING>` line and the same append-only, no-back-dating, no-fabrication rules; each owning writer defines its own body.
 
@@ -120,18 +120,20 @@ When a phase pauses (not completes), the END block uses the same format but adds
 
 ## Follow-up correction format
 
-When concrete user feedback changes code after a phase has already closed, preserve the historical START/END pair and append:
+For an inter-phase correction, preserve the historical START/END pair and completed phase status, and append the record below. If the operator chose an inserted phase/sub-phase instead, use its own normal START/END records with formal planning and reviews; do not present it as an unreviewed inter-phase correction.
 
 ```markdown
 ## <YYYY-MM-DD HH:MM> — END (correction)
 <Phase heading>
 
 Follow-up route:
-- direct fix | coder only | full cycle — <risk/size reason>
+- inter-phase implementation without formal review — <risk/size reason>
+- Phase recommendation: <inserted sub-phase normally recommended for high-risk/large work, or not needed for a small low-risk correction>
+- Operator ruling: <attributable route/scope decision, or existing authority for a small low-risk correction>
 
 Role model/venue:
-- Coder: skipped (direct fix) | model=<model> effort=<effort|default> venue=<native|claude|codex>
-- Critic: skipped (direct fix or coder only) | model=<model> effort=<effort|default> venue=<native|claude|codex>
+- Implementation: <primary or already-authorized delegate>
+- Formal planning/reviews: not invoked — inter-phase route
 
 Files changed:
 - <path> — <brief description of correction>
@@ -146,7 +148,7 @@ Remaining:
 - <anything significant left incomplete, or "None">
 ```
 
-This block records a correction to an already authorized goal; it does not reopen the phase or change its `✅` marker. New scope gets a new phase and a normal START/END pair.
+This block records the approved inter-phase scope and route; it does not reopen the phase or change its `✅` marker. High-risk or large/cross-cutting work normally receives an inserted sub-phase recommendation, but the operator may choose inter-phase implementation without formal review. That ruling never waives tests, applicable gates, safety/permissions or preservation of earlier evidence and consumed review accounting. New consequential scope needs explicit authorization, not a silently invented phase.
 
 ## Rules
 

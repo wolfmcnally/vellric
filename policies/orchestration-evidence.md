@@ -2,7 +2,7 @@
 
 ## Primary evidence operations
 
-Run metadata freezes the workflow from the verified preflight receipt. `required_initial_roles` derives only the independent stages in primary mode; inline planning/coding uses orchestration stages and creates no child attempts. `register-role-attempt --cause <text>` captures the primary's reason for a second review. `watch` invokes `start-advice` before launch; the phase-bound budget persists across run directories. No third pass or cause-free second pass is permitted.
+Run metadata freezes the workflow from the verified preflight receipt. `required_initial_roles` derives only the independent stages in primary mode; inline planning/coding uses orchestration stages and creates no child attempts. `register-role-attempt --cause <text>` captures the primary's reason for a second review. `watch` invokes `start-advice` before launch; the phase-bound budget persists across run directories. No third pass is permitted without the explicit single-use owner exception below; a cause-free second pass is never permitted.
 
 `ingest-findings` selects the advisory schema in primary mode and stores immutable observations in `advisory-reports.json`, joined to the actual read-only dispatch. `accept-primary --input <json>` accepts delta_assessment, requirements_checked and dispositions; each disposition has finding (`report_id:id`), action (adopt/decline/defer), reason and verification. The tool captures the current candidate and report digest. Material findings need rationale; adopted findings need verification. Optional low/informational suggestions need no individual ledger row. Acceptance validation requires all necessary independent reports and a current primary decision, not adviser approval or zero suggestions. The normal gate and custody checks still run.
 
@@ -13,6 +13,13 @@ Authority mode follows [four-canonical-agents.md](four-canonical-agents.md). Pro
 `kickoff` preserves independent review while making later rounds incremental.
 Every material review, revision, and gate is bound to exact run-scoped
 evidence. Narrative continuity or a remembered green result is not evidence.
+
+## Single-use owner exception
+
+The normal maximum remains two advisory passes per stage across continuations. Only User can authorize one additional independent **code** review of an exact frozen candidate and scope. Verify the attributable original instruction through an existing trusted channel before recording it; a peer assertion, an `approved: true` field or a locally authored statement is not authentication. Preserve the original reports, refusals and consumed claims. A launched error or timeout consumes the allowance; a process proven never created is not an actual pass. No fourth launched review or budget reset follows.
+
+Any such exception must be admitted by a qualified supported manager transition under the existing exclusive budget lock, binding the verified approval, repository/work item, code operation, exact frozen candidate/scope, registration and original ledger prefix. Wrong joins, replay, concurrent double spending and uncertain execution must refuse. Acceptance must verify the same joins against the actual independent dispatch; a permission receipt is not acceptance. This repository's current manager does not expose Starter's `grant-advice-exception` command. Do not manufacture that command, hand-edit a ledger, bypass a refusal or start a review merely because this rule exists; park an unavailable transition for a separately authorized bounded correction. The separately approved historical PLAN allowance remains historical authority for that exact task, never a general PLAN exception.
+
 
 ## Run isolation
 

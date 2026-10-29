@@ -9,13 +9,13 @@
       "leaves": 6
     },
     "pytest": {
-      "families": 158,
-      "leaves": 219
+      "families": 173,
+      "leaves": 246
     }
   },
   "counts": {
-    "families": 183,
-    "leaves": 244
+    "families": 198,
+    "leaves": 271
   },
   "families": [
     "gate:changed",
@@ -43,6 +43,15 @@
     "hook:.githooks/pre-commit:./bin/check-toolchain-callers",
     "hook:.githooks/pre-commit:./bin/python project/packaging/release_version.py --staged",
     "hook:.githooks/pre-commit:./bin/test-governance validate",
+    "pytest:project/tests/test_citations.py::test_images_do_not_claim_pdf_pages",
+    "pytest:project/tests/test_citations.py::test_large_ordinal_never_truncates",
+    "pytest:project/tests/test_citations.py::test_mapping_tamper_refuses",
+    "pytest:project/tests/test_citations.py::test_markup_rejects_non_generated_attribute_values",
+    "pytest:project/tests/test_citations.py::test_old_amend_base_refuses_at_amend_boundary",
+    "pytest:project/tests/test_citations.py::test_only_exact_generated_identity_enters_markup",
+    "pytest:project/tests/test_citations.py::test_original_physical_mapping_and_independent_consumer",
+    "pytest:project/tests/test_citations.py::test_raw_markdown_and_actual_renderer_sanitizer_limits",
+    "pytest:project/tests/test_citations.py::test_selected_render_keeps_original_physical_mapping",
     "pytest:project/tests/test_cli.py::test_help",
     "pytest:project/tests/test_configuration.py::test_composed_leaf_precedence_provenance_and_rejections",
     "pytest:project/tests/test_configuration.py::test_configured_native_bundle_excludes_paths_and_references",
@@ -149,6 +158,10 @@
     "pytest:tests/test_execution_telemetry.py::test_operator_park_recovers_missing_runtime_state_and_marks_cross_boot",
     "pytest:tests/test_install_hooks.py::test_install_is_idempotent",
     "pytest:tests/test_kickoff_config.py::TestGeneratedInvocationRecipes::test_claude_coder_is_the_only_write_enabled_role",
+    "pytest:tests/test_kickoff_config.py::TestGeneratedInvocationRecipes::test_source_review_controls_refuse_generator_drift_before_spawn",
+    "pytest:tests/test_kickoff_config.py::TestGeneratedInvocationRecipes::test_source_review_profile_narrows_shared_recipe",
+    "pytest:tests/test_kickoff_config.py::TestGeneratedInvocationRecipes::test_source_review_profile_rejects_other_roles_and_venues",
+    "pytest:tests/test_kickoff_config.py::TestGeneratedInvocationRecipes::test_source_review_watch_records_profile_without_model",
     "pytest:tests/test_kickoff_config.py::test_invalid_edit_is_atomic",
     "pytest:tests/test_kickoff_config.py::test_preflight_still_aborts_on_a_failed_sentinel",
     "pytest:tests/test_kickoff_config.py::test_scoped_edit_preserves_extensions_comments_and_timeouts",
@@ -164,6 +177,8 @@
     "pytest:tests/test_kickoff_evidence.py::test_finding_state_is_stable_validated_and_reopen_is_counted",
     "pytest:tests/test_kickoff_evidence.py::test_nested_final_child_close_requires_an_accepted_parent_chain",
     "pytest:tests/test_kickoff_evidence.py::test_primary_mode_kickoff_records_advice_dispositions_and_stale_acceptance",
+    "pytest:tests/test_kickoff_evidence.py::test_reconcile_never_spawned_plan_preserves_actual_passes_once",
+    "pytest:tests/test_kickoff_evidence.py::test_reconcile_plan_refuses_uncertain_mismatched_and_nonowned_evidence",
     "pytest:tests/test_kickoff_evidence.py::test_revision_round_requires_and_carries_failure_analysis",
     "pytest:tests/test_kickoff_evidence.py::test_role_artifacts_feed_findings_and_change_metadata_without_reparsing",
     "pytest:tests/test_kickoff_evidence.py::test_validate_detects_corrupt_evidence",
@@ -202,8 +217,155 @@
     "pytest:tests/test_treatise.py::test_an_external_fact_without_a_retrieval_date_fails",
     "pytest:tests/test_treatise.py::test_the_repository_own_treatises_validate"
   ],
-  "inventory_sha256": "4db70c34e163067db4d0ecdaa356c0a540b4ac1a9adad5c880942b9fd79867b2",
+  "inventory_sha256": "9e7edab1a25b40718be9e966333a72e971101fcd141fa4ec4023f4d5727c9756",
   "proofs": [
+    {
+      "family": "pytest:project/tests/test_citations.py::test_original_physical_mapping_and_independent_consumer",
+      "id": "pytest:project/tests/test_citations.py::test_original_physical_mapping_and_independent_consumer",
+      "kind": "pytest",
+      "selector": "project/tests/test_citations.py::test_original_physical_mapping_and_independent_consumer",
+      "source_path": "project/tests/test_citations.py"
+    },
+    {
+      "family": "pytest:project/tests/test_citations.py::test_mapping_tamper_refuses",
+      "id": "pytest:project/tests/test_citations.py::test_mapping_tamper_refuses[missing]",
+      "kind": "pytest",
+      "selector": "project/tests/test_citations.py::test_mapping_tamper_refuses[missing]",
+      "source_path": "project/tests/test_citations.py"
+    },
+    {
+      "family": "pytest:project/tests/test_citations.py::test_mapping_tamper_refuses",
+      "id": "pytest:project/tests/test_citations.py::test_mapping_tamper_refuses[contract]",
+      "kind": "pytest",
+      "selector": "project/tests/test_citations.py::test_mapping_tamper_refuses[contract]",
+      "source_path": "project/tests/test_citations.py"
+    },
+    {
+      "family": "pytest:project/tests/test_citations.py::test_mapping_tamper_refuses",
+      "id": "pytest:project/tests/test_citations.py::test_mapping_tamper_refuses[anchor]",
+      "kind": "pytest",
+      "selector": "project/tests/test_citations.py::test_mapping_tamper_refuses[anchor]",
+      "source_path": "project/tests/test_citations.py"
+    },
+    {
+      "family": "pytest:project/tests/test_citations.py::test_mapping_tamper_refuses",
+      "id": "pytest:project/tests/test_citations.py::test_mapping_tamper_refuses[digest]",
+      "kind": "pytest",
+      "selector": "project/tests/test_citations.py::test_mapping_tamper_refuses[digest]",
+      "source_path": "project/tests/test_citations.py"
+    },
+    {
+      "family": "pytest:project/tests/test_citations.py::test_mapping_tamper_refuses",
+      "id": "pytest:project/tests/test_citations.py::test_mapping_tamper_refuses[ordinal]",
+      "kind": "pytest",
+      "selector": "project/tests/test_citations.py::test_mapping_tamper_refuses[ordinal]",
+      "source_path": "project/tests/test_citations.py"
+    },
+    {
+      "family": "pytest:project/tests/test_citations.py::test_mapping_tamper_refuses",
+      "id": "pytest:project/tests/test_citations.py::test_mapping_tamper_refuses[float]",
+      "kind": "pytest",
+      "selector": "project/tests/test_citations.py::test_mapping_tamper_refuses[float]",
+      "source_path": "project/tests/test_citations.py"
+    },
+    {
+      "family": "pytest:project/tests/test_citations.py::test_mapping_tamper_refuses",
+      "id": "pytest:project/tests/test_citations.py::test_mapping_tamper_refuses[non-object]",
+      "kind": "pytest",
+      "selector": "project/tests/test_citations.py::test_mapping_tamper_refuses[non-object]",
+      "source_path": "project/tests/test_citations.py"
+    },
+    {
+      "family": "pytest:project/tests/test_citations.py::test_mapping_tamper_refuses",
+      "id": "pytest:project/tests/test_citations.py::test_mapping_tamper_refuses[old]",
+      "kind": "pytest",
+      "selector": "project/tests/test_citations.py::test_mapping_tamper_refuses[old]",
+      "source_path": "project/tests/test_citations.py"
+    },
+    {
+      "family": "pytest:project/tests/test_citations.py::test_images_do_not_claim_pdf_pages",
+      "id": "pytest:project/tests/test_citations.py::test_images_do_not_claim_pdf_pages",
+      "kind": "pytest",
+      "selector": "project/tests/test_citations.py::test_images_do_not_claim_pdf_pages",
+      "source_path": "project/tests/test_citations.py"
+    },
+    {
+      "family": "pytest:project/tests/test_citations.py::test_old_amend_base_refuses_at_amend_boundary",
+      "id": "pytest:project/tests/test_citations.py::test_old_amend_base_refuses_at_amend_boundary",
+      "kind": "pytest",
+      "selector": "project/tests/test_citations.py::test_old_amend_base_refuses_at_amend_boundary",
+      "source_path": "project/tests/test_citations.py"
+    },
+    {
+      "family": "pytest:project/tests/test_citations.py::test_raw_markdown_and_actual_renderer_sanitizer_limits",
+      "id": "pytest:project/tests/test_citations.py::test_raw_markdown_and_actual_renderer_sanitizer_limits",
+      "kind": "pytest",
+      "selector": "project/tests/test_citations.py::test_raw_markdown_and_actual_renderer_sanitizer_limits",
+      "source_path": "project/tests/test_citations.py"
+    },
+    {
+      "family": "pytest:project/tests/test_citations.py::test_only_exact_generated_identity_enters_markup",
+      "id": "pytest:project/tests/test_citations.py::test_only_exact_generated_identity_enters_markup[AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-1]",
+      "kind": "pytest",
+      "selector": "project/tests/test_citations.py::test_only_exact_generated_identity_enters_markup[AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-1]",
+      "source_path": "project/tests/test_citations.py"
+    },
+    {
+      "family": "pytest:project/tests/test_citations.py::test_only_exact_generated_identity_enters_markup",
+      "id": "pytest:project/tests/test_citations.py::test_only_exact_generated_identity_enters_markup[a\" onclick=\"x-1]",
+      "kind": "pytest",
+      "selector": "project/tests/test_citations.py::test_only_exact_generated_identity_enters_markup[a\" onclick=\"x-1]",
+      "source_path": "project/tests/test_citations.py"
+    },
+    {
+      "family": "pytest:project/tests/test_citations.py::test_only_exact_generated_identity_enters_markup",
+      "id": "pytest:project/tests/test_citations.py::test_only_exact_generated_identity_enters_markup[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-True]",
+      "kind": "pytest",
+      "selector": "project/tests/test_citations.py::test_only_exact_generated_identity_enters_markup[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-True]",
+      "source_path": "project/tests/test_citations.py"
+    },
+    {
+      "family": "pytest:project/tests/test_citations.py::test_only_exact_generated_identity_enters_markup",
+      "id": "pytest:project/tests/test_citations.py::test_only_exact_generated_identity_enters_markup[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-0]",
+      "kind": "pytest",
+      "selector": "project/tests/test_citations.py::test_only_exact_generated_identity_enters_markup[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-0]",
+      "source_path": "project/tests/test_citations.py"
+    },
+    {
+      "family": "pytest:project/tests/test_citations.py::test_large_ordinal_never_truncates",
+      "id": "pytest:project/tests/test_citations.py::test_large_ordinal_never_truncates",
+      "kind": "pytest",
+      "selector": "project/tests/test_citations.py::test_large_ordinal_never_truncates",
+      "source_path": "project/tests/test_citations.py"
+    },
+    {
+      "family": "pytest:project/tests/test_citations.py::test_markup_rejects_non_generated_attribute_values",
+      "id": "pytest:project/tests/test_citations.py::test_markup_rejects_non_generated_attribute_values[x\" onclick=\"y]",
+      "kind": "pytest",
+      "selector": "project/tests/test_citations.py::test_markup_rejects_non_generated_attribute_values[x\" onclick=\"y]",
+      "source_path": "project/tests/test_citations.py"
+    },
+    {
+      "family": "pytest:project/tests/test_citations.py::test_markup_rejects_non_generated_attribute_values",
+      "id": "pytest:project/tests/test_citations.py::test_markup_rejects_non_generated_attribute_values[vellric-pdf-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-page-000001]",
+      "kind": "pytest",
+      "selector": "project/tests/test_citations.py::test_markup_rejects_non_generated_attribute_values[vellric-pdf-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-page-000001]",
+      "source_path": "project/tests/test_citations.py"
+    },
+    {
+      "family": "pytest:project/tests/test_citations.py::test_markup_rejects_non_generated_attribute_values",
+      "id": "pytest:project/tests/test_citations.py::test_markup_rejects_non_generated_attribute_values[vellric-pdf-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-page-00001]",
+      "kind": "pytest",
+      "selector": "project/tests/test_citations.py::test_markup_rejects_non_generated_attribute_values[vellric-pdf-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-page-00001]",
+      "source_path": "project/tests/test_citations.py"
+    },
+    {
+      "family": "pytest:project/tests/test_citations.py::test_selected_render_keeps_original_physical_mapping",
+      "id": "pytest:project/tests/test_citations.py::test_selected_render_keeps_original_physical_mapping",
+      "kind": "pytest",
+      "selector": "project/tests/test_citations.py::test_selected_render_keeps_original_physical_mapping",
+      "source_path": "project/tests/test_citations.py"
+    },
     {
       "family": "pytest:project/tests/test_cli.py::test_help",
       "id": "pytest:project/tests/test_cli.py::test_help",
@@ -1339,6 +1501,34 @@
       "source_path": "tests/test_kickoff_config.py"
     },
     {
+      "family": "pytest:tests/test_kickoff_config.py::TestGeneratedInvocationRecipes::test_source_review_profile_narrows_shared_recipe",
+      "id": "pytest:tests/test_kickoff_config.py::TestGeneratedInvocationRecipes::test_source_review_profile_narrows_shared_recipe",
+      "kind": "pytest",
+      "selector": "tests/test_kickoff_config.py::TestGeneratedInvocationRecipes::test_source_review_profile_narrows_shared_recipe",
+      "source_path": "tests/test_kickoff_config.py"
+    },
+    {
+      "family": "pytest:tests/test_kickoff_config.py::TestGeneratedInvocationRecipes::test_source_review_profile_rejects_other_roles_and_venues",
+      "id": "pytest:tests/test_kickoff_config.py::TestGeneratedInvocationRecipes::test_source_review_profile_rejects_other_roles_and_venues",
+      "kind": "pytest",
+      "selector": "tests/test_kickoff_config.py::TestGeneratedInvocationRecipes::test_source_review_profile_rejects_other_roles_and_venues",
+      "source_path": "tests/test_kickoff_config.py"
+    },
+    {
+      "family": "pytest:tests/test_kickoff_config.py::TestGeneratedInvocationRecipes::test_source_review_controls_refuse_generator_drift_before_spawn",
+      "id": "pytest:tests/test_kickoff_config.py::TestGeneratedInvocationRecipes::test_source_review_controls_refuse_generator_drift_before_spawn",
+      "kind": "pytest",
+      "selector": "tests/test_kickoff_config.py::TestGeneratedInvocationRecipes::test_source_review_controls_refuse_generator_drift_before_spawn",
+      "source_path": "tests/test_kickoff_config.py"
+    },
+    {
+      "family": "pytest:tests/test_kickoff_config.py::TestGeneratedInvocationRecipes::test_source_review_watch_records_profile_without_model",
+      "id": "pytest:tests/test_kickoff_config.py::TestGeneratedInvocationRecipes::test_source_review_watch_records_profile_without_model",
+      "kind": "pytest",
+      "selector": "tests/test_kickoff_config.py::TestGeneratedInvocationRecipes::test_source_review_watch_records_profile_without_model",
+      "source_path": "tests/test_kickoff_config.py"
+    },
+    {
       "family": "pytest:tests/test_kickoff_config.py::test_preflight_still_aborts_on_a_failed_sentinel",
       "id": "pytest:tests/test_kickoff_config.py::test_preflight_still_aborts_on_a_failed_sentinel",
       "kind": "pytest",
@@ -1420,6 +1610,20 @@
       "id": "pytest:tests/test_kickoff_evidence.py::test_primary_mode_kickoff_records_advice_dispositions_and_stale_acceptance",
       "kind": "pytest",
       "selector": "tests/test_kickoff_evidence.py::test_primary_mode_kickoff_records_advice_dispositions_and_stale_acceptance",
+      "source_path": "tests/test_kickoff_evidence.py"
+    },
+    {
+      "family": "pytest:tests/test_kickoff_evidence.py::test_reconcile_never_spawned_plan_preserves_actual_passes_once",
+      "id": "pytest:tests/test_kickoff_evidence.py::test_reconcile_never_spawned_plan_preserves_actual_passes_once",
+      "kind": "pytest",
+      "selector": "tests/test_kickoff_evidence.py::test_reconcile_never_spawned_plan_preserves_actual_passes_once",
+      "source_path": "tests/test_kickoff_evidence.py"
+    },
+    {
+      "family": "pytest:tests/test_kickoff_evidence.py::test_reconcile_plan_refuses_uncertain_mismatched_and_nonowned_evidence",
+      "id": "pytest:tests/test_kickoff_evidence.py::test_reconcile_plan_refuses_uncertain_mismatched_and_nonowned_evidence",
+      "kind": "pytest",
+      "selector": "tests/test_kickoff_evidence.py::test_reconcile_plan_refuses_uncertain_mismatched_and_nonowned_evidence",
       "source_path": "tests/test_kickoff_evidence.py"
     },
     {

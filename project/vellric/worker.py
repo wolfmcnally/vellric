@@ -17,6 +17,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from . import __version__, native, pdf_tools, vision
+from .citations import CONTRACT, anchor_markup, page_anchor
 from .errors import ConverterUnavailable, OcrOperationalError
 from .fidelity import native_section
 from .orientation import MAX_RENDER_SIDE, recover_page
@@ -34,10 +35,12 @@ from .runtime import (
 )
 
 
-def reader(title: str, texts: list[str]) -> str:
+def reader(title: str, texts: list[str], source_sha256: str) -> str:
     parts = [f"# {title}"]
     for number, text in enumerate(texts, 1):
         parts += [
+            "",
+            anchor_markup(page_anchor(source_sha256, number)),
             "",
             f"## Page {number}",
             "",
@@ -649,6 +652,7 @@ def execute(config: dict) -> dict:
             geometry = geometry_and_layout(source, number, options["layout"])
             record = {
                 "number": number,
+                "anchor": page_anchor(config["sha256"], number),
                 "geometry": {k: v for k, v in geometry.items() if k != "layout"},
                 "native_text_present": bool(native_text.strip()),
                 "raster_coverage": coverage[number - 1],
@@ -770,11 +774,11 @@ def execute(config: dict) -> dict:
             for n in range(1, count + 1)
         ]
         (root / "document.md").write_text(
-            reader(title, reading_view), encoding="utf-8", newline="\n"
+            reader(title, reading_view, config["sha256"]), encoding="utf-8", newline="\n"
         )
         if want_structure:
             (root / "structured.md").write_text(
-                reader(title, structured), encoding="utf-8", newline="\n"
+                reader(title, structured, config["sha256"]), encoding="utf-8", newline="\n"
             )
         subset = None
         if options.get("subset_pdf"):
@@ -828,6 +832,7 @@ def execute(config: dict) -> dict:
                 )
         manifest = {
             "schema": SCHEMA,
+            "page_citations": {"schema": CONTRACT},
             "status": "complete",
             "job": options["command"],
             "source": {"sha256": config["sha256"], "size": config["size"]},

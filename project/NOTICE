@@ -1,4 +1,4 @@
-Vellric 0.2.3
+Vellric 0.2.4
 Copyright (c) 2026 Wolf McNally.
 Project grant: AGPL-3.0-only. Full license: LICENSE.
 
@@ -38,9 +38,11 @@ all other mandatory release gates pass. Cloud-vision human acceptance is
 OPEN and UNQUALIFIED. The exception does not close real-provider tests or
 authorize provider calls, credentials, or Windows binary distribution.
 
-Version 0.2.3 uses host libproc for macOS process-group RSS observation.
+Since version 0.2.3, Vellric uses host libproc for macOS process-group RSS observation.
 Memory, disk and deadline limits are sampled and can overshoot; this
 watchdog is not a network or filesystem sandbox. Read the matching release
 notes for measured platform and caller-profile qualification. Cloud-vision
 human acceptance remains OPEN and UNQUALIFIED; no provider acceptance or
 Windows binary redistribution is implied.
+
+Version 0.2.4 adds the vellric.document/1.1 physical PDF page-citation mapping and standard reader Markdown anchors, without a new runtime dependency or packaged binary.

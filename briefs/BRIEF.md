@@ -62,7 +62,7 @@ Progress uses stderr; `--status-json` reserves stdout for one bounded terminal J
 
 ## Artifact contract v1
 
-The schema is `vellric.document/1.0`; the major is negotiated explicitly. Software SemVer, artifact schema and extraction/formatting behavior identifiers are distinct. Additive optional fields can advance a schema minor; removing/changing meaning requires a new major. Before the first stable external release, replace incorrect draft schemas directly per the inherited greenfield policy. Published schemas and example artifacts live with the implementation; there is no promise of pre-release compatibility.
+As of 2026-10-29 UTC, the pre-release schema is `vellric.document/1.1`, requiring exact-PDF/physical-page citation mapping for PDF jobs. Software version, artifact schema and extraction/formatting behavior identifiers are distinct. This is a direct pre-release contract replacement: 1.0 bundles and amend bases are refused, so consumers must qualify 1.1 and rerun original inputs. Before the first stable external release and an explicit change of compatibility regime, replace incorrect draft schemas directly; there is no promise of pre-release compatibility. A future stable regime should reserve schema minors for additive optional fields and require a new major when removing/changing meaning. Published schemas and example artifacts live with the implementation.
 
 | Artifact | Contract |
 |---|---|

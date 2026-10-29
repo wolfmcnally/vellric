@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:vellric:document:1.0",
+  "$id": "urn:vellric:document:1.1",
   "title": "Vellric complete document bundle",
   "type": "object",
   "required": [
@@ -21,7 +21,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "vellric.document/1.0"
+      "const": "vellric.document/1.1"
     },
     "status": {
       "const": "complete"
@@ -85,6 +85,10 @@
               "native",
               "text"
             ]
+          },
+          "anchor": {
+            "type": "string",
+            "pattern": "^vellric-pdf-[a-f0-9]{64}-page-[0-9]{6,}$"
           }
         }
       }
@@ -132,7 +136,62 @@
           }
         }
       }
+    },
+    "page_citations": {
+      "type": "object",
+      "required": [
+        "schema"
+      ],
+      "properties": {
+        "schema": {
+          "const": "vellric.pdf-page-citations/1.0"
+        }
+      },
+      "additionalProperties": false
     }
   },
-  "additionalProperties": true
+  "additionalProperties": true,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "job": {
+            "const": "image"
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": [
+            "page_citations"
+          ]
+        },
+        "properties": {
+          "pages": {
+            "items": {
+              "not": {
+                "required": [
+                  "anchor"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "required": [
+          "page_citations"
+        ],
+        "properties": {
+          "pages": {
+            "items": {
+              "required": [
+                "anchor"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
 }
