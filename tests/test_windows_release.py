@@ -92,6 +92,7 @@ wheels=[{{hash="sha256:{digest}"}}]
     (sources / "demo.tar.gz").write_bytes(source_bytes)
     declaration = {
         "status": "qualified",
+        "notice": "Synthetic notice; no third-party or license authority claimed",
         "uv_lock_sha256": report["uv_lock_sha256"],
         "native_versions": {"demo": "1.0"},
         "native_wheels": {
@@ -127,6 +128,10 @@ def test_release_zip_preserves_wheels_and_binds_sources_reproducibly(tmp_path):
             assert delivered.read(name) == original.read(name)
         assert delivered.read("sources/demo.tar.gz") == (sources / "demo.tar.gz").read_bytes()
         assert json.loads(delivered.read("WINDOWS-RELEASE.json"))["native_probe"] == {"demo": "1.0"}
+        assert (
+            delivered.read("WINDOWS-NATIVE-NOTICES.txt")
+            == b"Synthetic notice; no third-party or license authority claimed"
+        )
         assert any(name.startswith("third-party-notices/") for name in delivered.namelist())
     with pytest.raises(ValueError, match="replacement"):
         RELEASE.assemble(bundle, root, closure, sources, first, proof, "v0.2.4")
@@ -162,6 +167,7 @@ def test_release_refuses_unqualified_or_unjoined_material_without_output(tmp_pat
 
     for change, message in [
         ({"status": "pending"}, "basis remains unqualified"),
+        ({"notice": ""}, "Closure notice companion is empty"),
         ({"uv_lock_sha256": "0" * 64}, "different dependency lock"),
         ({"native_versions": {"demo": "2.0"}}, "Native runtime versions differ"),
         ({"native_wheels": {}}, "cover every native distribution"),

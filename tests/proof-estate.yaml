@@ -73,6 +73,7 @@ families:
   - pending-closure-admitted
   - unlocked-wheel-admitted
   - native-eol-refused
+  - native-notice-lost
   replacement_lineage: []
   tier: vital
   size: small

@@ -162,6 +162,10 @@ jobs:
           New-Item -ItemType Directory release-dist | Out-Null
           $zip = "release-dist\vellric-$($env:RELEASE_REF.Substring(1))-windows-x64-py313.zip"
           & $python $tool assemble --bundle (Get-Item dist\*.zip).FullName --source-root . --closure $closure --sources corresponding-sources --provenance measured\windows-bundle-provenance.json --tag $env:RELEASE_REF --output $zip | Tee-Object measured\windows-release-asset.json
+          New-Item -ItemType Directory release-reproduced | Out-Null
+          $reproduced = "release-reproduced\vellric-$($env:RELEASE_REF.Substring(1))-windows-x64-py313.zip"
+          & $python $tool assemble --bundle (Get-Item dist\*.zip).FullName --source-root . --closure $closure --sources corresponding-sources --provenance measured\windows-bundle-provenance.json --tag $env:RELEASE_REF --output $reproduced | Out-File measured\windows-release-reproduction.json -Encoding utf8
+          if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne (Get-FileHash $reproduced -Algorithm SHA256).Hash) { throw 'Release ZIP assembly was not reproducible' }
           Expand-Archive $zip -DestinationPath released-bundle
           python -m venv "$env:RUNNER_TEMP\released-vellric"
           Push-Location released-bundle

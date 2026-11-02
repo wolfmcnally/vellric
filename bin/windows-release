@@ -283,6 +283,9 @@ def assemble(
     guide = Path(__file__).resolve().parents[1] / "WINDOWS-RELEASE.md"
     added["WINDOWS-RELEASE.md"] = guide.read_bytes()
     report["release_guide_sha256"] = sha(added["WINDOWS-RELEASE.md"])
+    if not declaration["notice"].strip():
+        raise ValueError("Closure notice companion is empty")
+    added["WINDOWS-NATIVE-NOTICES.txt"] = declaration["notice"].encode("utf-8")
     report["closure"] = declaration
     report["closure_sha256"] = sha(closure.read_bytes())
     added["WINDOWS-RELEASE.json"] = (json.dumps(report, indent=2, sort_keys=True) + "\n").encode()
@@ -314,6 +317,8 @@ def fetch(closure: Path, directory: Path) -> dict:
         "mupdf.com",
         "ftp.gnu.org",
         "gcc.gnu.org",
+        "repo.msys2.org",
+        "raw.githubusercontent.com",
     }
     for entry in declaration["materials"]:
         name = entry["file"]
