@@ -131,6 +131,25 @@ def test_release_zip_preserves_wheels_and_binds_sources_reproducibly(tmp_path):
     with pytest.raises(ValueError, match="replacement"):
         RELEASE.assemble(bundle, root, closure, sources, first, proof, "v0.2.4")
 
+    # The immutable builder's text writer uses native CRLF on Windows; keep
+    # identity exact while accepting that transport newline, without stripping.
+    with zipfile.ZipFile(bundle) as original:
+        payload = {name: original.read(name) for name in original.namelist()}
+    payload["SOURCE.txt"] = payload["SOURCE.txt"].replace(b"\n", b"\r\n")
+    payload["requirements-wheels.txt"] = payload["requirements-wheels.txt"].replace(b"\n", b"\r\n")
+    with zipfile.ZipFile(bundle, "w") as changed:
+        for name, data in payload.items():
+            changed.writestr(name, data)
+    assert RELEASE.inventory(bundle, root)["release_source"] == RELEASE.git(
+        root, "rev-parse", "HEAD"
+    )
+    payload["SOURCE.txt"] += b"\r\n"
+    with zipfile.ZipFile(bundle, "w") as changed:
+        for name, data in payload.items():
+            changed.writestr(name, data)
+    with pytest.raises(ValueError, match="Conric source declaration"):
+        RELEASE.inventory(bundle, root)
+
 
 def test_release_refuses_unqualified_or_unjoined_material_without_output(tmp_path):
     root, bundle, closure, sources, proof, original = fixture(tmp_path)

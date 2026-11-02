@@ -145,7 +145,7 @@ def inventory(bundle: Path, source: Path) -> dict:
         raise ValueError("Conric requires exact source revision")
     url = urllib.parse.urlunsplit(conric._replace(query="", fragment=""))
     expected_source = f"conric @ git+{url}@{revision}\n".encode()
-    if payload.get("SOURCE.txt") != expected_source:
+    if payload.get("SOURCE.txt", b"").replace(b"\r\n", b"\n") != expected_source:
         raise ValueError("Conric source declaration does not match the lock")
     requirements = payload.get("requirements-wheels.txt", b"").decode().splitlines()
     expected = [f"./{w['wheel']} --hash=sha256:{w['sha256']}" for w in wheels]
