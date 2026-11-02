@@ -1,5 +1,16 @@
 name: Windows
-on: [push, pull_request, workflow_dispatch]
+on:
+  push:
+  pull_request:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_ref:
+        description: Existing immutable release tag to qualify/backfill (empty uses event source)
+        required: false
+        type: string
+        default: ""
 permissions:
   contents: read
 jobs:
@@ -26,10 +37,30 @@ jobs:
     name: Bundle, OCR engines and fixture conversion
     runs-on: windows-2025
     timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: source
+    env:
+      RELEASE_REF: ${{ inputs.release_ref || github.event.release.tag_name || '' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          fetch-depth: 0 # Tags too: the bundle builder's release-version check reads them.
+          path: source
+          ref: ${{ inputs.release_ref || github.sha }}
+          fetch-depth: 0 # The exact source tag and immutable project content are checked.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: release-tools
+          ref: ${{ github.sha }}
+      - name: Verify requested source tag
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          if ($env:RELEASE_REF) {
+            if ($env:RELEASE_REF -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') { throw 'An existing release tag is required' }
+            $tag = git rev-parse "refs/tags/$env:RELEASE_REF"
+            $head = git rev-parse HEAD
+            if ($tag -ne $head) { throw 'Checkout differs from requested release tag' }
+          }
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
         with:
           version: "0.9.26"
@@ -58,6 +89,10 @@ jobs:
           & $env:VELLRIC doctor
           & $env:VELLRIC inspect project\tests\fixtures\Fake_Doc_watermarked.pdf --out "$env:RUNNER_TEMP\inspected" --status-json
           & $env:VELLRIC render project\tests\fixtures\Fake_Doc_watermarked.pdf --out "$env:RUNNER_TEMP\rendered" --status-json
+      - name: Record exact bundle and installed native provenance
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          & "$env:RUNNER_TEMP\vellric\Scripts\python.exe" ..\release-tools\bin\windows-release inventory --bundle (Get-Item dist\*.zip).FullName --source-root . --probe-native --output measured\windows-bundle-provenance.json
       - name: Install the OCR engines
         run: |
           $ProgressPreference = 'SilentlyContinue'
@@ -116,11 +151,39 @@ jobs:
           foreach ($name in 'Fake_Doc_watermarked', 'Fake_Math_Doc_watermarked') {
             & $env:VELLRIC convert "project\tests\fixtures\$name.pdf" --out "measured\$name" --ocr auto --status-json
           }
-      # The bundle itself is not kept: it holds third-party binaries, and its list of hashes
-      # is enough to tell that a bundle built elsewhere is the one proved here.
+      - name: Assemble source-closed release ZIP
+        if: env.RELEASE_REF != ''
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $python = "$env:RUNNER_TEMP\vellric\Scripts\python.exe"
+          $tool = '..\release-tools\bin\windows-release'
+          $closure = '..\release-tools\lib\windows-release-sources.json'
+          & $python $tool fetch --closure $closure --directory corresponding-sources
+          New-Item -ItemType Directory release-dist | Out-Null
+          $zip = "release-dist\vellric-$($env:RELEASE_REF.Substring(1))-windows-x64-py313.zip"
+          & $python $tool assemble --bundle (Get-Item dist\*.zip).FullName --source-root . --closure $closure --sources corresponding-sources --provenance measured\windows-bundle-provenance.json --tag $env:RELEASE_REF --output $zip | Tee-Object measured\windows-release-asset.json
+          Expand-Archive $zip -DestinationPath released-bundle
+          python -m venv "$env:RUNNER_TEMP\released-vellric"
+          Push-Location released-bundle
+          & "$env:RUNNER_TEMP\released-vellric\Scripts\python.exe" -m pip install --no-index --require-hashes --no-deps -r requirements-wheels.txt
+          & "$env:RUNNER_TEMP\released-vellric\Scripts\python.exe" -m pip check
+          Pop-Location
+          $cli = "$env:RUNNER_TEMP\released-vellric\Scripts\vellric.exe"
+          & $cli doctor --json | Out-File measured\released-doctor.json -Encoding utf8
+          & $cli inspect project\tests\fixtures\Fake_Doc_watermarked.pdf --out "$env:RUNNER_TEMP\released-inspect" --status-json
+          foreach ($name in 'Fake_Doc_watermarked', 'Fake_Math_Doc_watermarked') {
+            & $cli convert "project\tests\fixtures\$name.pdf" --out "measured\released-$name" --ocr auto --local-only --status-json
+          }
+      - name: Retain only the qualified release ZIP
+        if: success() && env.RELEASE_REF != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-release-zip
+          if-no-files-found: error
+          path: source/release-dist/*.zip
       - name: Keep the measured results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: windows-measured
-          path: measured
+          path: source/measured

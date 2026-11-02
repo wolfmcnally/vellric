@@ -1,0 +1,317 @@
+{
+  "schema": "vellric.windows-source-closure/1.0",
+  "status": "pending-source-and-redistribution-basis",
+  "uv_lock_sha256": "6e8ae26aec855b694eb9090bb8768ac75abdf7d0dd72a18dd03380538002633e",
+  "native_versions": {
+    "pymupdf": "1.28.2",
+    "mupdf": "1.28.2",
+    "libheif": "1.23.0",
+    "libde265": "1.1.1",
+    "libqpdf": "12.4.2"
+  },
+  "native_wheels": {
+    "cffi": {
+      "sha256": "1aa5645c30469b09530c4ebca77ebf8f17618293c58f8549cb1a543a50236e7d",
+      "materials": [
+        "cffi-2.1.1.tar.gz"
+      ],
+      "basis": "UNQUALIFIED: exact corresponding native materials and redistribution terms must be verified"
+    },
+    "charset-normalizer": {
+      "sha256": "78456a747de8dc58360ffa581f30a002baf5aa28cb262536545e91f113ed7639",
+      "materials": [
+        "charset_normalizer-3.5.2.tar.gz"
+      ],
+      "basis": "UNQUALIFIED: exact corresponding native materials and redistribution terms must be verified"
+    },
+    "cryptography": {
+      "sha256": "7afa5a6602a9f29af1f3a2965f831bae7c9d5d597b7cbb716d41ab3b7d89879c",
+      "materials": [
+        "cryptography-50.0.2.tar.gz"
+      ],
+      "basis": "UNQUALIFIED: exact corresponding native materials and redistribution terms must be verified"
+    },
+    "fonttools": {
+      "sha256": "43d1284c1964666ee833f2badd3017dc138f53d4889043ffca66c5ce4188f188",
+      "materials": [
+        "fonttools-4.66.1.tar.gz"
+      ],
+      "basis": "UNQUALIFIED: exact corresponding native materials and redistribution terms must be verified"
+    },
+    "lxml": {
+      "sha256": "e477aca0bc0d19f3b4ae9e4f2a1cfd687c31bf772d78734910658186b40b2477",
+      "materials": [
+        "lxml-6.1.3.tar.gz"
+      ],
+      "basis": "UNQUALIFIED: exact corresponding native materials and redistribution terms must be verified"
+    },
+    "pi-heif": {
+      "sha256": "7692b50e0305170502fdd0657b31818e724f9630629bdbc05a91b10a7979d786",
+      "materials": [
+        "pi_heif-1.4.0.tar.gz",
+        "libheif-1.23.0.tar.gz",
+        "libde265-1.1.1.tar.gz"
+      ],
+      "basis": "UNQUALIFIED: exact corresponding native materials and redistribution terms must be verified"
+    },
+    "pikepdf": {
+      "sha256": "138568b126f17e98ef50dee88a68f6e2bed538079d54d9592575b432b2b676d0",
+      "materials": [
+        "pikepdf-10.16.0.tar.gz"
+      ],
+      "basis": "UNQUALIFIED: exact corresponding native materials and redistribution terms must be verified"
+    },
+    "pillow": {
+      "sha256": "1cca606cd25738df4ed873d5ad46bbdb3d83b5cbca291f6b4ff13a4df6b0bbe8",
+      "materials": [
+        "pillow-12.3.0.tar.gz"
+      ],
+      "basis": "UNQUALIFIED: exact corresponding native materials and redistribution terms must be verified"
+    },
+    "pydantic-core": {
+      "sha256": "15f4a94963c95accac15b7b657bb177d3ad82bb90b0d0526d9a9b85079925db5",
+      "materials": [
+        "pydantic_core-2.46.5.tar.gz"
+      ],
+      "basis": "UNQUALIFIED: exact corresponding native materials and redistribution terms must be verified"
+    },
+    "pymupdf": {
+      "sha256": "ebd244918798502d7b4504c90410d1711a4d7675a32584ca30f1bab419ecbffe",
+      "materials": [
+        "pymupdf-1.28.2.tar.gz",
+        "mupdf-1.28.2-source.tar.gz"
+      ],
+      "basis": "UNQUALIFIED: exact corresponding native materials and redistribution terms must be verified"
+    },
+    "pypdfium2": {
+      "sha256": "47dcca2a8d507b5fd24f94c3c9d48fb379430f097bc20f01beff6c963ffbcedb",
+      "materials": [
+        "pypdfium2-5.13.0.tar.gz"
+      ],
+      "basis": "UNQUALIFIED: exact corresponding native materials and redistribution terms must be verified"
+    },
+    "pyyaml": {
+      "sha256": "79005a0d97d5ddabfeeea4cf676af11e647e41d81c9a7722a193022accdb6b7c",
+      "materials": [
+        "pyyaml-6.0.3.tar.gz"
+      ],
+      "basis": "UNQUALIFIED: exact corresponding native materials and redistribution terms must be verified"
+    },
+    "uharfbuzz": {
+      "sha256": "49450c32c32d7ea5e0a36211c08dc4b8c5b76460ec09532a8c77baa297c98792",
+      "materials": [
+        "uharfbuzz-0.56.2.tar.gz"
+      ],
+      "basis": "UNQUALIFIED: exact corresponding native materials and redistribution terms must be verified"
+    }
+  },
+  "materials": [
+    {
+      "file": "annotated_types-0.8.0.tar.gz",
+      "sha256": "13b2beaad985e05e2d6407ee4c4f35590b11f8d693a258a561055cac8f64cab7",
+      "upstream": "https://files.pythonhosted.org/packages/5f/56/a8120250d128bed162cd73c76d45f6ef9991f3e068f62a8ee060afa3104a/annotated_types-0.8.0.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "cffi-2.1.1.tar.gz",
+      "sha256": "dd31f52ea1086513bb9df30f8fcee9b8918323ae067a3d5b78bc826a000712be",
+      "upstream": "https://files.pythonhosted.org/packages/9e/ef/008a1939e372c06329a3fce4279c02f328488f3526744906eeec3da7ad5f/cffi-2.1.1.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "charset_normalizer-3.5.2.tar.gz",
+      "sha256": "39de2a259fc954455c57274dc94c79d5842774e1247a016aff30bc0efed0f4ef",
+      "upstream": "https://files.pythonhosted.org/packages/33/1c/f41d4e74c28ab327ff3acd36053f7ea506c55872d7a90b0fa71aa3ab0c89/charset_normalizer-3.5.2.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "cryptography-50.0.2.tar.gz",
+      "sha256": "7b46165bb56eb4704e2eaaf86f3c940d19154535d9b0ca7d6d590b04060e00d5",
+      "upstream": "https://files.pythonhosted.org/packages/9d/af/182eb91b0df3fe75c4d9f26fe70684569566745f6ba7e5c9c73a862c5252/cryptography-50.0.2.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "defusedxml-0.7.1.tar.gz",
+      "sha256": "1bb3032db185915b62d7c6209c5a8792be6a32ab2fedacc84e01b52c51aa3e69",
+      "upstream": "https://files.pythonhosted.org/packages/0f/d5/c66da9b79e5bdb124974bfe172b4daf3c984ebd9c2a06e2b8a4dc7331c72/defusedxml-0.7.1.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "deprecation-2.1.0.tar.gz",
+      "sha256": "72b3bde64e5d778694b0cf68178aed03d15e15477116add3fb773e581f9518ff",
+      "upstream": "https://files.pythonhosted.org/packages/5a/d3/8ae2869247df154b64c1884d7346d412fed0c49df84db635aab2d1c40e62/deprecation-2.1.0.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "fonttools-4.66.1.tar.gz",
+      "sha256": "64967c6ddb0d4c610dfd8cb1485981b2d27972ddfb7d4bbbd9e199d2a089c450",
+      "upstream": "https://files.pythonhosted.org/packages/87/b6/126c659ab7e0e03e01a5f5d223abf7b2c0691ae92718085a212a3924a2a3/fonttools-4.66.1.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "fpdf2-2.8.9.tar.gz",
+      "sha256": "5b0b3786f5236a2b3cc83c1fee567df17ddd314f8c4e13d820d8f09b617ab4f0",
+      "upstream": "https://files.pythonhosted.org/packages/12/23/84dbe637708c2690972eff5df233a7c9f8d4bde809f714839dc1b08f5e5e/fpdf2-2.8.9.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "img2pdf-0.6.3.tar.gz",
+      "sha256": "219518020f5bd242bdc46493941ea3f756f664c2e86f2454721e74353f58cd95",
+      "upstream": "https://files.pythonhosted.org/packages/8e/97/ca44c467131b93fda82d2a2f21b738c8bcf63b5259e3b8250e928b8dd52a/img2pdf-0.6.3.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "lxml-6.1.3.tar.gz",
+      "sha256": "45222d94ddd511536f3b2f7d9deae3b2339b4ce0f075f1ca25703b07cad9dd21",
+      "upstream": "https://files.pythonhosted.org/packages/23/ad/28ecd7cb894d172f3c9c80a075eeeb2017ac62e3632cee05a5f9493547eb/lxml-6.1.3.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "markdown_it_py-4.2.0.tar.gz",
+      "sha256": "04a21681d6fbb623de53f6f364d352309d4094dd4194040a10fd51833e418d49",
+      "upstream": "https://files.pythonhosted.org/packages/06/ff/7841249c247aa650a76b9ee4bbaeae59370dc8bfd2f6c01f3630c35eb134/markdown_it_py-4.2.0.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "mdurl-0.1.2.tar.gz",
+      "sha256": "bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba",
+      "upstream": "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "ocrmypdf-17.7.0.tar.gz",
+      "sha256": "c0a351910e8fee09bdbfee6cc7ba0299b9d561bba42afbbf4df29edcc7d58bc6",
+      "upstream": "https://files.pythonhosted.org/packages/0e/f4/7d8fcd1f255ce098ecb8daf40ae20eb3fd940ac0f40c5bc22f10711352f6/ocrmypdf-17.7.0.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "packaging-26.3.tar.gz",
+      "sha256": "94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79",
+      "upstream": "https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "pdfminer_six-20260107.tar.gz",
+      "sha256": "96bfd431e3577a55a0efd25676968ca4ce8fd5b53f14565f85716ff363889602",
+      "upstream": "https://files.pythonhosted.org/packages/34/a4/5cec1112009f0439a5ca6afa8ace321f0ab2f48da3255b7a1c8953014670/pdfminer_six-20260107.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "pi_heif-1.4.0.tar.gz",
+      "sha256": "e1199d9d41d9ecc877cf3ae7322ff099f6404574f2e62da47590cd4ecb9ec554",
+      "upstream": "https://files.pythonhosted.org/packages/6a/a2/70168b601b41bdf5726dfc8dc110eb4052a2e851fed9c9bdae95910e401d/pi_heif-1.4.0.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "pikepdf-10.16.0.tar.gz",
+      "sha256": "d9541429f079f7838f2856fea5c2ad165885693cdb36894e73d40d1b845d2e11",
+      "upstream": "https://files.pythonhosted.org/packages/32/80/0fb229f1d4772f102af425975b302c9de1b177b3e191ed7f7ffe24a02e98/pikepdf-10.16.0.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "pillow-12.3.0.tar.gz",
+      "sha256": "3b8182a766685eaa002637e28b4ec8d6b18819a0c71f579bf0dbaa5830297cce",
+      "upstream": "https://files.pythonhosted.org/packages/1c/3d/bb7fca845737cf9d7dbde16ed1843984665ff2e0a518f5db43e77ec540b9/pillow-12.3.0.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "pluggy-1.6.0.tar.gz",
+      "sha256": "7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3",
+      "upstream": "https://files.pythonhosted.org/packages/f9/e2/3e91f31a7d2b083fe6ef3fa267035b518369d9511ffab804f839851d2779/pluggy-1.6.0.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "pycparser-3.0.tar.gz",
+      "sha256": "600f49d217304a5902ac3c37e1281c9fe94e4d0489de643a9504c5cdfdfc6b29",
+      "upstream": "https://files.pythonhosted.org/packages/1b/7d/92392ff7815c21062bea51aa7b87d45576f649f16458d78b7cf94b9ab2e6/pycparser-3.0.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "pydantic-2.13.5.tar.gz",
+      "sha256": "51a9c5f7b2f8e636f04c6cada605d9b6a3bf1348fdf945a3d8869b19bba0ee08",
+      "upstream": "https://files.pythonhosted.org/packages/53/ef/fc4f868f4e2cee79f863883abffceff107875f569b848507319842d2a681/pydantic-2.13.5.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "pydantic_core-2.46.5.tar.gz",
+      "sha256": "10416c15b8839ecc4ef4d0885da76da6fd0f67333a0eb8aff6d93c4b8f2910fc",
+      "upstream": "https://files.pythonhosted.org/packages/af/f9/8a06bea35ef8daf588f707784c973a7046e0034c8d8cfb08828eeffb8b75/pydantic_core-2.46.5.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "pygments-2.21.0.tar.gz",
+      "sha256": "610ca751c9bc2492b38eb9a38a7fbc93edbbb2d7182edaf34e66ae493dee5c8c",
+      "upstream": "https://files.pythonhosted.org/packages/49/2e/ced460408999b33da6b31b0021b0f37d329e202d4169aeb164493778f25b/pygments-2.21.0.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "pymupdf-1.28.2.tar.gz",
+      "sha256": "5e0be7908a715aa20333caddd73f1d6f01e4cd0c26e869fa2dd0b7f344da2249",
+      "upstream": "https://files.pythonhosted.org/packages/a3/fb/b6761fa2d5266f2cdb24c3b91f4023070ab7848381417678e7a289a1d52a/pymupdf-1.28.2.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "pypdfium2-5.13.0.tar.gz",
+      "sha256": "7ca2d8e31bd8d0d40c496416b7d8bea423388669ffd494929f50e8c3a82326b8",
+      "upstream": "https://files.pythonhosted.org/packages/ec/78/a52cb80611339ec95f35c7a10d7bfe7a6f97f3b50a35a9f94283d062512e/pypdfium2-5.13.0.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "pyyaml-6.0.3.tar.gz",
+      "sha256": "d76623373421df22fb4cf8817020cbb7ef15c725b9d5e45f17e189bfc384190f",
+      "upstream": "https://files.pythonhosted.org/packages/05/8e/961c0007c59b8dd7729d542c61a4d537767a59645b82a0b521206e1e25c2/pyyaml-6.0.3.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "rich-15.0.0.tar.gz",
+      "sha256": "edd07a4824c6b40189fb7ac9bc4c52536e9780fbbfbddf6f1e2502c31b068c36",
+      "upstream": "https://files.pythonhosted.org/packages/c0/8f/0722ca900cc807c13a6a0c696dacf35430f72e0ec571c4275d2371fca3e9/rich-15.0.0.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "typing_extensions-4.16.0.tar.gz",
+      "sha256": "dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5",
+      "upstream": "https://files.pythonhosted.org/packages/f6/cc/6253133b5bb138fc3306cebfbda2c520f545d36b5be2c7255cc528bb45d6/typing_extensions-4.16.0.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "typing_inspection-0.4.4.tar.gz",
+      "sha256": "547274fa6b0a561ccf549cc9524b999a578e737d015d8709d021f9d0d13bea47",
+      "upstream": "https://files.pythonhosted.org/packages/a3/26/b09b8010994eccc3c09092e6b34058f36a460eea2d4c3e8b910c695975a0/typing_inspection-0.4.4.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "uharfbuzz-0.56.2.tar.gz",
+      "sha256": "303cd60c329bc4d88053ca03eb752476b51ca023944051c33710534dbc4fdac6",
+      "upstream": "https://files.pythonhosted.org/packages/90/cb/b87e1e470e43c6d0b8edd9b5ed968c4465c3de5391a0f253edb0df1a9f18/uharfbuzz-0.56.2.tar.gz",
+      "purpose": "Exact locked Python distribution source"
+    },
+    {
+      "file": "libheif-1.23.0.tar.gz",
+      "sha256": "4c9182b18897617182eed12ab5eb9f9d855b3aa3a736d6bdb31abc034ec7d393",
+      "upstream": "https://github.com/strukturag/libheif/releases/download/v1.23.0/libheif-1.23.0.tar.gz",
+      "purpose": "Matching native library source; qualification pending build/notice inspection"
+    },
+    {
+      "file": "libde265-1.1.1.tar.gz",
+      "sha256": "fd48a927e94ed74fc7ce8829d222b9d8599fcbfe8b6448ba66705babc56ab219",
+      "upstream": "https://github.com/strukturag/libde265/releases/download/v1.1.1/libde265-1.1.1.tar.gz",
+      "purpose": "Matching native library source; qualification pending build/notice inspection"
+    },
+    {
+      "file": "mupdf-1.28.2-source.tar.gz",
+      "sha256": "44075a84e329db55b9bef5f342a70fd26d69e48ad1d33cb89d9664581c641156",
+      "upstream": "https://mupdf.com/downloads/archive/mupdf-1.28.2-source.tar.gz",
+      "purpose": "Matching native library source; qualification pending build/notice inspection"
+    }
+  ],
+  "limitations": [
+    "Declaration status is a technical review disposition, not owner authorization or proof of a Microsoft license.",
+    "No public ZIP until exact materials, notices and redistribution basis are qualified.",
+    "Existing runtime installer/desktop human acceptance and cloud vision remain separate.",
+    "As of 2026-11-02, recovered materials are hash-verified but aggregate closure is still pending. The retained older Windows bundles contain these same native binaries; this is inherited closure work, not a new runtime change.",
+    "pi-heif original bundled notice names older libheif/libde265 versions; actual Windows probe and matching build/source material must bind the correction while preserving that original notice.",
+    "No direct Visual Studio entitlement or documented upstream Microsoft runtime distribution chain is inferred from installation or public availability.",
+    "Non-Python source materials for qpdf, OpenSSL, imaging and libxml2/libxslt components are not yet listed here. Audit their actual license-specific source/notice obligations; a Python sdist or nonempty placeholder basis does not establish closure."
+  ]
+}

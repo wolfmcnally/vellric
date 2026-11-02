@@ -52,6 +52,30 @@ critical_risks:
     rationale: Local implementation is not deployed or published; packaging is qualified locally.
     activation_trigger: Adding distribution/deployment commands requires direct deployment proofs.
 families:
+- id: pytest-tests-test_windows_release-py
+  kind: pytest
+  selectors:
+  - tests/test_windows_release.py
+  source_paths:
+  - tests/test_windows_release.py
+  covers:
+  - bin/windows-release
+  - lib/windows-release-sources.json
+  - .github/workflows/windows.yml
+  contract: An additional Windows release ZIP preserves exact wheel bytes and binds corresponding materials and native observations; incomplete or mismatched closure refuses output.
+  risk_class: binary-release-provenance
+  oracle: Independently read final ZIP bytes, compare original wheels and material bytes, and require explicit refusal without an output for invalid joins.
+  admission: The pre-existing project bundle tests do not cover root-level source-closed release assembly or the public-retention boundary.
+  nearest_overlap: Existing project builder tests prove raw wheelhouse composition, not native material and installed-probe joins.
+  historical_evidence: []
+  mutation_evidence:
+  - source-bytes-corrupted
+  - pending-closure-admitted
+  - unlocked-wheel-admitted
+  replacement_lineage: []
+  tier: vital
+  size: small
+  flake_rate: 0.0
 - id: pytest-project-tests-test_citations-py
   kind: pytest
   selectors:

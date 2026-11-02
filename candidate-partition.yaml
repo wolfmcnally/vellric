@@ -12,6 +12,7 @@ active:
   - "/LICENSES/**"
   - "/THIRD_PARTY.md"
   - "/README.md"
+  - "/WINDOWS-RELEASE.md"
   - "/kickoff.yaml"
   - "/.agents/**"
   - "/.claude/**"

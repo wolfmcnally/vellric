@@ -9,13 +9,13 @@
       "leaves": 6
     },
     "pytest": {
-      "families": 173,
-      "leaves": 246
+      "families": 176,
+      "leaves": 249
     }
   },
   "counts": {
-    "families": 198,
-    "leaves": 271
+    "families": 201,
+    "leaves": 274
   },
   "families": [
     "gate:changed",
@@ -215,9 +215,12 @@
     "pytest:tests/test_toolchain_entrypoints.py::test_test_defaults_to_every_repository_test_from_any_cwd",
     "pytest:tests/test_toolchain_entrypoints.py::test_test_governed_lanes_run_selected_proofs",
     "pytest:tests/test_treatise.py::test_an_external_fact_without_a_retrieval_date_fails",
-    "pytest:tests/test_treatise.py::test_the_repository_own_treatises_validate"
+    "pytest:tests/test_treatise.py::test_the_repository_own_treatises_validate",
+    "pytest:tests/test_windows_release.py::test_inventory_refuses_unlocked_or_unreleased_artifacts",
+    "pytest:tests/test_windows_release.py::test_release_refuses_unqualified_or_unjoined_material_without_output",
+    "pytest:tests/test_windows_release.py::test_release_zip_preserves_wheels_and_binds_sources_reproducibly"
   ],
-  "inventory_sha256": "9e7edab1a25b40718be9e966333a72e971101fcd141fa4ec4023f4d5727c9756",
+  "inventory_sha256": "ca7b513e2359cd711a3fa37dda9c556b951fe852e1c642ce71db766d59f294db",
   "proofs": [
     {
       "family": "pytest:project/tests/test_citations.py::test_original_physical_mapping_and_independent_consumer",
@@ -1940,6 +1943,27 @@
       "kind": "pytest",
       "selector": "tests/test_treatise.py::test_the_repository_own_treatises_validate",
       "source_path": "tests/test_treatise.py"
+    },
+    {
+      "family": "pytest:tests/test_windows_release.py::test_release_zip_preserves_wheels_and_binds_sources_reproducibly",
+      "id": "pytest:tests/test_windows_release.py::test_release_zip_preserves_wheels_and_binds_sources_reproducibly",
+      "kind": "pytest",
+      "selector": "tests/test_windows_release.py::test_release_zip_preserves_wheels_and_binds_sources_reproducibly",
+      "source_path": "tests/test_windows_release.py"
+    },
+    {
+      "family": "pytest:tests/test_windows_release.py::test_release_refuses_unqualified_or_unjoined_material_without_output",
+      "id": "pytest:tests/test_windows_release.py::test_release_refuses_unqualified_or_unjoined_material_without_output",
+      "kind": "pytest",
+      "selector": "tests/test_windows_release.py::test_release_refuses_unqualified_or_unjoined_material_without_output",
+      "source_path": "tests/test_windows_release.py"
+    },
+    {
+      "family": "pytest:tests/test_windows_release.py::test_inventory_refuses_unlocked_or_unreleased_artifacts",
+      "id": "pytest:tests/test_windows_release.py::test_inventory_refuses_unlocked_or_unreleased_artifacts",
+      "kind": "pytest",
+      "selector": "tests/test_windows_release.py::test_inventory_refuses_unlocked_or_unreleased_artifacts",
+      "source_path": "tests/test_windows_release.py"
     },
     {
       "family": "gate:changed",

@@ -1,0 +1,399 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.12"
+# ///
+"""Inventory and assemble the source-closed Windows release bundle; never publish it."""
+
+from __future__ import annotations
+
+import argparse
+import email
+import hashlib
+import io
+import json
+import re
+import subprocess
+import sys
+import tomllib
+import urllib.parse
+import urllib.request
+import zipfile
+from pathlib import Path, PurePosixPath
+
+EPOCH = (2021, 1, 1, 0, 0, 0)
+
+
+def sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def canonical(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def members(archive: zipfile.ZipFile) -> dict[str, bytes]:
+    result = {}
+    seen = set()
+    for entry in archive.infolist():
+        name = entry.filename
+        path = PurePosixPath(name)
+        if (
+            path.is_absolute()
+            or ".." in path.parts
+            or "\\" in name
+            or path.as_posix() != name.rstrip("/")
+            or ":" in name
+            or name.rstrip("/").casefold() in seen
+            or (entry.external_attr >> 16) & 0o170000 == 0o120000
+        ):
+            raise ValueError(f"Unsafe or duplicate archive member: {name}")
+        seen.add(name.rstrip("/").casefold())
+        if not entry.is_dir():
+            result[name] = archive.read(entry)
+    return result
+
+
+def git(root: Path, *args: str) -> str:
+    return subprocess.check_output(["git", "-C", str(root), *args], text=True).strip()
+
+
+def inventory(bundle: Path, source: Path) -> dict:
+    project = source / "project"
+    version = tomllib.loads((project / "pyproject.toml").read_text())["project"]["version"]
+    tag = f"v{version}"
+    tag_query = subprocess.run(
+        ["git", "-C", str(source), "show-ref", "--verify", "--quiet", f"refs/tags/{tag}"],
+        capture_output=True,
+        text=True,
+    )
+    if tag_query.returncode not in (0, 1):
+        raise ValueError(f"Cannot query release tag: {tag_query.stderr.strip()}")
+    tagged = tag_query.returncode == 0
+    project_tree = git(source, "rev-parse", "HEAD:project")
+    if tagged and git(source, "rev-parse", f"{tag}:project") != project_tree:
+        raise ValueError("Project content differs from its immutable release tag")
+    if git(source, "status", "--porcelain", "--", "project"):
+        raise ValueError("Project source has uncommitted changes")
+    lock_bytes = (project / "uv.lock").read_bytes()
+    lock = {p["name"]: p for p in tomllib.loads(lock_bytes.decode())["package"]}
+    raw = bundle.read_bytes()
+    with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+        payload = members(archive)
+    wheels = []
+    seen = set()
+    for path, data in sorted(payload.items()):
+        if not path.startswith("wheels/"):
+            continue
+        if len(PurePosixPath(path).parts) != 2 or not path.endswith(".whl"):
+            raise ValueError("Unexpected wheel directory content")
+        with zipfile.ZipFile(io.BytesIO(data)) as wheel:
+            files = members(wheel)
+        metadata = [n for n in files if n.endswith(".dist-info/METADATA")]
+        if len(metadata) != 1:
+            raise ValueError("Wheel must contain exactly one distribution metadata record")
+        meta = email.message_from_bytes(files[metadata[0]])
+        if not isinstance(meta["Name"], str) or not isinstance(meta["Version"], str):
+            raise ValueError("Missing wheel name/version metadata")
+        name = canonical(meta["Name"])
+        if name in seen or name not in lock or meta["Version"] != lock[name]["version"]:
+            raise ValueError(f"Unknown, duplicate or unlocked distribution: {name}")
+        seen.add(name)
+        tag_records = [n for n in files if n.endswith(".dist-info/WHEEL")]
+        if len(tag_records) != 1:
+            raise ValueError("Missing unique wheel tag metadata")
+        tags = email.message_from_bytes(files[tag_records[0]]).get_all("Tag", [])
+        if not tags or any(tag.rsplit("-", 1)[-1] not in {"any", "win_amd64"} for tag in tags):
+            raise ValueError("Wheel metadata is not Windows x64 or portable")
+        digest = sha(data)
+        package = lock[name]
+        if "registry" in package["source"] and digest not in {
+            item["hash"].removeprefix("sha256:") for item in package.get("wheels", [])
+        }:
+            raise ValueError(f"Wheel hash is not in the exact lock: {name}")
+        if not re.search(r"-(?:[^-]+-)?(?:any|win_amd64)\.whl$", path):
+            raise ValueError(f"Non-Windows-x64 wheel: {path}")
+        notices = {
+            n: {"sha256": sha(b), "bytes": len(b)}
+            for n, b in files.items()
+            if "sbom" in n.lower()
+            or "licens" in n.lower()
+            or PurePosixPath(n).name.lower().startswith(("copying", "notice"))
+        }
+        if not notices:
+            raise ValueError(f"No retained license/notice material: {name}")
+        wheels.append(
+            {
+                "name": name,
+                "version": meta["Version"],
+                "wheel": path,
+                "sha256": digest,
+                "source": package["source"],
+                "sdist": package.get("sdist"),
+                "notices": notices,
+                "native_files": {
+                    n: sha(b) for n, b in files.items() if n.endswith((".dll", ".pyd"))
+                },
+            }
+        )
+    if not {"vellric", "conric"} <= seen or len(wheels) != len(seen):
+        raise ValueError("Incomplete project/source dependency inventory")
+    conric = urllib.parse.urlsplit(lock["conric"]["source"]["git"])
+    revision = conric.fragment
+    if not re.fullmatch(r"[a-f0-9]{40}", revision) or urllib.parse.parse_qs(conric.query) != {
+        "rev": [revision]
+    }:
+        raise ValueError("Conric requires exact source revision")
+    url = urllib.parse.urlunsplit(conric._replace(query="", fragment=""))
+    expected_source = f"conric @ git+{url}@{revision}\n".encode()
+    if payload.get("SOURCE.txt") != expected_source:
+        raise ValueError("Conric source declaration does not match the lock")
+    requirements = payload.get("requirements-wheels.txt", b"").decode().splitlines()
+    expected = [f"./{w['wheel']} --hash=sha256:{w['sha256']}" for w in wheels]
+    if sorted(requirements) != sorted(expected):
+        raise ValueError("Offline requirements do not bind exactly every wheel")
+    return {
+        "schema": "vellric.windows-release/1.0",
+        "version": version,
+        "tag": tag,
+        "release_source": git(source, "rev-parse", f"refs/tags/{tag}^{{commit}}")
+        if tagged
+        else None,
+        "build_checkout": git(source, "rev-parse", "HEAD"),
+        "project_tree": project_tree,
+        "uv_lock_sha256": sha(lock_bytes),
+        "raw_bundle_sha256": sha(raw),
+        "assembler_sha256": sha(Path(__file__).read_bytes()),
+        "tooling_commit": git(Path(__file__).resolve().parents[1], "rev-parse", "HEAD"),
+        "python_target": "3.13",
+        "platform": "windows-x64",
+        "wheels": wheels,
+    }
+
+
+def probe_native() -> dict:
+    if sys.platform != "win32":
+        raise ValueError("Native probe requires the actual Windows installed-wheel environment")
+    import ctypes
+    import site
+
+    import pi_heif
+    import pikepdf
+    import pymupdf
+    from cryptography.hazmat.backends.openssl.backend import backend
+
+    root = Path(site.getsitepackages()[-1])
+    candidates = list(root.glob("libde265-*.dll"))
+    if len(candidates) != 1:
+        raise ValueError("Cannot identify exactly one installed libde265 DLL")
+    decoder = ctypes.CDLL(str(candidates[0]))
+    decoder.de265_get_version.argtypes = []
+    decoder.de265_get_version.restype = ctypes.c_char_p
+    return {
+        "python": sys.version,
+        "pymupdf": pymupdf.VersionBind,
+        "mupdf": pymupdf.VersionFitz,
+        "libheif": pi_heif.libheif_version(),
+        "libde265": decoder.de265_get_version().decode("ascii"),
+        "libqpdf": pikepdf.__libqpdf_version__,
+        "openssl": backend.openssl_version_text(),
+    }
+
+
+def assemble(
+    bundle: Path,
+    source: Path,
+    closure: Path,
+    sources: Path,
+    output: Path,
+    proof: Path,
+    expected_tag: str,
+) -> dict:
+    report = inventory(bundle, source)
+    if report["release_source"] is None:
+        raise ValueError("Release assembly requires an existing immutable source tag")
+    if expected_tag != report["tag"]:
+        raise ValueError("Requested release tag differs from the project version")
+    declaration = json.loads(closure.read_text())
+    if declaration.get("status") != "qualified":
+        raise ValueError(
+            "Native source/notice/redistribution basis remains unqualified; no release ZIP"
+        )
+    if declaration["uv_lock_sha256"] != report["uv_lock_sha256"]:
+        raise ValueError("Closure declaration belongs to a different dependency lock")
+    observed = json.loads(proof.read_text())
+    for key in ["raw_bundle_sha256", "release_source", "uv_lock_sha256"]:
+        if observed[key] != report[key]:
+            raise ValueError("Native Windows observation belongs to another artifact/source")
+    required_versions = declaration["native_versions"]
+    if not required_versions or any(
+        observed["native_probe"].get(k) != v for k, v in required_versions.items()
+    ):
+        raise ValueError("Native runtime versions differ from reviewed source closure")
+    report["native_probe"] = observed["native_probe"]
+    native = {w["name"]: w for w in report["wheels"] if w["native_files"]}
+    if set(declaration["native_wheels"]) != set(native):
+        raise ValueError("Closure must explicitly cover every native distribution")
+    for name, wheel in native.items():
+        if declaration["native_wheels"][name]["sha256"] != wheel["sha256"]:
+            raise ValueError(f"Native wheel differs from reviewed closure: {name}")
+    with zipfile.ZipFile(bundle) as archive:
+        payload = members(archive)
+    added = {}
+    material_hashes = {}
+    for entry in declaration["materials"]:
+        name = entry["file"]
+        if not material_name(name) or not re.fullmatch(r"[0-9a-f]{64}", entry["sha256"]):
+            raise ValueError("Invalid closure material identity")
+        data = (sources / name).read_bytes()
+        if (
+            sha(data) != entry["sha256"]
+            or not entry["upstream"]
+            or not entry["purpose"]
+            or entry["purpose"].startswith("UNQUALIFIED")
+        ):
+            raise ValueError(f"Missing or mismatched corresponding material: {name}")
+        if name in material_hashes:
+            raise ValueError("Duplicate closure material")
+        material_hashes[name] = entry["sha256"]
+        added[f"sources/{name}"] = data
+    if not added:
+        raise ValueError("No corresponding source material")
+    for wheel in report["wheels"]:
+        sdist = wheel["sdist"]
+        if sdist is not None:
+            name = sdist["url"].rsplit("/", 1)[-1]
+            if material_hashes.get(name) != sdist["hash"].removeprefix("sha256:"):
+                raise ValueError(f"Locked source archive absent: {wheel['name']}")
+        if wheel["native_files"]:
+            entry = declaration["native_wheels"][wheel["name"]]
+            references = entry["materials"]
+            if (
+                not references
+                or not set(references) <= material_hashes.keys()
+                or not entry["basis"]
+                or entry["basis"].startswith("UNQUALIFIED")
+            ):
+                raise ValueError(
+                    f"Native source/notice obligation lacks material/basis: {wheel['name']}"
+                )
+        with zipfile.ZipFile(io.BytesIO(payload[wheel["wheel"]])) as archive:
+            files = members(archive)
+        for name in wheel["notices"]:
+            added[f"third-party-notices/{wheel['name']}/{name}"] = files[name]
+    guide = Path(__file__).resolve().parents[1] / "WINDOWS-RELEASE.md"
+    added["WINDOWS-RELEASE.md"] = guide.read_bytes()
+    report["release_guide_sha256"] = sha(added["WINDOWS-RELEASE.md"])
+    report["closure"] = declaration
+    report["closure_sha256"] = sha(closure.read_bytes())
+    added["WINDOWS-RELEASE.json"] = (json.dumps(report, indent=2, sort_keys=True) + "\n").encode()
+    if payload.keys() & added.keys() or output.exists():
+        raise ValueError("Refusing archive collision or output replacement")
+    payload.update(added)
+    with zipfile.ZipFile(output, "x", zipfile.ZIP_DEFLATED) as archive:
+        for name, data in sorted(payload.items()):
+            entry = zipfile.ZipInfo(name, EPOCH)
+            entry.compress_type = zipfile.ZIP_DEFLATED
+            entry.external_attr = 0o644 << 16
+            archive.writestr(entry, data)
+    return {"file": str(output), "sha256": sha(output.read_bytes()), "bytes": output.stat().st_size}
+
+
+def material_name(name: str) -> bool:
+    return bool(name) and name not in {".", ".."} and not any(c in name for c in "/\\:")
+
+
+def fetch(closure: Path, directory: Path) -> dict:
+    declaration = json.loads(closure.read_text())
+    if declaration.get("status") != "qualified":
+        raise ValueError("Source/redistribution closure unqualified; no release source fetch")
+    directory.mkdir(parents=True, exist_ok=True)
+    allowed = {
+        "files.pythonhosted.org",
+        "github.com",
+        "codeload.github.com",
+        "mupdf.com",
+        "ftp.gnu.org",
+        "gcc.gnu.org",
+    }
+    for entry in declaration["materials"]:
+        name = entry["file"]
+        url = urllib.parse.urlsplit(entry["upstream"])
+        if (
+            not material_name(name)
+            or url.scheme != "https"
+            or url.hostname not in allowed
+            or url.username
+            or url.password
+            or not re.fullmatch(r"[a-f0-9]{64}", entry["sha256"])
+        ):
+            raise ValueError("Invalid pinned primary-source material")
+        target = directory / name
+        if target.exists():
+            if sha(target.read_bytes()) != entry["sha256"]:
+                raise ValueError("Existing source material differs; preserve it for diagnosis")
+            continue
+        with urllib.request.urlopen(entry["upstream"], timeout=120) as response:
+            data = response.read()
+        target.write_bytes(data)
+        if sha(data) != entry["sha256"]:
+            raise ValueError(f"Downloaded source hash mismatch (preserved): {name}")
+    return {"source_directory": str(directory), "materials": len(declaration["materials"])}
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest="command", required=True)
+    for name in ["inventory", "assemble"]:
+        command = sub.add_parser(name)
+        command.add_argument("--bundle", type=Path, required=True)
+        command.add_argument("--source-root", type=Path, required=True)
+        command.add_argument("--output", type=Path, required=True)
+        if name == "inventory":
+            command.add_argument("--probe-native", action="store_true")
+        else:
+            command.add_argument("--tag", required=True)
+            command.add_argument("--closure", type=Path, required=True)
+            command.add_argument("--sources", type=Path, required=True)
+            command.add_argument("--provenance", type=Path, required=True)
+    fetch_parser = sub.add_parser("fetch")
+    fetch_parser.add_argument("--closure", type=Path, required=True)
+    fetch_parser.add_argument("--directory", type=Path, required=True)
+    args = parser.parse_args()
+    try:
+        if args.command == "fetch":
+            report = fetch(args.closure, args.directory)
+        elif args.command == "inventory":
+            report = inventory(args.bundle, args.source_root)
+            if args.probe_native:
+                report["native_probe"] = probe_native()
+            args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+        else:
+            expected_name = f"vellric-{args.tag.removeprefix('v')}-windows-x64-py313.zip"
+            if args.output.name != expected_name:
+                raise ValueError("Release ZIP filename differs from the requested version")
+            report = assemble(
+                args.bundle,
+                args.source_root,
+                args.closure,
+                args.sources,
+                args.output,
+                args.provenance,
+                args.tag,
+            )
+        print(
+            json.dumps(report if args.command != "inventory" else {"inventory": str(args.output)})
+        )
+        return 0
+    except (
+        ValueError,
+        KeyError,
+        OSError,
+        subprocess.CalledProcessError,
+        zipfile.BadZipFile,
+    ) as exc:
+        print(f"WINDOWS RELEASE REFUSED: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

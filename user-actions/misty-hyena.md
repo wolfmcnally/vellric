@@ -6,7 +6,6 @@ category: release
 urgency: medium
 blocks:
   - Calling the Windows support of 0.2.0 accepted
-  - Giving the Windows bundle to anyone outside the owner's own organisation
 filed: 2026-10-10
 needed_at: before the Windows bundle is shared or 0.2.0 is released
 source: primary
@@ -24,3 +23,5 @@ First, try it on the target machine, which no agent session can reach: a Windows
 Second, ask the machine's administrators to install Tesseract 5.5.3 (`tesseract-ocr-w64-setup-5.5.3.20260724.exe`) and Ghostscript 10.07.1 (`gs10071w64.exe`) to their default folders. Until they do, scanned pages read by a vision model have no independent check.
 
 Third, decide how the Windows bundle may be shared. The owner ruled on 2026-10-10 that it may go as it is to colleagues' workspaces inside the owner's own organisation; sharing outside it is still undecided. It holds unmodified third-party binary wheels, including PyMuPDF under AGPL and libraries under LGPL and MPL, with only the license files each wheel carries. The licensing guide says such an artifact needs its source and notice closure assembled before it is given to anyone else. Installing it on the owner's own machines is the use it was built for. Three bundles built by the first workflow runs were public workflow artifacts for about two hours until they were deleted on 2026-10-10; the workflow no longer publishes the bundle.
+
+As of 2026-11-02, the operator explicitly requested standard Windows ZIP release-pipeline support and a qualified downloadable ZIP for v0.2.4. This resolves the sharing decision in the third item, conditional on the exact native-source, notice and redistribution obligations being satisfied. It does not close the first item's remaining human trial, claim real scanned-document acceptance, or authorize credentials, new licenses or provider calls. The historical distribution record above remains unchanged.

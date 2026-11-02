@@ -627,3 +627,7 @@ Behavioral coverage lives in `tests/test_new_name.py`.
 `kickoff-evidence` registers only independent reviewers in primary mode. Its watcher-owned `start-advice` consumes the phase-wide pass allowance. `ingest-findings` stores advisory reports separately; `accept-primary --input <json>` records primary dispositions and final-candidate acceptance; `carry-advice --source-run <prior>` preserves observations across continuations. Status and timing distinguish advisory observations from delegated verdicts. Shared implementation lives in `lib/agentic_starter/workflow.py` and `lib/agentic_starter/advisory.py`; transfer them with the managers and finding schema.
 
 `review-verdicts --advisory-run <run-directory>` reads canonical advisory observations and primary decisions into separate dataset arrays, without treating declined advice as a rejection loop. Repeat the option for selected runs; historical transcript verdict harvesting remains unchanged. A stored primary decision is historical evidence, not proof that today's working tree is accepted.
+
+## Windows release payload
+
+`windows-release` inventories the exact offline wheel bundle and installed Windows native versions, fetches only reviewed hash-pinned corresponding materials, and assembles the source/notice-closed release ZIP. It never publishes or grants redistribution rights. Pending closure refuses assembly; the canonical procedure is [Windows release](../WINDOWS-RELEASE.md).

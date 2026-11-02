@@ -7,7 +7,7 @@ This policy governs how a Vellric version is prepared, tagged and published on G
 - A release needs the owner's current authorization naming the version. Agents prepare it: they bump the version, update the guides, run the gates, build the artifacts locally and draft the release notes.
 - Tags belong to the owner (hard rule 1). An agent creates a tag only on the owner's explicit, current instruction naming the version, and never moves or deletes one.
 - The owner publishes the GitHub release. An agent runs `gh release create`, uploads an asset or publishes a draft only under an explicit, current instruction naming the version and the artifacts.
-- No release goes to a package index. Nothing in this policy authorizes publishing the Windows bundle anywhere.
+- No release goes to a package index. Windows binary distribution requires the current owner authorization and exact source/notice/redistribution closure below.
 
 ## One-release ruling: v0.2.2 (2026-10-21)
 
@@ -59,7 +59,7 @@ Everything below runs on the exact commit that will be tagged:
 
 - Titled `Vellric X.Y.Z` and attached to tag `vX.Y.Z`, with the full commit ID as its target. It is not a prerelease.
 - Created as a draft, checked, then published. (0.1.0 was created at 09:34 UTC and published at 10:04.)
-- Its assets are exactly `vellric-X.Y.Z-py3-none-any.whl` and `vellric-X.Y.Z.tar.gz`, byte-identical to the recorded hashes. It never carries the Windows bundle or any third-party binary.
+- The project assets are `vellric-X.Y.Z-py3-none-any.whl` and `vellric-X.Y.Z.tar.gz`, byte-identical to the recorded hashes. The separately qualified Windows asset is `vellric-X.Y.Z-windows-x64-py313.zip`; it may be added only under current authorization after the Windows binary closure and real installed-ZIP qualification below. Existing assets are never replaced or deleted.
 - The notes follow 0.1.0's order:
   1. What the version provides.
   2. Licensing: AGPL-3.0-only with the retained MIT grants; dependencies install separately under their own licenses; the packages contain no dependency binaries, OCR programs or language data; read NOTICE before redistributing a bundled runtime.
@@ -75,10 +75,10 @@ Everything below runs on the exact commit that will be tagged:
 - **Build.** Start from the tagged commit, in a full Git checkout with a clean tree. From `project/`, run `python packaging/windows_bundle.py --out dist`. The bundle targets Python 3.13 unless `--python` says otherwise, and the target goes into its name: `vellric-X.Y.Z-windows-x64-py313.zip`. Registry dependency wheels come from `uv.lock` and are checked against their published hashes. Conric is built from its exact locked Git commit, recorded in `SOURCE.txt`; both locally built project wheels and every registry wheel have their byte hashes recorded in `requirements-wheels.txt` and the printed list. The archive's timestamps are fixed; identical source bytes and build inputs give identical output bytes. Only tracked guides and license files go into it. `dist/` is never committed.
 - **Record.** The builder prints a SHA-256 for each wheel and for the ZIP. Keep that list, with the version and the commit, in the local release evidence. It matches a bundle in hand against the Windows workflow's list wheel by wheel. The project's own wheel matches only if both were built on the same kind of system (see State).
 - **Proof.** On every push, the Windows workflow builds the bundle and installs it with no package index. It then runs `doctor`, `inspect` and `render`, installs the qualified engines, runs the tests with no skips allowed, and converts the fixtures. A trial on the target machine is the owner's acceptance, recorded in `user-actions/`. An agent never claims it.
-- **Distribution.** The bundle holds third-party binary wheels without their assembled source and notice closure (`project/docs/LICENSING.md`).
-  - The owner's own machines may receive it, and so may colleagues' workspaces inside the owner's organisation (owner ruling, 2026-10-10).
-  - It may not be attached to a GitHub release, uploaded as a workflow artifact, placed anywhere public, or given to anyone outside the organisation. That holds until the owner decides otherwise and the closure is assembled.
-  - The workflow keeps only measured results. Do not add an upload of the bundle back.
+- **Distribution.** The operator explicitly requested the Windows ZIP as part of the standard release pipeline and its addition to current v0.2.4 on 2026-11-02. This supplies the publication decision, not proof of third-party rights, native source or notices. Existing organisation-only use remains historical; public workflow retention and release attachment require the exact closure below.
+- **Source closure.** `lib/windows-release-sources.json` records the reviewed native wheel identities, exact source/notice materials and observed native versions. A pending declaration refuses release assembly/retention. The declaration is a technical disposition, not authentication or a grant of a Microsoft license. Corresponding source includes native libraries and build material where their licenses require it; Python sdists alone are not assumed sufficient. Preserve original wheel notices and add any evidenced correction, retaining both provenance and exact material hashes. Establish applicable non-open-source redistribution terms as well as open-source obligations before declaring closure qualified.
+- **Pipeline.** The existing Windows workflow retains measured reports on ordinary pushes. A published-release event or `workflow_dispatch` with an existing `release_ref` additionally assembles the source-closed ZIP, freshly installs that actual ZIP offline with hashes, checks dependencies/doctor, and completes native/OCR conversions before retaining `windows-release-zip`. It uses the existing read-only repository token; it does not add a publication grant. The standard owner-authorized CLI publication route is documented in [Windows release procedure](../WINDOWS-RELEASE.md).
+- **Current backfill.** v0.2.4's source/tag and existing project wheel/source archive remain immutable. Release tooling outside `project/` may produce the additional ZIP from the exact tagged project content, with the tooling revision/content identity recorded separately. No project edit or retag is implied. The original discarded CI bundle is not claimed recovered; a new exact-source build receives its own hash and real Windows qualification. Target-desktop human acceptance remains separate from hosted x64 CI and any ARM64 Parallels emulation coverage.
 
 ## State as of 2026-10-16
 
@@ -99,5 +99,5 @@ Everything below runs on the exact commit that will be tagged:
 
 1. Whether 0.2.0 is published from its existing tag, and when 0.2.1 gets a GitHub release.
 2. Whether a release is recorded in `LOG.md`. No release has been so far.
-3. Whether the Windows bundle may be shared outside the owner's organisation (`misty-hyena`).
+3. Historical sharing decision resolved by the 2026-11-02 instruction above; exact binary source/notice/redistribution closure remains an executable preparation obligation, not an inferred waiver of third-party terms.
 4. Whether the locally built Vellric and Conric wheels must build byte-identically on every system. The likely cause of the Windows difference is unconfirmed: license and notice files have no fixed line ending in `.gitattributes`, so a Windows checkout may give them CRLF.
