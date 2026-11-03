@@ -74,7 +74,11 @@ def inventory(bundle: Path, source: Path) -> dict:
         raise ValueError("Project content differs from its immutable release tag")
     if git(source, "status", "--porcelain", "--", "project"):
         raise ValueError("Project source has uncommitted changes")
-    lock_bytes = (project / "uv.lock").read_bytes()
+    # Bind the immutable source blob, not checkout-dependent LF/CRLF bytes.
+    # The project cleanliness check above still refuses actual local changes.
+    lock_bytes = subprocess.check_output(
+        ["git", "-C", str(source), "show", "HEAD:project/uv.lock"]
+    )
     lock = {p["name"]: p for p in tomllib.loads(lock_bytes.decode())["package"]}
     raw = bundle.read_bytes()
     with zipfile.ZipFile(io.BytesIO(raw)) as archive:
@@ -161,6 +165,7 @@ def inventory(bundle: Path, source: Path) -> dict:
         "build_checkout": git(source, "rev-parse", "HEAD"),
         "project_tree": project_tree,
         "uv_lock_sha256": sha(lock_bytes),
+        "checkout_uv_lock_sha256": sha((project / "uv.lock").read_bytes()),
         "raw_bundle_sha256": sha(raw),
         "assembler_sha256": sha(Path(__file__).read_bytes()),
         "tooling_commit": git(Path(__file__).resolve().parents[1], "rev-parse", "HEAD"),

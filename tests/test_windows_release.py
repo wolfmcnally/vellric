@@ -66,6 +66,7 @@ wheels=[{{hash="sha256:{digest}"}}]
         ["init", "-b", "master", "-q"],
         ["config", "user.name", "Synthetic"],
         ["config", "user.email", "synthetic@example.invalid"],
+        ["config", "core.autocrlf", "true"],
         ["add", "project"],
         ["commit", "-qm", "Synthetic fixture"],
         ["tag", "v0.2.4"],
@@ -135,6 +136,29 @@ def test_release_zip_preserves_wheels_and_binds_sources_reproducibly(tmp_path):
         assert any(name.startswith("third-party-notices/") for name in delivered.namelist())
     with pytest.raises(ValueError, match="replacement"):
         RELEASE.assemble(bundle, root, closure, sources, first, proof, "v0.2.4")
+
+    # Git's clean CRLF checkout must bind the same committed dependency lock.
+    lock_path = root / "project/uv.lock"
+    committed_lock = subprocess.check_output(
+        ["git", "-C", str(root), "show", "HEAD:project/uv.lock"]
+    )
+    lock_path.write_bytes(committed_lock.replace(b"\n", b"\r\n"))
+    # Refresh the fixture's index stat cache after writing checkout bytes;
+    # the normalized staged blob must remain exactly the committed blob.
+    subprocess.run(["git", "-C", str(root), "add", "--", "project/uv.lock"], check=True)
+    assert (
+        subprocess.check_output(["git", "-C", str(root), "show", ":project/uv.lock"])
+        == committed_lock
+    )
+    report = RELEASE.inventory(bundle, root)
+    assert report["uv_lock_sha256"] == hashlib.sha256(committed_lock).hexdigest()
+    assert report["checkout_uv_lock_sha256"] == hashlib.sha256(lock_path.read_bytes()).hexdigest()
+    RELEASE.assemble(bundle, root, closure, sources, root / "crlf.zip", proof, "v0.2.4")
+    lock_path.write_bytes(lock_path.read_bytes() + b"# actual local change\r\n")
+    with pytest.raises(ValueError, match="uncommitted changes"):
+        RELEASE.inventory(bundle, root)
+    lock_path.write_bytes(committed_lock.replace(b"\n", b"\r\n"))
+    subprocess.run(["git", "-C", str(root), "add", "--", "project/uv.lock"], check=True)
 
     # The immutable builder's text writer uses native CRLF on Windows; keep
     # identity exact while accepting that transport newline, without stripping.
