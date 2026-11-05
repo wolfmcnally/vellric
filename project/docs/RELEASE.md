@@ -1,4 +1,10 @@
-# Vellric 0.2.4 page-anchor release preparation
+# Vellric 0.2.5 Windows offline-install release preparation
+
+This version corrects offline installation of the Windows bundle. From 0.2.2 to 0.2.4 the bundle's Vellric wheel named Conric by its exact Git source, so a resolving `pip install --no-index --find-links wheels "vellric[ocr]==X"`, the command bundles up to 0.2.1 documented, tried to clone Conric from GitHub and failed on a machine without GitHub access. The bundle builder now rewrites only that one requirement in the bundle's copy of the Vellric wheel to `conric==0.1.0` and updates the wheel's RECORD, so every documented offline command finds the bundled Conric wheel. PDF processing, output, dependencies and notices are otherwise unchanged from 0.2.4; the project wheel differs only by version and documentation, and the source archive additionally carries `packaging/`, so the Windows ZIP's corresponding source includes the builder that rewrites the bundled wheel. The Windows workflow additionally installs the bundle with that resolving command, with pip's cache disabled and Git forbidden from using any transport, which fails for a bundle whose Vellric wheel still names a Git source.
+
+For release-policy qualification item 5, the advertised 0.2.5 capabilities remain physical PDF citations, native extraction, OCR and the offline Windows bundle. Cloud-vision human acceptance remains OPEN and UNQUALIFIED and outside this release's advertised scope; no earlier exception is invoked.
+
+## Vellric 0.2.4 page-anchor release preparation (historical)
 
 This version adds standard exact-PDF/physical-page citations and the [consumer mapping](PAGE-CITATIONS.md), with bundle envelope 1.1. Native/OCR fidelity, provider/network policy and watchdog behavior are unchanged. Publication requires the exact candidate's normal gates, CI, isolated installs, license and reproducibility checks; matching public release notes record actual outcomes. Cloud-vision human acceptance remains OPEN and UNQUALIFIED and is outside this release's advertised capabilities. Earlier one-release exceptions do not transfer.
 

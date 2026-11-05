@@ -1,6 +1,6 @@
 [project]
 name = "vellric"
-version = "0.2.4"
+version = "0.2.5"
 description = "Independent local PDF inspection, fidelity conversion, rendering and OCR."
 requires-python = ">=3.12"
 license = "AGPL-3.0-only"
@@ -45,7 +45,7 @@ testpaths = ["tests"]
 addopts = "-ra"
 
 [tool.hatch.build.targets.sdist]
-include = ["vellric", "docs", "tests", "pyproject.toml", "README.md", "LICENSE", "LICENSES", "NOTICE", "uv.lock", ".python-version", "build-constraints.txt"]
+include = ["vellric", "docs", "tests", "packaging", "pyproject.toml", "README.md", "LICENSE", "LICENSES", "NOTICE", "uv.lock", ".python-version", "build-constraints.txt"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "docs" = "vellric/docs"

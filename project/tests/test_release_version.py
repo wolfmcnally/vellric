@@ -153,3 +153,54 @@ def test_the_bundle_carries_only_tracked_guides(tmp_path, monkeypatch):
     (project / "docs" / "DRAFT.md").write_text("Untracked.\n")
     monkeypatch.setattr(windows_bundle, "PROJECT", project)
     assert windows_bundle.tracked("docs") == ["docs/GUIDE.md"]
+
+
+def test_the_bundled_wheel_names_conric_by_version(tmp_path, monkeypatch):
+    import base64
+    import hashlib
+    import zipfile
+
+    windows_bundle = load("windows_bundle", monkeypatch)
+    source = "conric @ git+https://example.invalid/conric.git@" + "a" * 40
+    metadata = (
+        "Metadata-Version: 2.5\nName: vellric\nVersion: 9.9.9\n"
+        f"Requires-Dist: {source}\nRequires-Dist: pillow==1.0\n"
+        "Requires-Dist: ocrmypdf==1.0; extra == 'ocr'\n"
+    )
+    names = ["vellric/__init__.py", "vellric-9.9.9.dist-info/METADATA"]
+    names.append("vellric-9.9.9.dist-info/RECORD")
+    record = "vellric/__init__.py,sha256=x,1\nvellric-9.9.9.dist-info/METADATA,sha256=old,1\n"
+    record += "vellric-9.9.9.dist-info/RECORD,,\n"
+
+    def wheel(path: Path, meta: str) -> Path:
+        with zipfile.ZipFile(path, "w") as archive:
+            for name, data in zip(names, ["", meta, record]):
+                entry = zipfile.ZipInfo(name, (2021, 1, 1, 0, 0, 0))
+                entry.compress_type = zipfile.ZIP_DEFLATED
+                entry.external_attr = 0o644 << 16
+                archive.writestr(entry, data)
+        return path
+
+    first = wheel(tmp_path / "first.whl", metadata)
+    second = wheel(tmp_path / "second.whl", metadata)
+    for path in (first, second):
+        windows_bundle.pin_bundled_conric(path, source, "conric==0.1.0")
+    assert first.read_bytes() == second.read_bytes()
+    with zipfile.ZipFile(first) as archive:
+        assert [info.filename for info in archive.infolist()] == names
+        assert {info.date_time for info in archive.infolist()} == {(2021, 1, 1, 0, 0, 0)}
+        assert {(i.compress_type, i.external_attr) for i in archive.infolist()} == {
+            (zipfile.ZIP_DEFLATED, 0o644 << 16)
+        }
+        rewritten = archive.read(names[1])
+        rows = archive.read(names[2]).decode().splitlines()
+    assert rewritten.decode() == metadata.replace(source, "conric==0.1.0")
+    digest = base64.urlsafe_b64encode(hashlib.sha256(rewritten).digest()).rstrip(b"=").decode()
+    assert rows[1] == f"{names[1]},sha256={digest},{len(rewritten)}"
+    assert rows[0] == "vellric/__init__.py,sha256=x,1" and rows[2] == f"{names[2]},,"
+    # A wheel that names some other Conric source is refused, not silently re-pointed.
+    other = wheel(tmp_path / "other.whl", metadata.replace("a" * 40, "b" * 40))
+    before = other.read_bytes()
+    with pytest.raises(SystemExit, match="exact locked Conric source"):
+        windows_bundle.pin_bundled_conric(other, source, "conric==0.1.0")
+    assert other.read_bytes() == before

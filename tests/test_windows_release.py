@@ -91,6 +91,8 @@ wheels=[{{hash="sha256:{digest}"}}]
     sources = root / "materials"
     sources.mkdir()
     (sources / "demo.tar.gz").write_bytes(source_bytes)
+    project_source = b"synthetic Vellric source archive"
+    (sources / "vellric-0.2.4.tar.gz").write_bytes(project_source)
     declaration = {
         "status": "qualified",
         "notice": "Synthetic notice; no third-party or license authority claimed",
@@ -109,7 +111,13 @@ wheels=[{{hash="sha256:{digest}"}}]
                 "sha256": source_sha,
                 "upstream": "https://files.pythonhosted.org/demo.tar.gz",
                 "purpose": "synthetic corresponding material",
-            }
+            },
+            {
+                "file": "vellric-0.2.4.tar.gz",
+                "sha256": hashlib.sha256(project_source).hexdigest(),
+                "upstream": "https://github.com/wolfmcnally/vellric/releases/download/v0.2.4/vellric-0.2.4.tar.gz",
+                "purpose": "synthetic project corresponding source",
+            },
         ],
     }
     closure = root / "closure.json"
@@ -201,6 +209,13 @@ def test_release_refuses_unqualified_or_unjoined_material_without_output(tmp_pat
         refuse(message)
     closure.write_text(json.dumps(original))
     refuse("Requested release tag differs", tag="v0.2.5")
+    # A closure still carrying an earlier version's project source must not assemble.
+    changed = json.loads(json.dumps(original))
+    changed["materials"][1]["file"] = "vellric-0.2.3.tar.gz"
+    (sources / "vellric-0.2.3.tar.gz").write_bytes((sources / "vellric-0.2.4.tar.gz").read_bytes())
+    closure.write_text(json.dumps(changed))
+    refuse("Vellric corresponding source for this exact version is absent")
+    closure.write_text(json.dumps(original))
     original_proof = json.loads(proof.read_text())
     for key in ("raw_bundle_sha256", "release_source", "uv_lock_sha256"):
         proof.write_text(json.dumps(original_proof | {key: "0" * 64}))

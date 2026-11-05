@@ -83,6 +83,18 @@ jobs:
           & "$env:RUNNER_TEMP\vellric\Scripts\python.exe" -m pip check
           Pop-Location
           "VELLRIC=$env:RUNNER_TEMP\vellric\Scripts\vellric.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Install the bundle by name with no package index and no Git
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          # The resolving form older bundles documented. Git may use no transport here, so a
+          # bundled wheel that still names a Git source fails instead of cloning from GitHub. The
+          # build step left Conric in pip's cache, which would satisfy that source without a clone.
+          $env:GIT_ALLOW_PROTOCOL = 'none'
+          $version = (Get-Item bundle\wheels\vellric-*.whl).Name.Split('-')[1]
+          python -m venv "$env:RUNNER_TEMP\vellric-by-name"
+          & "$env:RUNNER_TEMP\vellric-by-name\Scripts\python.exe" -m pip install --no-cache-dir --no-index --find-links bundle\wheels "vellric[ocr]==$version"
+          & "$env:RUNNER_TEMP\vellric-by-name\Scripts\python.exe" -m pip check
+          & "$env:RUNNER_TEMP\vellric-by-name\Scripts\vellric.exe" doctor
       - name: Run the installed tool with no OCR engines
         run: |
           $PSNativeCommandUseErrorActionPreference = $true

@@ -99,3 +99,22 @@ Lessons:
 - Write terminal Lessons as a literal standalone field followed by its content, and run the composed log and lesson validators before the expensive full handoff gate. Original failed executions and repair proof remain privately preserved. Earlier review/tool and packaging lessons remain candidates, not graduated rules.
 
 Delivery remains conditional on the renewed bare full gate, clean attributable commit/fast-forward source push, exact-commit Qualification and Windows success, then authorized two-asset tag/draft publication and download verification. Cloud vision remains OPEN/UNQUALIFIED. Original unrelated research remains outside the release. Actual release results are recorded after observation in private receipts and the delivery handoff, without changing this tracked tree after a successful handoff gate.
+
+## 2026-11-04 22:56 — END (correction)
+
+Vellric 0.2.5 offline Windows bundle correction and release candidate.
+
+Follow-up route: the operator directed the 0.2.5 release “that works standalone and clarified documentation” after a user inside an enclave without GitHub access could not install the 0.2.4 Windows bundle. Inline product correction; no phase inserted.
+
+Cause: from 0.2.2 the bundle's Vellric wheel named Conric by its Git source. The resolving `pip install --no-index --find-links wheels "vellric[ocr]==X"` that bundles up to 0.2.1 documented therefore cloned Conric from GitHub. The hash-checked `--no-deps -r requirements-wheels.txt` route in current INSTALL.txt was unaffected. Windows CI proved only the current route, on a networked runner.
+
+Behavior: the bundle builder rewrites only the bundled Vellric wheel's Conric requirement to `conric==<locked version>` with a recomputed RECORD row, failing closed on any other shape. INSTALL.txt and INSTALLATION.md state the offline promise and upgrade steps. The Windows workflow installs the raw bundle by name with pip's cache disabled and Git allowed no transport. Release assembly refuses a closure lacking the exact-version Vellric source archive; the closure now names the 0.2.5 archive, which also carries `packaging/`. Project wheel and PDF behavior are otherwise unchanged.
+
+Validation observed: with Git transports refused, a win_amd64 offline resolve of the published 0.2.4 bundle reproduced the reported clone failure while the 0.2.5 candidate resolved every package from the bundle. A warm pip cache let the 0.2.4 bundle pass the same probe, confirming the advisory review's cache finding; `--no-cache-dir` restored the failure. Bundle rebuilds were byte-identical; wheel/source archive rebuilds and the wheel rebuilt from the source archive were byte-identical. Red witnesses: removing the Conric rewrite and removing the exact-version source guard each failed their named tests; both restored byte-exactly. Changed-path selection passed apart from the unadmitted new proof, since admitted.
+
+Review: one advisory code critique. Adopted: pip-cache falsifier fix, exact-version source guard and 0.2.5 source material, narrowed proof wording, upgrade wording, stale v0.2.4 disposition wording, explicit METADATA/RECORD refusals and archive-attribute assertion. Declined: a wheel build tag distinguishing the bundled wheel; the docs and release notes explain the hash difference.
+
+Delivery: full gate, commit and fast-forward push, exact-commit Qualification and Windows CI, then the authorized lightweight v0.2.5 tag and GitHub release with wheel, source archive and qualified Windows ZIP. Unrelated research edits were set aside outside the tree for the release and are restored afterward. Cloud vision remains OPEN/UNQUALIFIED and is not advertised; no provider calls.
+
+Lessons:
+- wooden-koel (candidate, local): prove each documented install command of an offline artifact with network transports and caches actually excluded; a connected runner cannot evidence an offline promise.

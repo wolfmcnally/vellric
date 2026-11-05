@@ -1,6 +1,6 @@
-# Install Vellric 0.2.4
+# Install Vellric 0.2.5
 
-As of 2026-10-21 this version uses an exact public MIT-licensed Conric 0.1.0 Git dependency, pinned to commit ed9286297e92b8c049f70eb15a3b5556ed107ff0 at https://github.com/wolfmcnally/conric.git. The package lives at the repository root; no subdirectory selector is used. The wheel's metadata carries that source reference. The source integration is public; tagged release artifacts require repository release qualification. No package-index publication is authorized. A release requires passing exact-commit public CI and the Windows bundle pipeline, as recorded in the matching GitHub release. The Windows instructions describe the internal bundle contract; this project wheel/source release distributes no Windows bundle. No credentials or artifact feed are provisioned. See [configuration](CONFIGURATION.md).
+As of 2026-10-21 this version uses an exact public MIT-licensed Conric 0.1.0 Git dependency, pinned to commit ed9286297e92b8c049f70eb15a3b5556ed107ff0 at https://github.com/wolfmcnally/conric.git. The package lives at the repository root; no subdirectory selector is used. The project wheel's metadata carries that source reference; the Windows bundle's copy names Conric by version instead (see [Windows](#windows)). The source integration is public; tagged release artifacts require repository release qualification. No package-index publication is authorized. A release requires passing exact-commit public CI and the Windows bundle pipeline, as recorded in the matching GitHub release. Since 0.2.4 each GitHub release also carries a separately qualified Windows bundle, described under [Windows](#windows). No credentials or artifact feed are provisioned. See [configuration](CONFIGURATION.md).
 
 Vellric needs Python 3.12+, PyMuPDF 1.28.2 and Pillow 12.3.0. Earlier fixture evidence qualifies macOS and Linux arm64; current release CI/install results are recorded with their observed architectures in the matching GitHub release. Windows x64 automation and still-pending desktop acceptance are distinct, as described under [Windows](#windows); atomic publication refuses any other platform. English native/full-OCR samples are qualified. Other languages/architectures need their own fixture qualification.
 
@@ -10,7 +10,7 @@ Build the candidate wheel locally, or use the matching locally prepared source. 
 
 ```bash
 uv venv --python 3.12 .venv
-uv pip install --python .venv/bin/python ./vellric-0.2.4-py3-none-any.whl
+uv pip install --python .venv/bin/python ./vellric-0.2.5-py3-none-any.whl
 .venv/bin/vellric --version
 .venv/bin/vellric doctor --json
 ```
@@ -20,7 +20,7 @@ From extracted source, replace the wheel argument with `.`. For exact locked ins
 ## Scan OCR
 
 ```bash
-uv pip install --python .venv/bin/python './vellric-0.2.4-py3-none-any.whl[ocr]'
+uv pip install --python .venv/bin/python './vellric-0.2.5-py3-none-any.whl[ocr]'
 .venv/bin/vellric doctor --json
 ```
 
@@ -41,7 +41,7 @@ The directory must contain the requested traineddata. Do not copy the illustrati
 
 Vellric runs natively on 64-bit Windows with Python 3.12.4 or later; earlier Python releases create the private workspace readable by other accounts, and jobs refuse. Native PDF work and a vision-model pass need no Linux subsystem or container, and nothing in them asks for an administrator.
 
-An internally built Windows bundle, `vellric-0.2.4-windows-x64-py313.zip`, holds Vellric, every locked Python dependency of the OCR extra as Windows wheels for Python 3.13, the guides and an `INSTALL.txt`. That bundle contract installs with no package index. Its exact-commit automated proof is a release gate; desktop owner acceptance remains open and no Windows bundle is included in this public release. In PowerShell, run these commands from inside the qualified extracted bundle directory:
+The Windows bundle, `vellric-0.2.5-windows-x64-py313.zip`, is attached to the GitHub release. It holds Vellric, every locked Python dependency of the OCR extra as Windows wheels for Python 3.13, the guides and an `INSTALL.txt`. Installing it needs no network access at all: no package index, no GitHub and no Git, so it works on a machine that cannot reach the internet. Its exact-commit automated proof is a release gate; desktop owner acceptance remains open. Unpack it, and in PowerShell run these commands from inside the unpacked folder:
 
 ```powershell
 python -m venv "$env:LOCALAPPDATA\vellric"
@@ -58,6 +58,12 @@ python -m venv "$env:LOCALAPPDATA\vellric"
 ```powershell
 & "$env:LOCALAPPDATA\vellric\Scripts\vellric.exe" doctor
 ```
+
+### Upgrading a Windows installation
+
+Unpack the new bundle to a new folder and, from inside it, run the last three commands above: the install, `pip check` and `doctor`. The first command, which creates the environment, is needed only once. Always take the commands from the `INSTALL.txt` of the bundle being installed rather than from notes kept from an earlier one, since the install command changed in 0.2.2.
+
+Bundles up to 0.2.1 gave a shorter command, `pip install --no-index --find-links wheels "vellric[ocr]==VERSION"`. From 0.2.2 to 0.2.4 that command failed without GitHub access, because the bundle's Vellric wheel named Conric by its Git source and pip tried to clone it; the hash-checked command above was unaffected. From 0.2.5 the bundle's Vellric wheel names Conric by version, so both commands install offline. The hash-checked command remains the recommended one, because it refuses any wheel whose bytes differ from the ones the bundle recorded.
 
 Build the bundle with Python 3.12+, uv and Git by running `python packaging/windows_bundle.py --out dist` from the project directory. Build it in a full Git checkout: the builder refuses a version that is already tagged on different content, and refuses when it cannot read the tags. Registry wheels are selected for the target Python at the locked versions and checked against their published hashes. The Conric wheel is built from the exact locked Git commit; SOURCE.txt records that source. Every bundled wheel is hashed in requirements-wheels.txt and in the printed build list. The bundle is for installing on one's own machines; [licensing](LICENSING.md) says what passing it to others involves. It does not carry the `anthropic` package, so the `anthropic` vision provider is refused from a bundle install.
 
@@ -76,6 +82,6 @@ What differs from macOS and Linux:
 
 For independently installed Drawbridge, set DRAWBRIDGE_VELLRIC to this environment's absolute executable. No sibling repository or editable Vellric import is needed. See [boundary integration](INTEGRATION.md).
 
-The installed-package configuration proof builds a real wheel and installs the exact locked public runtime sources into a fresh environment, using the executing Python version. It may access public package/Git sources; an unavailable source fails closed rather than substituting another dependency. The separate Windows bundle carries a locally built wheel of the exact locked Conric commit, records that source in SOURCE.txt, and installs every bundled wheel by its recorded hash with dependency resolution disabled. Run pip check afterward; the installed package metadata remains unchanged and no Git access is needed for that bundle installation.
+The installed-package configuration proof builds a real wheel and installs the exact locked public runtime sources into a fresh environment, using the executing Python version. It may access public package/Git sources; an unavailable source fails closed rather than substituting another dependency. The separate Windows bundle carries a locally built wheel of the exact locked Conric commit, records that source in SOURCE.txt, and installs every bundled wheel by its recorded hash with dependency resolution disabled. The bundle's copy of the Vellric wheel differs from the project wheel in one metadata line: it requires `conric==0.1.0` instead of the Git source, so pip check confirms the bundled Conric and no Git access is needed for any bundle installation.
 
 On macOS, version 0.2.3 and later sample the supervised process group through native libproc resident-byte queries, without executing ps. Doctor tests the complete observer on a fresh private process group. Missing, denied, short or persistently truncated observations refuse supervision instead of silently disabling memory enforcement. The existing sampled memory/disk/deadline controls remain; they can overshoot and are not a hard sandbox. Caller-profile qualification is target-specific and recorded in the matching release notes; no sandbox profile or network policy is changed.

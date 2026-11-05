@@ -1,4 +1,4 @@
-Vellric 0.2.4
+Vellric 0.2.5
 Copyright (c) 2026 Wolf McNally.
 Project grant: AGPL-3.0-only. Full license: LICENSE.
 
@@ -46,3 +46,5 @@ human acceptance remains OPEN and UNQUALIFIED; no provider acceptance or
 Windows binary redistribution is implied.
 
 Version 0.2.4 adds the vellric.document/1.1 physical PDF page-citation mapping and standard reader Markdown anchors, without a new runtime dependency or packaged binary.
+
+Version 0.2.5 changes only how the Windows bundle names its bundled Conric wheel, so the bundle installs with no network access; it adds no runtime dependency or packaged binary.

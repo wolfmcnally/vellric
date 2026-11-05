@@ -1,6 +1,10 @@
 # Prepared standalone release route
 
-## Current 0.2.4 contract and version scope
+## Current 0.2.5 scope
+
+Version 0.2.5 changes only the Windows bundle's copy of the Vellric wheel, which names Conric by version so that the bundle installs with no Git or network access; see [RELEASE.md](RELEASE.md). The project wheel and source archive below keep the exact Git-sourced Conric requirement, and their build and locked-install route is unchanged.
+
+## 0.2.4 contract and version scope
 
 Version 0.2.4 provides standard physical PDF citation anchors and the [1.0 citation contract](PAGE-CITATIONS.md) inside complete-bundle envelope 1.1. The current release policy requires a new immutable X.Y.Z and exact qualified tag/artifacts; it does not assign compatibility classes to patch/minor increments. The still-unamended pre-stable development regime explicitly permits direct schema replacement. Therefore this version is a permitted project version, not a claim of backward-compatible SemVer behavior. Existing 1.0 bundles/amend bases refuse; consumers explicitly upgrade the independently installed executable/envelope and rerun from original PDF bytes. No legacy schema branch is added.
 
@@ -58,7 +62,7 @@ uv pip install --python /absolute/isolated/vellric-env/bin/python --no-deps -r r
 ```
 
 ```bash
-uv pip install --python /absolute/isolated/vellric-env/bin/python --no-deps dist/vellric-0.2.4-py3-none-any.whl
+uv pip install --python /absolute/isolated/vellric-env/bin/python --no-deps dist/vellric-0.2.5-py3-none-any.whl
 ```
 
 ```bash

@@ -1,7 +1,7 @@
 {
   "schema": "vellric.windows-source-closure/1.0",
   "status": "qualified",
-  "uv_lock_sha256": "6e8ae26aec855b694eb9090bb8768ac75abdf7d0dd72a18dd03380538002633e",
+  "uv_lock_sha256": "1d2ff7de268a8a62ecff393070045911f8d5b62f6325102b0fab8e8a839626b7",
   "native_versions": {
     "pymupdf": "1.28.2",
     "mupdf": "1.28.2",
@@ -63,7 +63,7 @@
       "materials": [
         "pikepdf-10.16.0.tar.gz"
       ],
-      "basis": "MPL-2.0 source/build and original third-party notices retained. The exact unmodified Microsoft14.51.36247.0 DLL matches the established retained0.2.1/0.2.2 runtime and its upstream qpdf12.4.2 origin. The operator confirmed existing approval of this unchanged distribution for current v0.2.4 on2026-11-02. This is an established-distribution disposition, not a claim of newly acquired Microsoft entitlement or grant.",
+      "basis": "MPL-2.0 source/build and original third-party notices retained. The exact unmodified Microsoft14.51.36247.0 DLL matches the established retained0.2.1/0.2.2 runtime and its upstream qpdf12.4.2 origin. The operator confirmed existing approval of this unchanged distribution for v0.2.4 on 2026-11-02, and it carries unchanged to v0.2.5 under the 2026-11-04 release direction. This is an established-distribution disposition, not a claim of newly acquired Microsoft entitlement or grant.",
       "runtime_origin": {
         "archive": "https://github.com/qpdf/qpdf/releases/download/v12.4.2/qpdf-12.4.2-msvc64.zip",
         "archive_sha256": "db87077e683630c1217e0e8f9a20a9749d952ab676e881c3689187763a5de25d",
@@ -329,10 +329,10 @@
       "purpose": "Official MSYS2 GCC16.1 source/build/patch bundle for compiler revisions observed in retained native DLLs; binary-source audit still pending"
     },
     {
-      "file": "vellric-0.2.4.tar.gz",
-      "sha256": "d10f806079f04e4a984781036f3f36c99a962409d96188af342d3ab1cdaa6f63",
-      "upstream": "https://github.com/wolfmcnally/vellric/releases/download/v0.2.4/vellric-0.2.4.tar.gz",
-      "purpose": "Exact already-published immutable Vellric corresponding source, reused from retained independently downloaded release bytes"
+      "file": "vellric-0.2.5.tar.gz",
+      "sha256": "13ac51b8ae26d9f10220f6c54dfb1a73e60155f5754a458d585ef169f404cf17",
+      "upstream": "https://github.com/wolfmcnally/vellric/releases/download/v0.2.5/vellric-0.2.5.tar.gz",
+      "purpose": "Exact Vellric 0.2.5 corresponding source: the fixed-epoch constrained source archive published as a v0.2.5 release asset, including packaging/windows_bundle.py, which builds the bundle and pins its Vellric wheel's Conric requirement"
     },
     {
       "file": "conric-ed9286297e92b8c049f70eb15a3b5556ed107ff0.tar.gz",
@@ -355,9 +355,9 @@
   ],
   "notice": "WINDOWS NATIVE SOURCE AND NOTICE COMPANION\n\nThis companion applies only to the exact wheels and native hashes in WINDOWS-RELEASE.json. Original wheels and their notices are preserved byte-for-byte. Each dependency retains its own terms; this is not a relicensing or a grant of rights absent from its upstream license.\n\npi-heif notice correction: its original LICENSES_bundled.txt points to older libheif1.18.1/libde2651.0.15. The actual locked Windows DLLs report libheif1.23.0 and libde2651.1.1; their complete corresponding source archives and the locked pi-heif Windows PKGBUILD are supplied under sources/. The original incorrect notice is retained for provenance rather than rewritten.\n\nThe bundled GCC runtime DLLs identify GCC16.1.0 MSYS2 Rev2/Rev5 compiler objects. Both official source/patch/build packages are supplied, including original GCC sources, with GPL3/GCC runtime-exception terms retained among third-party-notices and source files. Full winpthreads COPYING, including the mingw-w64 and derived Lockless copyright/permission/disclaimer text, is also supplied. Notice retrieval does not invent a DLL build-version identity.\n\nPyMuPDF and MuPDF1.28.2 use the AGPL branch: full locked PyMuPDF and complete matching MuPDF sources/build material accompany the bundle. The full AGPL is LICENSE, and all corresponding-source copyrights and third-party notices remain in the supplied archives. Sources for the exact Vellric and MIT Conric revisions are included as well.\n\nLGPL shared libraries remain separate DLLs. Recipients may rebuild, replace or relink them for modifications/debugging under their licenses. requirements-wheels.txt describes the qualified unmodified distribution; it is not a prohibition or technical lock on modified installations. A modified wheel needs its own correct RECORD and installation hashes; no signing key or secret is required by this distribution to make such a modified installation.\n\nOther original license texts and build-specific SBOM/notice records are copied under third-party-notices/ without replacing the versions inside the wheels. The Microsoft runtime remains subject to its applicable Microsoft terms; neither this document, a manifest status nor a passing test supplies Visual Studio entitlement or redistribution permission. The operator confirmed existing approval of the established unchanged bundle/runtime for this release. That disposition and preserved research are recorded separately; no new Microsoft license or entitlement is asserted by this archive.\n",
   "distribution_disposition": {
-    "as_of": "2026-11-02",
-    "scope": "Standard Windows pipeline and current v0.2.4 Windows ZIP, using unchanged established bundle/runtime and preserved notices.",
-    "basis": "The operator confirmed prior approval of the established unchanged distribution and directed continuation without a fresh entitlement investigation for this release.",
+    "as_of": "2026-11-04",
+    "scope": "Standard Windows pipeline and the v0.2.5 Windows ZIP, using the unchanged established bundle/runtime and preserved notices; v0.2.5 changes only the bundled Vellric wheel's Conric requirement from Git source to version.",
+    "basis": "On 2026-11-02 the operator confirmed prior approval of the established unchanged distribution and directed continuation without a fresh entitlement investigation; on 2026-11-04 the operator directed the v0.2.5 release as the standard pipeline's offline-installable Windows bundle.",
     "limit": "This records the operator distribution disposition and technical source/notice qualification; it does not assert a new Microsoft grant, entitlement or license acceptance."
   }
 }

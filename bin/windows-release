@@ -263,6 +263,8 @@ def assemble(
         added[f"sources/{name}"] = data
     if not added:
         raise ValueError("No corresponding source material")
+    if f"vellric-{report['version']}.tar.gz" not in material_hashes:
+        raise ValueError("Vellric corresponding source for this exact version is absent")
     for wheel in report["wheels"]:
         sdist = wheel["sdist"]
         if sdist is not None:

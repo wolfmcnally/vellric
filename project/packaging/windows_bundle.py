@@ -15,6 +15,7 @@ them third-party binaries, whose source and notice duties docs/LICENSING.md desc
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import os
 import re
@@ -37,13 +38,23 @@ PIP_TOOL = "pip==26.2.2"
 INSTALL = """\
 Vellric {version} for Windows x64, Python {python}
 
-Everything Vellric needs from Python is in the wheels folder; no package index is used.
-In PowerShell, from the folder this file is in:
+Everything Vellric needs from Python is in the wheels folder. Installing it needs no network
+access: no package index, no GitHub and no Git. In PowerShell, from the folder this file is in:
 
     python -m venv "{home}"
     & "{home}\\Scripts\\python.exe" -m pip install --no-index --require-hashes --no-deps -r requirements-wheels.txt
     & "{home}\\Scripts\\python.exe" -m pip check
     & "{home}\\Scripts\\vellric.exe" doctor
+
+To upgrade an earlier installation, unpack this bundle to a new folder and, from inside it,
+run the last three of the four lines above: everything except python -m venv. Use the
+commands in this file rather than ones kept from an earlier bundle. The shorter form that
+early bundles gave,
+
+    pip install --no-index --find-links wheels "vellric[ocr]==VERSION"
+
+needed GitHub access with versions 0.2.2 to 0.2.4. It works offline again from 0.2.5, but it
+does not check the wheel hashes that the command above checks.
 
 Then run it as:
 
@@ -89,8 +100,49 @@ def tracked(folder: str) -> list[str]:
     return [name for name in listed.stdout.decode("utf-8").split("\0") if name]
 
 
-def materialize_conric(selected: Path, wheels: Path) -> str:
-    """Build the exact locked public source; leave registry requirements hash-checked."""
+def pin_bundled_conric(wheel: Path, source: str, pinned: str) -> None:
+    """Make the bundled Vellric wheel name Conric by version instead of by Git source.
+
+    The project wheel names Conric by its exact Git commit, which only a resolver with Git and
+    network access can follow. The bundle already carries a wheel built from that commit, so the
+    bundled copy names it by version; any offline pip command then finds it in the wheels folder.
+    """
+    with zipfile.ZipFile(wheel) as archive:
+        entries = [(info, archive.read(info)) for info in archive.infolist()]
+    found = {
+        kind: [info.filename for info, _ in entries if info.filename.endswith(f".dist-info/{kind}")]
+        for kind in ("METADATA", "RECORD")
+    }
+    if any(len(names) != 1 for names in found.values()):
+        raise SystemExit("The Vellric wheel must hold exactly one METADATA and one RECORD")
+    ((metadata,), (record,)) = found.values()
+    files = {info.filename: data for info, data in entries}
+    lines = files[metadata].decode("utf-8").split("\n")
+    conric = [line for line in lines if re.match(r"Requires-Dist: conric\b", line)]
+    if conric != [f"Requires-Dist: {source}"]:
+        raise SystemExit("The Vellric wheel does not name the exact locked Conric source")
+    rewritten = "\n".join(f"Requires-Dist: {pinned}" if line in conric else line for line in lines)
+    files[metadata] = rewritten.encode("utf-8")
+    digest = base64.urlsafe_b64encode(hashlib.sha256(files[metadata]).digest()).rstrip(b"=")
+    rows = files[record].decode("utf-8").splitlines(keepends=True)
+    if sum(row.startswith(f"{metadata},") for row in rows) != 1:
+        raise SystemExit("The Vellric wheel's RECORD does not list its METADATA once")
+    files[record] = "".join(
+        f"{metadata},sha256={digest.decode('ascii')},{len(files[metadata])}\n"
+        if row.startswith(f"{metadata},")
+        else row
+        for row in rows
+    ).encode("utf-8")
+    with zipfile.ZipFile(wheel, "w") as archive:
+        for info, _ in entries:
+            archive.writestr(info, files[info.filename])
+
+
+def materialize_conric(selected: Path, wheels: Path) -> tuple[str, str]:
+    """Build the exact locked public source; leave registry requirements hash-checked.
+
+    Returns the Git requirement the project names and the version requirement the bundle uses.
+    """
     lock = tomllib.loads((PROJECT / "uv.lock").read_text(encoding="utf-8"))
     package = next(item for item in lock["package"] if item["name"] == "conric")
     source = urllib.parse.urlsplit(package["source"]["git"])
@@ -126,7 +178,7 @@ def materialize_conric(selected: Path, wheels: Path) -> str:
     if not expected.is_file() or list(wheels.glob("conric-*.whl")) != [expected]:
         raise SystemExit("Conric source did not produce one portable pure-Python wheel")
     selected.write_text("".join(line for line in lines if line not in references), encoding="utf-8")
-    return requirement
+    return requirement, f"conric=={package['version']}"
 
 
 def main() -> int:
@@ -193,7 +245,8 @@ def main() -> int:
             "--output-file",
             str(selected),
         )
-        conric_source = materialize_conric(selected, wheels)
+        conric_source, conric_pinned = materialize_conric(selected, wheels)
+        pin_bundled_conric(wheel, conric_source, conric_pinned)
         # Each registry wheel is checked against its published hash as it arrives.
         run(
             "uv",

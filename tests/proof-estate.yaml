@@ -1180,9 +1180,9 @@ families:
   covers:
   - project/packaging/release_version.py
   - project/packaging/windows_bundle.py
-  contract: A version whose tag names different project content refuses at commit time, at qualification and in the Windows bundle build; an unknowable tag state refuses too, and the bundle carries only tracked guides.
+  contract: A version whose tag names different project content refuses at commit time, at qualification and in the Windows bundle build; an unknowable tag state refuses too, the bundle carries only tracked guides, and the bundled Vellric wheel names Conric by version with a matching RECORD entry, deterministically, refusing any other Conric source.
   risk_class: release-identity
-  oracle: The refusal text for synthetic Git repositories with real tags, edits, untracked files and a shallow clone, and the absence of any build step.
+  oracle: The refusal text for synthetic Git repositories with real tags, edits, untracked files and a shallow clone, and the absence of any build step; for a synthetic wheel, the exact rewritten METADATA, its recomputed RECORD digest and size, unchanged entry order and timestamps, byte-identical repeat output, and unchanged bytes on refusal.
   admission: The owner ruled on 2026-10-15 that each version is bound to one commit; nothing else checks the binding.
   nearest_overlap: The gate family runs the check on the live repository only, where the tagged-and-changed case cannot be exercised without moving a tag.
   historical_evidence: []
