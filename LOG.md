@@ -118,3 +118,12 @@ Delivery: full gate, commit and fast-forward push, exact-commit Qualification an
 
 Lessons:
 - wooden-koel (candidate, local): prove each documented install command of an offline artifact with network transports and caches actually excluded; a connected runner cannot evidence an offline promise.
+
+## 2026-11-04 23:30 — METHODOLOGY
+
+Standing release contents ratified by the owner.
+
+The owner ratified four standing rules in policies/releases.md for every release from v0.2.5 on: every release ships the wheel, source archive and Windows ZIP; the ZIP is proved to install with no network access by every install command a released bundle has documented, with pip's cache disabled and Git allowed no transport; a changed install or upgrade command is announced with upgrade steps in the release notes and INSTALL.txt; and the ZIP carries the exact-version source archive. CLAUDE.md points at the rule. The Windows workflow's hash-checked installs now run under the same offline controls as the resolving install.
+
+Lessons:
+- wooden-koel graduated to policies/releases.md (standard release contents, rule 2) by owner ratification and archived as codified.
