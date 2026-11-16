@@ -10,3 +10,5 @@ Every top-level entry in this directory has one row here. `As of` is the date or
 
 | Document | Source | As of | Retrieved | Basis | Pinned for |
 |---|---|---|---|---|---|
+| [RFC 8118 page fragment excerpt](rfc8118-page-fragment-excerpt.txt) | https://www.rfc-editor.org/rfc/rfc8118.html#section-3 | March 2017 | 2026-10-29 UTC | Bounded quotation of a public IETF standard for research commentary; RFC copyright IETF Trust and identified authors, 2017; not a whole-document redistribution license | Verbatim page parameter clause, whitespace normalized from HTML; physical PDF citation research. |
+| [WAI complex images excerpt](w3c-complex-images-excerpt.txt) | https://www.w3.org/WAI/tutorials/images/complex/ | 2026-04-08 (tutorial update; copyright 2026) | 2026-10-29 UTC | W3C Document License 2023, linked in the excerpt; original copyright retained | Verbatim clause from the first paragraph of Example 1, with source/license URLs and copyright attribution; figure-description research. Tutorial guidance, not a conformance claim. |
