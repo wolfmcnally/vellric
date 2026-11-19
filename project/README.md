@@ -2,7 +2,9 @@
 
 Vellric inspects PDFs, preserves exact native text, recovers scans at four rotations, and exports optional native Markdown, page images and layout artifacts. Each CLI invocation owns one complete document job and publishes an inspectable bundle atomically. Native and OCR jobs run independently without account credentials or a model provider.
 
-The current candidate is **0.2.5**, licensed **AGPL-3.0-only**. Public source history retains its audited root and subsequent qualified commits. Original MIT grants and dependency notices are retained.
+The current candidate is **0.2.6**, licensed **AGPL-3.0-only**. Public source history retains its audited root and subsequent qualified commits. Original MIT grants and dependency notices are retained.
+
+Version 0.2.6 adds explicit configuration of conversion, OCR, resource limits and child paths through a Conric `--config` file (explicit CLI values take precedence), and selectable Bedrock vision transports: bearer, SigV4 and a caller-supplied broker command that receives only named inherited descriptors. No transport ever falls back to another. Linux arm64 offline installation is documented in [LINUX-ARM64-OFFLINE.md](docs/LINUX-ARM64-OFFLINE.md). Vision remains off by default; cloud-vision human acceptance remains OPEN and UNQUALIFIED, and no provider was called during verification.
 
 Version 0.2.5 fixes offline installation of the Windows bundle. From 0.2.2 to 0.2.4 the bundle's Vellric wheel named Conric by its GitHub source, so the shorter `--find-links` install command that earlier bundles gave tried to clone Conric and failed where GitHub is unreachable. The bundle's Vellric wheel now names Conric by version, and pip takes it from the bundle. The source archive now also carries the bundle builder. PDF processing, output and the standalone wheel are otherwise unchanged from 0.2.4.
 
@@ -18,7 +20,7 @@ With Python 3.12+ and uv and existing authorized Git access, from the directory 
 
 ```bash
 uv venv --python 3.12 .venv
-uv pip install --python .venv/bin/python ./vellric-0.2.5-py3-none-any.whl
+uv pip install --python .venv/bin/python ./vellric-0.2.6-py3-none-any.whl
 .venv/bin/vellric --version
 .venv/bin/vellric doctor --json
 .venv/bin/vellric convert input.pdf --ocr never --structure native --out converted --status-json
