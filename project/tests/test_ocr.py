@@ -198,3 +198,67 @@ def test_live_processing_fingerprint_excludes_document_page_selection(tmp_path):
         assert [p["number"] for p in manifest["pages"] if p["method"] == "ocr"] == [page_number]
         identities.append(manifest["provenance"]["processing_fingerprint"])
     assert identities[0] == identities[1]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Uses an executable fixture with a shebang")
+def test_configured_path_drives_doctor_and_recognition(tmp_path):
+    tools, work, tessdata = (tmp_path / name for name in ("tools", "work", "data"))
+    for directory in (tools, work, tessdata):
+        directory.mkdir()
+    (tessdata / "eng.traineddata").write_bytes(b"synthetic")
+    executable = tools / "tesseract"
+    executable.write_text(
+        f"#!{sys.executable}\n"
+        "import os, sys\n"
+        "from pathlib import Path\n"
+        f"assert os.environ['PATH'] == {str(tools)!r}\n"
+        f"assert Path(os.environ['TMPDIR']).is_relative_to({str(work)!r})\n"
+        f"if sys.argv[1:] == ['--version']: print({worker.QUALIFIED_TESSERACT!r})\n"
+        f"elif sys.argv[1:] == ['--list-langs']: print('List of available languages in \"'"
+        f" + {str(tessdata)!r} + '\" (1):\\neng')\n"
+        f"else: print({(HEADER + row(95, 'Recognition used the configured engine.'))!r}, end='')\n",
+        encoding="utf-8",
+    )
+    executable.chmod(0o755)
+    source, out = tmp_path / "input.pdf", tmp_path / "out"
+    with pymupdf.open() as document:
+        document.new_page(width=216, height=144).insert_text((36, 36), "Native source.")
+        document.save(source)
+    config = tmp_path / "config.json"
+    config.write_text(
+        json.dumps(
+            {
+                "vellric": {
+                    "path": str(tools),
+                    "temp_dir": str(work),
+                    "ocr": {"mode": "always", "preflight": "off", "tessdata_dir": str(tessdata)},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "vellric",
+            "convert",
+            str(source),
+            "--out",
+            str(out),
+            "--config",
+            str(config),
+            "--status-json",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    manifest = json.loads((out / "manifest.json").read_text())
+    assert manifest["engines"]["ocr"]["tesseract"]["executable_sha256"] == runtime.digest(
+        executable
+    )
+    assert (out / "pages/000001/text.txt").read_text().strip() == (
+        "Recognition used the configured engine."
+    )

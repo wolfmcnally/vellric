@@ -127,3 +127,18 @@ The owner ratified four standing rules in policies/releases.md for every release
 
 Lessons:
 - wooden-koel graduated to policies/releases.md (standard release contents, rule 2) by owner ratification and archived as codified.
+
+## 2026-11-19 05:09 — Phase 2 — DELIVERY (phase open)
+
+Vellric 0.2.6: offline configuration and brokered Bedrock vision, delivered as source; Phase 2 stays open.
+
+Route: the owner authorized changes to the document-conversion stack and owned dependencies on 2026-11-19, so that the stack runs from configuration alone in a networkless, hardware-isolated Linux arm64 environment. A read-only lane produced the change as patches; the coordinating session applied, verified and delivered them. No provider or model calls, credentials, tags or releases.
+
+Behavior: a Conric `--config` sets conversion, OCR, resource limits, diagnostics and child paths, with explicit CLI values taking precedence and strict checks keyed on each value's own source. The PDF password stays in the supervisor-to-worker pipe. Bedrock vision selects exactly one transport (bearer, SigV4 or a broker command) and never falls back. A broker command inherits only its listed descriptors (3–255, at most four), and a closed one is refused before input is read. Broker process groups are reaped before publication, and cleanup never replaces an original error.
+
+Validation observed: four independent advisory reviews, the last finding no high or medium defect. Linux arm64 (Debian 12, Tesseract 5.5.2, no network): 169 passed; the installed-wheel test (needs network) and the grandchild-reap test fail identically on the base in that container. macOS: the changed-path selection passed apart from the live-reset proof, fixed by refreshing the current inventory. Twenty-five red witnesses were applied and observed red, restored byte-exactly and observed green, with bytecode writing disabled after stale `.pyc` files masked two restorations.
+
+Open: the Phase 2 acceptance's fresh Linux arm64 install from staged, hash-verified wheels remains unrun. Cloud vision remains OPEN/UNQUALIFIED.
+
+Lessons:
+- none filed here; a stale-bytecode red-witness hazard is reported to the coordinating session.

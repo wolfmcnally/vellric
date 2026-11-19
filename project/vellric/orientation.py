@@ -94,6 +94,7 @@ def recover_page(
     timeout: int = 300,
     diagnostics: Path | None = None,
     tessdata_dir: str | None = None,
+    path: str | None = None,
     cancel_event=None,
 ) -> RecoveredPage:
     """Recognise one page at every angle in ``angles`` and keep the best.
@@ -145,6 +146,7 @@ def recover_page(
                     timeout=timeout,
                     temp=Path(temp),
                     tessdata_dir=tessdata_dir,
+                    path=path,
                     cancel_event=cancel_event,
                 )
                 if diagnostics is not None:

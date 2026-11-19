@@ -13,7 +13,7 @@ import pymupdf
 import pytest
 from conric import ConfigError, SecretRef, load
 
-from vellric import cli
+from vellric import cli, vision
 from vellric.configuration import vellric_schema
 from vellric.runtime import JobError
 
@@ -103,6 +103,10 @@ def test_composed_leaf_precedence_provenance_and_rejections(tmp_path):
         ("vellric: {vision: {api_key: SYNTHETIC_PLAINTEXT_SECRET}}\n", "expected_secret_reference"),
         ("vellric: {vision: {model: !env SYNTHETIC_PLAINTEXT_SECRET}}\n", "invalid_type"),
         ("vellric: {unknown: SYNTHETIC_PLAINTEXT_SECRET}\n", "unknown_field"),
+        *[
+            (f"vellric: {{{key}: true}}\n", "unknown_field")
+            for key in ("own_work", "under_license", "fair_use")
+        ],
         ("vellric: [SYNTHETIC_PLAINTEXT_SECRET\n", "yaml"),
     ]
     for index, (body, reason) in enumerate(invalid):
@@ -114,6 +118,104 @@ def test_composed_leaf_precedence_provenance_and_rejections(tmp_path):
         line = 2 if reason == "yaml" else 1  # An unterminated sequence is diagnosed at EOF.
         assert reason in str(error) and f"{bad}:{line}:" in str(error)
         assert "SYNTHETIC_PLAINTEXT_SECRET" not in str(error.status())
+
+
+def test_conversion_config_values_and_explicit_cli_precedence(tmp_path):
+    chosen = config(
+        tmp_path,
+        "convert.yaml",
+        """vellric:
+  local_only: true
+  ocr:
+    mode: auto
+    pages: 2-3
+    language: deu
+    dpi: 180
+    jobs: 3
+    page_timeout_seconds: 45
+    preflight: off
+    rotate_threshold: 1.5
+    preflight_timeout_seconds: 90
+    raster_threshold: 0.2
+  limits:
+    memory_mib: 512
+    raster_mib: 12
+    max_input_bytes: 123456
+    max_output_bytes: 654321
+    max_pages: 8
+    timeout_seconds: 120
+  diagnostics: true
+  progress: none
+""",
+    )
+    parsed = cli.parser().parse_args(
+        arguments(tmp_path, "--config", str(chosen), "--dpi", "300", "--no-diagnostics")
+    )
+    options = vars(parsed)
+    cli.validate_options(options)
+    assert {
+        key: options[key]
+        for key in (
+            "ocr",
+            "ocr_pages",
+            "language",
+            "dpi",
+            "jobs",
+            "page_timeout_seconds",
+            "preflight",
+            "rotate_threshold",
+            "preflight_timeout_seconds",
+            "raster_threshold",
+            "memory_mib",
+            "max_raster_bytes",
+            "max_input_bytes",
+            "max_output_bytes",
+            "max_pages",
+            "timeout_seconds",
+            "diagnostics",
+            "progress",
+            "local_only",
+        )
+    } == {
+        "ocr": "auto",
+        "ocr_pages": "2-3",
+        "language": "deu",
+        "dpi": 300,
+        "jobs": 3,
+        "page_timeout_seconds": 45,
+        "preflight": "off",
+        "rotate_threshold": 1.5,
+        "preflight_timeout_seconds": 90,
+        "raster_threshold": 0.2,
+        "memory_mib": 512,
+        "max_raster_bytes": 12 * 1024 * 1024,
+        "max_input_bytes": 123456,
+        "max_output_bytes": 654321,
+        "max_pages": 8,
+        "timeout_seconds": 120,
+        "diagnostics": False,
+        "progress": "none",
+        "local_only": True,
+    }
+
+
+def test_yaml_limits_and_child_path_refuse_before_input(tmp_path, monkeypatch, capsys):
+    def unexpected(*args):
+        pytest.fail("input was accessed before rejecting configuration")
+
+    monkeypatch.setattr(cli, "snapshot", unexpected)
+    for index, (settings, expected) in enumerate(
+        [
+            ("ocr: {jobs: true}", "invalid_type"),
+            ("limits: {raster_mib: 0}", "max-raster-bytes"),
+            ("limits: {imaginary_limit: 3}", "unknown_field"),
+            ("path: relative", "absolute directories"),
+        ]
+    ):
+        file = config(tmp_path, f"invalid-{index}.yaml", f"vellric:\n  {settings}\n")
+        raw = arguments(tmp_path, "--config", str(file), "--status-json")
+        assert cli.main(raw) == 2
+        assert expected in json.loads(capsys.readouterr().out)["message"]
 
 
 def test_local_only_and_credential_destination_binding(tmp_path, monkeypatch):
@@ -191,7 +293,18 @@ def test_local_only_and_credential_destination_binding(tmp_path, monkeypatch):
 
 
 def test_configured_native_bundle_excludes_paths_and_references(tmp_path):
-    chosen = config(tmp_path, "private-settings.yaml", "vellric: {local_only: true}\n")
+    chosen = config(
+        tmp_path,
+        "private-settings.yaml",
+        f"""vellric:
+  local_only: true
+  ocr: {{mode: never, preflight: off, tessdata_dir: {json.dumps(str(tmp_path))}}}
+  path: {json.dumps(str(tmp_path))}
+  temp_dir: {json.dumps(str(tmp_path))}
+  status_json: true
+  progress: none
+""",
+    )
     source, out = tmp_path / "input.pdf", tmp_path / "out"
     with pymupdf.open() as document:
         document.new_page().insert_text((72, 72), "Configuration preserves native text.")
@@ -207,13 +320,6 @@ def test_configured_native_bundle_excludes_paths_and_references(tmp_path):
                 str(chosen),
                 "--config-root",
                 str(tmp_path),
-                "--ocr",
-                "never",
-                "--preflight",
-                "off",
-                "--status-json",
-                "--progress",
-                "none",
             ),
         ],
         capture_output=True,
@@ -313,3 +419,97 @@ def test_installed_wheel_composes_outside_checkout(tmp_path):
         "ed9286297e92b8c049f70eb15a3b5556ed107ff0" == "".join(item.split())
         for item in observed["requirements"]
     )
+
+
+@pytest.mark.parametrize("section", ['vision: {pages: "1-2"}'])
+def test_yaml_does_not_change_cli_vision_admission(tmp_path, monkeypatch, section):
+    chosen = config(tmp_path, "config.yaml", f"vellric: {{{section}}}\n")
+    monkeypatch.setenv("VISION_TEST_KEY", "synthetic")
+    monkeypatch.setenv("AWS_BEARER_TOKEN_BEDROCK", "synthetic")
+    common = arguments(tmp_path, "--config", str(chosen))
+    for location in (
+        ["--vision-base-url", "http://example.invalid"],
+        ["--vision-region", "eusc-de-east-1"],
+    ):
+        options = vars(
+            cli.parser().parse_args(
+                [
+                    *common,
+                    "--vision-provider",
+                    "bedrock",
+                    "--vision-model",
+                    "global.example.profile",
+                    "--vision-api-key-env",
+                    "VISION_TEST_KEY",
+                    *location,
+                ]
+            )
+        )
+        cli.validate_options(options)
+        assert options["vision_region"] == (
+            "eusc-de-east-1" if location[0] == "--vision-region" else None
+        )
+    default_key = vars(
+        cli.parser().parse_args(
+            [
+                *common,
+                "--vision-provider",
+                "bedrock",
+                "--vision-model",
+                "global.example.profile",
+                "--vision-region",
+                "us-west-2",
+            ]
+        )
+    )
+    cli.validate_options(default_key)
+    assert default_key["vision_api_key_env"] == "AWS_BEARER_TOKEN_BEDROCK"
+    monkeypatch.chdir(tmp_path)
+    relative = vars(
+        cli.parser().parse_args(
+            [
+                *common,
+                "--vision-provider",
+                "command",
+                "--vision-command",
+                Path(sys.executable).name,
+            ]
+        )
+    )
+    executable = tmp_path / Path(sys.executable).name
+    executable.write_bytes(b"synthetic")
+    executable.chmod(0o755)
+    cli.validate_options(relative)
+    assert relative["vision_command"] == str(executable)
+
+
+def test_cli_sigv4_uses_default_chain_with_ocr_yaml(tmp_path, monkeypatch):
+    chosen = config(tmp_path, "config.yaml", "vellric: {ocr: {mode: never}}\n")
+    monkeypatch.setattr(cli.importlib.util, "find_spec", lambda name: object())
+    seen = []
+
+    def signing_credentials(*, explicit_config):
+        seen.append(explicit_config)
+        return ("synthetic-access", "synthetic-secret", None)
+
+    monkeypatch.setattr(vision, "signing_credentials", signing_credentials)
+    options = vars(
+        cli.parser().parse_args(
+            arguments(
+                tmp_path,
+                "--config",
+                str(chosen),
+                "--vision-provider",
+                "bedrock",
+                "--vision-model",
+                "amazon.nova-lite-v1:0",
+                "--vision-region",
+                "us-west-2",
+                "--vision-transport",
+                "sigv4",
+            )
+        )
+    )
+    cli.validate_options(options)
+    assert cli.vision_settings(options, tmp_path)["transport"] == "sigv4"
+    assert seen == [False]

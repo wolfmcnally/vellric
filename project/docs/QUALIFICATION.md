@@ -1,5 +1,7 @@
 # Platform and extraction qualification
 
+Use the [offline Linux arm64 procedure](LINUX-ARM64-OFFLINE.md) to qualify a changed configuration or transport candidate. The component record below describes historical runs.
+
 The standalone CLI is qualified on macOS and Linux arm64 with English native and OCR fixtures. Use independently installed Vellric and run doctor before recognition. Other architectures/languages, production sizing and hard hostile-document containment require their own qualification.
 
 The native fixture asserts an exact typography/word golden. Mixed fixtures recover intrinsically rotated scans and ignore stale hidden OCR. The long-scroll fixture retains all 59 visible lines in five 300-DPI bands. Preserved public PDF fixtures cover 27 pages of exact native text, OCR selection and image coverage. The two image cases preserve text; upright-column rotation metadata is corrected and confidence values differ. Representative public/synthetic originals and readable text are in [samples](samples/index.html). These unchanged text cases have no blanket human readability hold.

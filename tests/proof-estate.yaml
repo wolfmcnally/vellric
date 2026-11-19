@@ -76,7 +76,7 @@ families:
   - native-notice-lost
   replacement_lineage: []
   tier: vital
-  size: small
+  size: medium
   flake_rate: 0.0
 - id: pytest-project-tests-test_citations-py
   kind: pytest
@@ -593,7 +593,7 @@ families:
   mutation_evidence: []
   replacement_lineage: []
   tier: vital
-  size: small
+  size: medium
   flake_rate: 0.0
 - id: pytest-tests-test_check_catalogs-py
   kind: pytest
@@ -1122,6 +1122,7 @@ families:
   historical_evidence: []
   mutation_evidence:
   - selection-in-identity
+  - ocr-doctor-drops-configured-path
   replacement_lineage: []
   tier: vital
   size: medium
@@ -1167,6 +1168,7 @@ families:
   - windows-engine-starts-unsuspended
   - supplied-program-gets-private-environment
   - doctor-probe-in-callers-folder
+  - pdf-password-written-in-worker-config
   replacement_lineage: []
   tier: vital
   size: medium
@@ -1238,6 +1240,7 @@ families:
   covers:
   - project/tests/test_vision.py
   - project/vellric/vision.py
+  - project/vellric/broker.py
   - project/vellric/cli.py
   - project/vellric/worker.py
   - project/vellric/runtime.py
@@ -1270,6 +1273,25 @@ families:
   - program-not-told-what-the-tool-is-doing
   - failed-first-model-fails-job-despite-fallback
   - program-carriage-returns-kept
+  - bedrock-image-byte-budget-ignored
+  - broker-concurrency-limit-ignored
+  - broker-error-falls-through-to-http
+  - supervisor-drops-broker-descriptors
+  - explicit-no-probe-ignored
+  - rss-observation-error-escapes
+  - broker-executable-alias-canonicalized
+  - cleanup-replaces-original-worker-error
+  - publish-before-broker-reap
+  - broker-opt-in-not-required
+  - closed-broker-fd-admitted
+  - invalid-broker-response-accepted
+  - broker-stdout-cap-doubled
+  - timeout-kills-only-broker-leader
+  - darwin-rss-ignores-broker-subgroups
+  - markdown-command-inherits-parent-environment
+  - broker-reaper-trusts-stale-markers
+  - credential-resolver-catches-programming-errors
+  - sigv4-wrong-signing-service
   replacement_lineage: []
   tier: vital
   size: medium
@@ -1299,6 +1321,10 @@ families:
   - local-only-before-credentials
   - config-path-published
   - installed-leaf-corruption
+  - sigv4-chain-keyed-on-config-file
+  - conversion-yaml-overrides-cli
+  - cosmetic-yaml-tightens-bearer
+  - zero-raster-budget-admitted
   replacement_lineage: []
   tier: vital
   size: small

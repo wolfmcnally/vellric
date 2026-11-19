@@ -96,6 +96,7 @@ def image_job(config: dict) -> dict:
                     "password_file",
                     "password_stdin",
                     "temp_dir",
+                    "path",
                     "tessdata_dir",
                 }
             },

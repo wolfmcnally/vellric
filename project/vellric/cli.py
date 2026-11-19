@@ -21,8 +21,8 @@ import urllib.parse
 from collections.abc import Sequence
 from pathlib import Path
 
-from . import __version__, vision
-from .configuration import VISION_DEFAULTS, resolve_options
+from . import __version__, broker, vision
+from .configuration import CONVERT_OPTIONS, VISION_DEFAULTS, resolve_options
 from .runtime import (
     BEHAVIOR,
     SCHEMA,
@@ -41,6 +41,7 @@ from .runtime import (
     publication_available,
     publish,
     remove_tree,
+    require_open_fds,
     tree_size,
     validate_bundle,
     write_json,
@@ -54,7 +55,7 @@ class Parser(argparse.ArgumentParser):
     def parse_args(self, args=None, namespace=None):
         parsed = super().parse_args(args, namespace)
         if parsed.command == "convert":
-            return argparse.Namespace(**resolve_options(vars(parsed)))
+            return argparse.Namespace(**resolve_options(vars(parsed), self.convert_defaults))
         return parsed
 
 
@@ -68,6 +69,8 @@ def parser() -> argparse.ArgumentParser:
     doctor.add_argument("--json", action="store_true")
     doctor.add_argument("--language", default="eng")
     doctor.add_argument("--tessdata-dir")
+    doctor.add_argument("--path")
+    doctor.add_argument("--temp-dir")
     for name in ("inspect", "convert", "render", "image"):
         c = commands.add_parser(name)
         c.add_argument("input")
@@ -84,6 +87,7 @@ def parser() -> argparse.ArgumentParser:
         c.add_argument("--max-output-bytes", type=int, default=2 * 1024 * 1024 * 1024)
         c.add_argument("--max-pages", type=int, default=10000)
         c.add_argument("--temp-dir")
+        c.add_argument("--path", help="absolute directories for child executable lookup")
         c.add_argument("--tessdata-dir")
         c.add_argument("--layout", action="store_true")
         c.add_argument("--raster-threshold", type=float, default=0.5)
@@ -119,7 +123,7 @@ def parser() -> argparse.ArgumentParser:
             c.add_argument("--jobs", type=int, default=1)
             c.add_argument("--language", default="eng")
             c.add_argument("--searchable-pdf", action="store_true")
-            c.add_argument("--diagnostics", action="store_true")
+            c.add_argument("--diagnostics", action=argparse.BooleanOptionalAction, default=False)
             c.add_argument(
                 "--vision-provider",
                 choices=[*vision.PROVIDERS, "none"],
@@ -147,6 +151,10 @@ def parser() -> argparse.ArgumentParser:
                 "--vision-api-key-env", help="name of the environment variable holding the key"
             )
             c.add_argument("--vision-command", help="program for --vision-provider command")
+            c.add_argument("--vision-command-env", action="append", metavar="NAME")
+            c.add_argument("--vision-transport", choices=["bearer", "sigv4", "command"])
+            c.add_argument("--vision-probe", action=argparse.BooleanOptionalAction)
+            c.add_argument("--allow-brokered", action="store_true")
             c.add_argument("--vision-pages", help="pages/ranges that receive the vision pass")
             c.add_argument("--vision-cross-check", choices=["on", "off"], default="on")
             c.add_argument("--vision-max-side", type=int, default=vision.DEFAULT_MAX_SIDE)
@@ -155,8 +163,13 @@ def parser() -> argparse.ArgumentParser:
                 "--amend", help="earlier convert result of this input whose other pages are kept"
             )
             # Absence must remain distinguishable from an explicitly supplied default.
+            vision_options = {f"vision_{key}" for key in VISION_DEFAULTS}
+            p.convert_defaults = {}
             for action in c._actions:
-                if action.dest in {f"vision_{key}" for key in VISION_DEFAULTS}:
+                if action.dest in CONVERT_OPTIONS:
+                    p.convert_defaults[action.dest] = action.default
+                    c._defaults.pop(action.dest, None)
+                if action.dest in CONVERT_OPTIONS or action.dest in vision_options:
                     action.default = argparse.SUPPRESS
         if name == "image":
             c.add_argument("--width", type=int)
@@ -177,8 +190,14 @@ def parser() -> argparse.ArgumentParser:
 
 
 def doctor(
-    *, language: str = "eng", tessdata_dir: str | None = None, include_osd: bool = True
+    *,
+    language: str = "eng",
+    tessdata_dir: str | None = None,
+    include_osd: bool = True,
+    path: str | None = None,
+    temp_dir: str | None = None,
 ) -> dict:
+    validate_path(path)
     publication = publication_available()
     data = {
         "tool": {"name": "vellric", "version": __version__},
@@ -218,7 +237,7 @@ def doctor(
                 text=True,
                 timeout=15,
                 cwd=temp,
-                env=environment(temp, tessdata_dir),
+                env=environment(temp, tessdata_dir, path=path),
             )
             return result.returncode, result.stdout or result.stderr
         except (OSError, subprocess.TimeoutExpired, UnicodeError):
@@ -228,11 +247,13 @@ def doctor(
     for tool in ("tesseract", "ocrmypdf", "gs"):
         # Ghostscript's console program has its own name on Windows.
         name = "gswin64c" if WINDOWS and tool == "gs" else tool
-        executable = find_program(name, path=environment(Path(tempfile.gettempdir()))["PATH"])
+        lookup = environment(Path(temp_dir or tempfile.gettempdir()), path=path)["PATH"]
+        executable = find_program(name, path=lookup)
         entry = {"available": False}
         if executable:
             # The probe runs in this folder, so removal waits out a process that is ending.
-            with private_directory("vellric-doctor-", None) as temp:
+            base = Path(temp_dir) if temp_dir else None
+            with private_directory("vellric-doctor-", base) as temp:
                 returncode, output = probe(executable, "--version", Path(temp))
                 lines = output.splitlines()
                 entry["returncode"] = returncode
@@ -269,7 +290,29 @@ def doctor(
     return data
 
 
+def validate_path(path: str | None) -> None:
+    if path is not None and (
+        "\x00" in path or not all(Path(part).is_absolute() for part in path.split(os.pathsep))
+    ):
+        raise JobError("usage", "Child PATH requires absolute directories", stage="settings")
+
+
+def executable_path(name: str) -> str:
+    if os.path.isfile(name) and os.access(name, os.X_OK):
+        return name if os.path.isabs(name) else os.path.join(os.getcwd(), name)
+    raise JobError("usage", "vision-command must name an executable file", stage="settings")
+
+
 def validate_options(options: dict) -> None:
+    validate_path(options.get("path"))
+    for key, choices in (
+        ("ocr", ("auto", "never", "always")),
+        ("preflight", ("on", "off")),
+        ("structure", ("none", "native")),
+        ("progress", ("human", "json", "none")),
+    ):
+        if options[key] not in choices:
+            raise JobError("usage", f"Invalid {key}", stage="settings")
     for key in (
         "timeout_seconds",
         "page_timeout_seconds",
@@ -368,12 +411,19 @@ def validate_vision(options: dict) -> None:
                 "vision_min_agreement",
                 "vision_api_key_env",
                 "vision_command",
+                "vision_transport",
                 "vision_pages",
                 "vision_max_output_tokens",
                 "amend",
             )
             if options.get(key) is not None
-        ] + [key for key in vision.DECLARATIONS if options.get(key)]
+        ] + [
+            key
+            for key in ("vision_command_env", "vision_limits", *vision.DECLARATIONS)
+            if options.get(key)
+        ]
+        if not options.get("vision_probe", True):
+            named.append("vision_probe")
         if named:
             raise JobError(
                 "usage",
@@ -397,29 +447,77 @@ def validate_vision(options: dict) -> None:
     fallback = options["vision_fallback_model"]
     if fallback is not None and (not fallback or fallback == options["vision_model"]):
         raise refuse("vision-fallback-model must name a different model")
+    transport = options["vision_transport"]
+    yaml_fields = options["vision_yaml_fields"]
+    limits = options["vision_limits"]
+    command = options["vision_command"]
+    command_env = options["vision_command_env"]
+    if any(not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) for name in command_env):
+        raise refuse("Invalid vision command environment variable name")
+    if provider != "bedrock" and (transport is not None or limits or not options["vision_probe"]):
+        raise refuse("Vision transport, limits and probe require the bedrock provider")
+    brokered = provider == "bedrock" and transport == "command"
+    if command_env and provider != "command" and not brokered:
+        raise refuse("Vision command environment requires a command route")
+    for key, ceiling in (
+        ("timeout_seconds", None),
+        ("max_concurrency", None),
+        ("max_output_tokens", 1_000_000),
+        ("max_image_bytes", vision.BEDROCK_MAX_IMAGE_BYTES),
+        ("max_image_side_px", vision.BEDROCK_MAX_IMAGE_SIDE),
+    ):
+        if key in limits and (
+            not 0 < limits[key] < float("inf") or (ceiling is not None and limits[key] > ceiling)
+        ):
+            raise refuse(f"Invalid vision limit {key}")
     region = options["vision_region"]
     if region is not None and provider != "bedrock":
         raise refuse("vision-region requires the bedrock provider")
     if provider == "bedrock" and (region is None) == (options["vision_base_url"] is None):
         raise refuse("The bedrock provider requires --vision-region or --vision-base-url, not both")
-    if region is not None and not re.fullmatch("[a-z]{2,5}(-[a-z]+)+-[0-9]+", region):
+    if region is not None and not re.fullmatch(r"[a-z]{2,5}(?:-[a-z]+)+-[1-9][0-9]*", region):
         raise refuse("vision-region must be an AWS region name")
+    if provider == "bedrock":
+        strict_transport = transport in ("sigv4", "command") or "vision_transport" in yaml_fields
+        if region is None and (strict_transport or "vision_base_url" in yaml_fields):
+            raise refuse("Configured Bedrock requires an exact AWS region")
+        for key in ("vision_model", "vision_fallback_model"):
+            model = options[key]
+            if (strict_transport or key in yaml_fields) and model is not None:
+                if not vision.foundation_model_id(model):
+                    raise refuse("Bedrock requires exact foundation-model IDs")
+    if brokered:
+        if not options["allow_brokered"]:
+            raise refuse("Bedrock command transport requires allow_brokered")
+        if options["vision_api_key_env"] or not isinstance(command, dict):
+            raise refuse("Bedrock command transport requires argv and takes no API key")
+        if not Path(command["argv"][0]).is_absolute():
+            raise refuse("Bedrock command executable must be absolute")
+        command["argv"][0] = executable_path(command["argv"][0])
+        if WINDOWS:
+            raise refuse("Bedrock command transport requires POSIX process supervision")
+        require_open_fds(command["pass_fds"], stage="settings")
+    elif isinstance(command, dict):
+        raise refuse("An argv mapping requires Bedrock command transport")
+    if transport == "sigv4":
+        if options["vision_api_key_env"]:
+            raise refuse("Bedrock SigV4 takes no bearer API key")
+        if importlib.util.find_spec("botocore") is None:
+            raise JobError(
+                "dependency-unavailable", "Install vellric[bedrock] for SigV4", stage="settings"
+            )
     if options["searchable_pdf"] and options["vision_cross_check"] == "off":
         # Skipping Tesseract for vision pages would leave them out of the searchable derivative.
         raise refuse("Searchable PDF requires --vision-cross-check on")
     if provider == "command":
         if options["vision_base_url"] or options["vision_api_key_env"] or tokens is not None:
             raise refuse("The command provider takes no base URL, API key or token limit")
-        try:
-            command = Path(options["vision_command"] or "").resolve(strict=True)
-            if not command.is_file() or not os.access(command, os.X_OK):
-                raise ValueError
-        except (OSError, ValueError) as exc:
-            raise refuse("vision-command must name an executable file") from exc
-        options["vision_command"] = str(command)
+        if "vision_command" in yaml_fields and not Path(command or "").is_absolute():
+            raise refuse("Configured vision command executable must be absolute")
+        options["vision_command"] = executable_path(command or "")
     else:
-        if options["vision_command"]:
-            raise refuse("vision-command requires the command provider")
+        if command and not brokered:
+            raise refuse("vision-command requires a command route")
         if not options["vision_model"]:
             raise refuse("This vision provider requires --vision-model")
         default_url = (
@@ -444,9 +542,15 @@ def validate_vision(options: dict) -> None:
             raise refuse("Invalid API key variable name")
         # A key goes only where the user sent it: the provider's own endpoint takes the
         # provider's usual variable, and any other endpoint takes a key only when one is named.
-        if name is None and url == default_url:
+        if name is None and url == default_url and transport not in ("sigv4", "command"):
+            if provider == "bedrock" and yaml_fields & {
+                "vision_api_key_env",
+                "vision_region",
+                "vision_transport",
+            }:
+                raise refuse("Configured Bedrock bearer requires an API key reference")
             name = options["vision_api_key_env"] = vision.DEFAULT_KEY_ENV[provider]
-        if name is None and provider != "openai":
+        if name is None and provider != "openai" and transport not in ("sigv4", "command"):
             raise refuse(f"A custom {provider.capitalize()} endpoint requires --vision-api-key-env")
         if name is not None and not os.environ.get(name):
             raise refuse(f"Environment variable {name} holds no API key")
@@ -474,7 +578,7 @@ def validate_vision(options: dict) -> None:
         options["ocr"], options["preflight"] = "never", "off"
 
 
-def vision_settings(options: dict) -> dict | None:
+def vision_settings(options: dict, work: Path) -> dict | None:
     """What the worker needs to reach the provider, including material no artifact may carry."""
     provider = options.get("vision_provider")
     if provider is None:
@@ -485,12 +589,33 @@ def vision_settings(options: dict) -> dict | None:
         "fallback_model": options["vision_fallback_model"],
         "declarations": [name for name in vision.DECLARATIONS if options[name]],
         "base_url": options["vision_base_url"],
+        "region": options["vision_region"],
+        "transport": options["vision_transport"] or "bearer",
+        "probe": options["vision_probe"],
         "max_output_tokens": options["vision_max_output_tokens"]
         or (vision.ANTHROPIC_MAX_OUTPUT_TOKENS if provider == "anthropic" else None),
     }
-    if provider == "command":
-        # The user's own program runs as the user would run it.
-        settings |= {"command": options["vision_command"], "env": dict(os.environ)}
+    if provider == "bedrock":
+        settings["limits"] = options["vision_limits"]
+        tokens = settings["limits"].get("max_output_tokens", settings["max_output_tokens"])
+        if tokens is None and settings["transport"] != "bearer":
+            tokens = 4096
+        settings["max_output_tokens"] = tokens
+    if provider == "command" or settings["transport"] == "command":
+        settings["command"] = options["vision_command"]
+        names = options["vision_command_env"]
+        settings["env"] = {name: os.environ[name] for name in names if name in os.environ}
+        if options["path"] is not None and "PATH" in names:
+            settings["env"]["PATH"] = options["path"]
+        if WINDOWS:
+            native_env = environment(work, path=options["path"])
+            settings["env"].update(
+                {key: native_env[key] for key in ("SystemRoot", "ComSpec", "PATHEXT", "TEMP")}
+            )
+    elif settings["transport"] == "sigv4":
+        settings["sigv4"] = vision.signing_credentials(
+            explicit_config="vision_transport" in options["vision_yaml_fields"]
+        )
     elif options["vision_api_key_env"]:
         settings["api_key"] = os.environ[options["vision_api_key_env"]]
     return settings
@@ -604,6 +729,36 @@ def run_job(options: dict) -> dict:
             signal.signal(sig, handler)
 
 
+def worker_options(options: dict) -> dict:
+    """Keep private or supervisor-only fields out of the worker's JSON options."""
+    return {
+        key: value
+        for key, value in options.items()
+        if key
+        not in {
+            "vision_command",
+            "vision_command_env",
+            "vision_api_key_env",
+            "vision_yaml_fields",
+            "password_file",
+        }
+    }
+
+
+def supervised_rss(group: int, work: Path, *, brokered: bool) -> int:
+    resident = group_rss(group)
+    if brokered and sys.platform == "darwin":
+        try:
+            resident += sum(group_rss(helper) for helper in broker.active_groups(work, group))
+        except OSError as exc:
+            raise JobError(
+                "dependency-unavailable",
+                "Cannot observe broker process groups",
+                stage="supervision",
+            ) from exc
+    return resident
+
+
 def _run_job(options: dict) -> dict:
     validate_options(options)
     if WINDOWS and sys.version_info < (3, 12, 4):
@@ -612,6 +767,10 @@ def _run_job(options: dict) -> dict:
             "dependency-unavailable", "Windows requires Python 3.12.4 or later", stage="settings"
         )
     job_started = time.monotonic()
+    brokered = options.get("vision_transport") == "command"
+    broker_fds = ()
+    if brokered:
+        broker_fds = tuple(options["vision_command"]["pass_fds"])
     requested = Path(options["out"]).absolute()
     parent = requested.parent.resolve(strict=True)
     target = parent / requested.name
@@ -645,6 +804,7 @@ def _run_job(options: dict) -> dict:
         staging = None
         process = None
         group = None
+        broker_groups_reaped = False
         try:
             staging = Path(tempfile.mkdtemp(prefix=f".{target.name}.vellric-", dir=parent))
             os.chmod(staging, 0o700)
@@ -653,16 +813,14 @@ def _run_job(options: dict) -> dict:
                 or "Document"
             )
             config = {
-                "options": options,
+                "options": worker_options(options),
                 "source": str(source),
                 "sha256": identity,
                 "size": size,
                 "staging": str(staging),
                 "work": str(work),
                 "result": str(work / "result.json"),
-                "password": password,
                 "title": title,
-                "vision": options.get("vision_provider") is not None,
             }
             write_json(work / "config.json", config)
             os.chmod(work / "config.json", 0o600)
@@ -673,6 +831,9 @@ def _run_job(options: dict) -> dict:
                 "from vellric.worker import main;raise SystemExit(main())"
             )
             package_root = str(Path(__file__).resolve().parent.parent)
+            payload = json.dumps(
+                {"password": password, "vision": vision_settings(options, work)}
+            ).encode()
             with (work / "engine.log").open("wb") as log:
                 process = subprocess.Popen(
                     [
@@ -683,27 +844,25 @@ def _run_job(options: dict) -> dict:
                         package_root,
                         str(work / "config.json"),
                     ],
-                    stdin=subprocess.PIPE if config["vision"] else None,
+                    stdin=subprocess.PIPE,
+                    cwd=work,
                     stdout=log,
                     stderr=log,
-                    env=environment(work, options.get("tessdata_dir")),
+                    env=environment(work, options.get("tessdata_dir"), path=options.get("path")),
+                    close_fds=True,
+                    **({"pass_fds": broker_fds} if broker_fds else {}),
                     **SUPERVISED,
                 )
                 group = contain(process)
-                if config["vision"]:
-                    # The key travels on a pipe so that no crash can leave it on disk.
-                    def feed(stream, payload):
-                        try:
-                            stream.write(payload)
-                            stream.close()
-                        except OSError:
-                            pass  # The worker ended first; its status is read below.
 
-                    threading.Thread(
-                        target=feed,
-                        args=(process.stdin, json.dumps(vision_settings(options)).encode()),
-                        daemon=True,
-                    ).start()
+                def feed(stream, data):
+                    try:
+                        with stream:
+                            stream.write(data)
+                    except OSError:
+                        pass  # The worker ended first; its status is read below.
+
+                threading.Thread(target=feed, args=(process.stdin, payload), daemon=True).start()
                 started = job_started
                 peak_rss = 0
                 peak_private_bytes = size
@@ -739,7 +898,7 @@ def _run_job(options: dict) -> dict:
                 while process.poll() is None:
                     if time.monotonic() - started > options["timeout_seconds"]:
                         raise JobError("deadline", "Job deadline exceeded", stage="supervision")
-                    peak_rss = max(peak_rss, group_rss(group))
+                    peak_rss = max(peak_rss, supervised_rss(group, work, brokered=brokered))
                     if time.monotonic() >= next_disk_sample:
                         staging_bytes, work_bytes = tree_size(staging), tree_size(work)
                         peak_private_bytes = max(peak_private_bytes, staging_bytes + work_bytes)
@@ -837,6 +996,10 @@ def _run_job(options: dict) -> dict:
             validate_bundle(staging, manifest)
             if tree_size(staging) > options["max_output_bytes"]:
                 raise JobError("resource-limit", "Final output exceeds byte limit")
+            if brokered:
+                process.wait()
+                broker.reap_groups(work, group)
+                broker_groups_reaped = True
             publish(staging, target)
             return result["status"] | {
                 "stage": "published",
@@ -844,14 +1007,23 @@ def _run_job(options: dict) -> dict:
                 "output": str(target),
             }
         finally:
-            if process is not None:
-                if group is None:
-                    process.kill()  # Stopped between starting the worker and holding its group.
-                else:
-                    kill_group(group)
-                process.wait()
-            if staging is not None and staging.exists():
-                remove_tree(staging)
+            failed = sys.exc_info()[0] is not None
+            try:
+                if process is not None:
+                    if group is None:
+                        process.kill()  # Stopped between starting the worker and holding its group.
+                    else:
+                        kill_group(group)
+                    process.wait()
+                if group is not None and brokered and not broker_groups_reaped:
+                    try:
+                        broker.reap_groups(work, group)
+                    except JobError:
+                        if not failed:
+                            raise
+            finally:
+                if staging is not None and staging.exists():
+                    remove_tree(staging)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -869,7 +1041,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             p.print_help()
             return 0
         if parsed.command == "doctor":
-            data = doctor(language=parsed.language, tessdata_dir=parsed.tessdata_dir)
+            data = doctor(
+                language=parsed.language,
+                tessdata_dir=parsed.tessdata_dir,
+                path=parsed.path,
+                temp_dir=parsed.temp_dir,
+            )
             if parsed.json:
                 print(json.dumps(data, ensure_ascii=False, indent=2))
             else:
@@ -878,6 +1055,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     print(f"{name}: {entry.get('version', 'unavailable')}")
             return 0
         options = vars(parsed)
+        want_json = options["status_json"]
         status = run_job(options)
         code = 0
     except JobError as exc:

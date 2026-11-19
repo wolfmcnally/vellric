@@ -38,7 +38,7 @@ def config(source, base, *args):
         source=str(source),
         staging=str(stage),
         work=str(work),
-        options=options,
+        options=cli.worker_options(options),
         password="",
         sha256=runtime.digest(source),
         size=source.stat().st_size,
@@ -483,7 +483,9 @@ def test_windows_engine_keeps_its_folder_environment_and_suspended_start(tmp_pat
     seen = launches(monkeypatch)
     monkeypatch.setattr(runtime, "WINDOWS", True)
     private = {"PATH": "C:\\engines"}
-    monkeypatch.setattr(runtime, "environment", lambda temp, tessdata: private | {"at": temp})
+    monkeypatch.setattr(
+        runtime, "environment", lambda temp, tessdata, **kwargs: private | {"at": temp}
+    )
     with pytest.raises(runtime.JobError, match="cannot start"):
         runtime.run_tool(["C:\\engines\\tesseract.exe"], timeout=1, temp=tmp_path)
     (launch,) = seen
@@ -516,3 +518,45 @@ def test_doctor_probes_engines_in_their_private_folder(monkeypatch):
         folder = probe.get("cwd")
         assert folder is not None and folder.name.startswith("vellric-doctor-")
         assert probe["env"]["HOME"] == str(folder)
+
+
+def test_supervisor_keeps_pdf_password_off_disk(tmp_path, monkeypatch):
+    secret = "synthetic-pdf-password"
+    source = tmp_path / "encrypted.pdf"
+    with pymupdf.open() as document:
+        document.new_page().insert_text((72, 72), "A private PDF.")
+        document.save(
+            source, encryption=pymupdf.PDF_ENCRYPT_AES_256, user_pw=secret, owner_pw="owner"
+        )
+    password_file = tmp_path / "password"
+    password_file.write_text(secret, encoding="utf-8")
+    original = cli.subprocess.Popen
+    seen = []
+
+    def observe(command, **kwargs):
+        if command[0] == sys.executable:
+            config = Path(command[-1]).read_bytes()
+            seen.append(config)
+            assert secret.encode() not in config
+            assert "password" not in json.loads(config)
+        return original(command, **kwargs)
+
+    monkeypatch.setattr(cli.subprocess, "Popen", observe)
+    out = tmp_path / "out"
+    options = vars(
+        cli.parser().parse_args(
+            [
+                "inspect",
+                str(source),
+                "--out",
+                str(out),
+                "--password-file",
+                str(password_file),
+                "--progress",
+                "none",
+            ]
+        )
+    )
+    assert cli.run_job(options)["status"] == "complete"
+    assert len(seen) == 1
+    assert (out / "pages/000001/text.txt").read_text() == "A private PDF.\n"

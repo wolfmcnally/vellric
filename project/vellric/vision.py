@@ -14,7 +14,9 @@ import base64
 import difflib
 import hashlib
 import http.client
+import io
 import json
+import os
 import re
 import ssl
 import unicodedata
@@ -23,6 +25,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+from . import broker
 from .runtime import JobError, remove, run_tool
 
 PROVIDERS = ("anthropic", "openai", "bedrock", "command")
@@ -33,6 +36,8 @@ DEFAULT_KEY_ENV = {
     "bedrock": "AWS_BEARER_TOKEN_BEDROCK",
 }
 DEFAULT_MAX_SIDE = 2576
+BEDROCK_MAX_IMAGE_BYTES = 3_932_160
+BEDROCK_MAX_IMAGE_SIDE = 8000
 ANTHROPIC_MAX_OUTPUT_TOKENS = 16000
 RESPONSE_LIMIT = 16 * 1024 * 1024
 MAX_SPANS = 200
@@ -93,6 +98,15 @@ def system_message(declarations) -> str:
 def prompt_sha256(declarations) -> str:
     """Identity of everything a model is told: the system message and the page instructions."""
     return hashlib.sha256((system_message(declarations) + "\n\n" + PROMPT).encode()).hexdigest()
+
+
+def foundation_model_id(model: str) -> bool:
+    # Geography-prefixed IDs are inference profiles, even without an ARN.
+    prefix = model.partition(".")[0]
+    return bool(
+        prefix not in {"apac", "au", "ca", "eu", "global", "jp", "us", "us-gov"}
+        and re.fullmatch(r"[a-z][a-z0-9-]*\.[a-z0-9]+(?:[._-][a-z0-9]+)*(?::[0-9]+)?", model)
+    )
 
 
 def bedrock_url(region: str) -> str:
@@ -200,11 +214,11 @@ def _anthropic(
     return text, {"served_model": response.model, "usage": usage}
 
 
-def _post(url: str, body: dict, headers: dict, page: int | None, timeout: float) -> dict:
+def _post(url: str, body: dict | bytes, headers: dict, page: int | None, timeout: float) -> dict:
     """POST JSON without following a redirect and return the decoded reply."""
     request = urllib.request.Request(
         url,
-        data=json.dumps(body).encode(),
+        data=body if isinstance(body, bytes) else json.dumps(body).encode(),
         headers={"Content-Type": "application/json", **headers},
         method="POST",
     )
@@ -314,31 +328,128 @@ def _openai(
     return content, facts
 
 
-def _converse(settings: dict, body: dict, page: int | None, timeout: float) -> dict:
-    """Bedrock's one request shape for every model family, authorised by a bearer token."""
+def signing_credentials(*, explicit_config: bool) -> tuple:
+    """Use the standard standalone chain or the explicit-config environment provider."""
+    from botocore.credentials import EnvProvider
+    from botocore.exceptions import (
+        ConfigNotFound,
+        ConfigParseError,
+        CredentialRetrievalError,
+        InvalidConfigError,
+        InvalidSTSRegionalEndpointsConfigError,
+        LoginError,
+        NoAuthTokenError,
+        NoCredentialsError,
+        PartialCredentialsError,
+        ProfileNotFound,
+        RefreshWithMFAUnsupportedError,
+        SSOError,
+        TokenRetrievalError,
+        UnknownCredentialError,
+        UnknownTokenProviderError,
+    )
+    from botocore.session import Session
+
+    try:
+        credentials = (
+            EnvProvider(environ=os.environ).load()
+            if explicit_config
+            else Session().get_credentials()
+        )
+        frozen = credentials.get_frozen_credentials() if credentials else None
+        if frozen:
+            return frozen.access_key, frozen.secret_key, frozen.token
+    except (
+        ConfigNotFound,
+        ConfigParseError,
+        CredentialRetrievalError,
+        InvalidConfigError,
+        InvalidSTSRegionalEndpointsConfigError,
+        LoginError,
+        NoAuthTokenError,
+        NoCredentialsError,
+        PartialCredentialsError,
+        ProfileNotFound,
+        RefreshWithMFAUnsupportedError,
+        SSOError,
+        TokenRetrievalError,
+        UnknownCredentialError,
+        UnknownTokenProviderError,
+    ) as exc:
+        raise _failure("Bedrock signing credentials are unavailable", None) from exc
+    raise _failure("Bedrock signing credentials are unavailable", None)
+
+
+def _converse(
+    settings: dict, body: dict, page: int | None, timeout: float, *, temp: Path, cancel_event=None
+) -> dict:
+    transport = settings["transport"]
     if settings.get("max_output_tokens"):
         body["inferenceConfig"] = {"maxTokens": settings["max_output_tokens"]}
-    return _post(
+    if transport == "command":
+        return broker.converse(settings, body, page, timeout, temp, cancel_event)
+    url = (
         settings["base_url"].rstrip("/")
         + "/model/"
         + urllib.parse.quote(settings["model"], safe="")
-        + "/converse",
-        body,
-        {"Authorization": "Bearer " + settings["api_key"]},
-        page,
-        timeout,
+        + "/converse"
     )
+    if transport == "sigv4":
+        from botocore.auth import SigV4Auth
+        from botocore.awsrequest import AWSRequest
+        from botocore.credentials import Credentials
+
+        payload = json.dumps(body).encode()
+        request = AWSRequest(
+            method="POST", url=url, data=payload, headers={"Content-Type": "application/json"}
+        )
+        SigV4Auth(Credentials(*settings["sigv4"]), "bedrock", settings["region"]).add_auth(request)
+        return _post(url, payload, dict(request.headers), page, timeout)
+    if transport == "bearer":
+        return _post(url, body, {"Authorization": "Bearer " + settings["api_key"]}, page, timeout)
+    raise _failure("Unknown Bedrock transport", page)
+
+
+def _bedrock_image(path: Path, limits: dict, page: int) -> tuple[str, bytes]:
+    from PIL import Image
+
+    side = limits.get("max_image_side_px", BEDROCK_MAX_IMAGE_SIDE)
+    size = limits.get("max_image_bytes", BEDROCK_MAX_IMAGE_BYTES)
+    try:
+        with Image.open(path) as source:
+            if max(source.size) <= side and path.stat().st_size <= size:
+                with path.open("rb") as stream:
+                    data = stream.read(size + 1)
+                if len(data) <= size:
+                    return "png", data
+            image = source.convert("RGB")
+        image.thumbnail((side, side))
+        while True:
+            output = io.BytesIO()
+            image.save(output, format="JPEG", quality=80)
+            if output.tell() <= size:
+                return "jpeg", output.getvalue()
+            if max(image.size) <= 1:
+                break
+            image.thumbnail(tuple(max(1, n // 2) for n in image.size))
+    except (OSError, ValueError, Image.DecompressionBombError) as exc:
+        raise _failure("Bedrock image could not be prepared", page) from exc
+    raise _failure("Bedrock image exceeds the configured limits", page, category="limit")
 
 
 def _bedrock(
-    image: bytes, page: int, settings: dict, timeout: float, system: str
+    image_path: Path, page: int, settings: dict, timeout: float, temp: Path, cancel_event
 ) -> tuple[str, dict]:
-    picture = {"format": "png", "source": {"bytes": base64.standard_b64encode(image).decode()}}
+    format_name, image = _bedrock_image(image_path, settings["limits"], page)
+    picture = {
+        "format": format_name,
+        "source": {"bytes": base64.standard_b64encode(image).decode()},
+    }
     body = {
-        "system": [{"text": system}],
+        "system": [{"text": system_message(settings["declarations"])}],
         "messages": [{"role": "user", "content": [{"image": picture}, {"text": PROMPT}]}],
     }
-    data = _converse(settings, body, page, timeout)
+    data = _converse(settings, body, page, timeout, temp=temp, cancel_event=cancel_event)
     try:
         stop = data["stopReason"]
         text = "".join(
@@ -365,7 +476,7 @@ def _bedrock(
     return text, facts
 
 
-def probe(settings: dict, *, timeout: float) -> None:
+def probe(settings: dict, *, timeout: float, temp: Path) -> None:
     """Refuse a Bedrock model the key cannot invoke before any page is read.
 
     A model listing shows what a region offers, not what a key may call, so the check is one
@@ -373,7 +484,7 @@ def probe(settings: dict, *, timeout: float) -> None:
     """
     body = {"messages": [{"role": "user", "content": [{"text": "Reply with the word ready."}]}]}
     try:
-        _converse(settings | {"max_output_tokens": 64}, body, None, timeout)
+        _converse(settings | {"max_output_tokens": 64}, body, None, timeout, temp=temp)
     except JobError as exc:
         status = exc.details.get("http_status", 0)
         # Only a client-side refusal says the key cannot use the model; anything else is an outage.
@@ -431,8 +542,10 @@ def transcribe(
     try:
         if settings["provider"] == "command":
             text, facts = _command(image_path, page, settings, timeout, temp, cancel_event)
+        elif settings["provider"] == "bedrock":
+            text, facts = _bedrock(image_path, page, settings, timeout, temp, cancel_event)
         else:
-            hosted = {"anthropic": _anthropic, "openai": _openai, "bedrock": _bedrock}
+            hosted = {"anthropic": _anthropic, "openai": _openai}
             text, facts = hosted[settings["provider"]](
                 image_path.read_bytes(),
                 page,

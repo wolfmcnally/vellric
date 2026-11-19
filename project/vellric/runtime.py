@@ -79,14 +79,37 @@ class JobError(Exception):
         return 5
 
 
-def environment(temp: Path, tessdata_dir: str | None = None) -> dict[str, str]:
+def require_open_fds(fds, *, stage: str) -> None:
+    for fd in fds:
+        try:
+            os.fstat(fd)
+        except OSError as exc:
+            code = "usage" if stage == "settings" else "vision-operational"
+            raise JobError(code, "A required broker descriptor is closed", stage=stage) from exc
+
+
+def environment(
+    temp: Path, tessdata_dir: str | None = None, *, path: str | None = None
+) -> dict[str, str]:
     """No inherited credentials, Python/loader injection or user tool plugins."""
     if WINDOWS:
-        return _windows_environment(temp, tessdata_dir)
+        return _windows_environment(temp, tessdata_dir, path)
+    if path is None:
+        search = [str(Path(sys.prefix) / "bin"), "/usr/local/bin", "/usr/bin", "/bin"]
+        if sys.platform == "darwin":
+            search.insert(1, "/opt/homebrew/bin")
+        path = os.pathsep.join(search)
     values = {
-        "PATH": str(Path(sys.prefix) / "bin") + ":/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+        "PATH": path,
         "HOME": str(temp),
         "TMPDIR": str(temp),
+        "TMP": str(temp),
+        "TEMP": str(temp),
+        "XDG_CACHE_HOME": str(temp / "cache"),
+        "XDG_CONFIG_HOME": str(temp / "config"),
+        "XDG_DATA_HOME": str(temp / "data"),
+        "XDG_CONFIG_DIRS": str(temp / "config"),
+        "XDG_DATA_DIRS": str(temp / "data"),
         "LANG": "en_US.UTF-8",
         "LC_ALL": "en_US.UTF-8",
         "OMP_THREAD_LIMIT": "1",
@@ -98,7 +121,7 @@ def environment(temp: Path, tessdata_dir: str | None = None) -> dict[str, str]:
     return values
 
 
-def _windows_environment(temp: Path, tessdata_dir: str | None) -> dict[str, str]:
+def _windows_environment(temp: Path, tessdata_dir: str | None, path: str | None) -> dict[str, str]:
     """The same private environment where the system itself needs a few variables to run."""
     from . import _windows
 
@@ -116,7 +139,7 @@ def _windows_environment(temp: Path, tessdata_dir: str | None) -> dict[str, str]
         system,
     ]
     values = {
-        "PATH": os.pathsep.join(map(str, search)),
+        "PATH": path if path is not None else os.pathsep.join(map(str, search)),
         "PATHEXT": ".COM;.EXE;.BAT;.CMD",
         "SystemRoot": str(system),
         "windir": str(system),
@@ -234,6 +257,7 @@ def run_tool(
     limit: int = 64 * 1024 * 1024,
     stage: str = "recognition",
     tessdata_dir: str | None = None,
+    path: str | None = None,
     cancel_event=None,
     env: dict[str, str] | None = None,
     stdin: Path | None = None,
@@ -259,7 +283,7 @@ def run_tool(
                 stderr=err,
                 # Never the caller's folder, where Windows would look for a program's libraries.
                 cwd=temp,
-                env=environment(temp, tessdata_dir) if env is None else env,
+                env=environment(temp, tessdata_dir, path=path) if env is None else env,
                 **({"creationflags": SUSPENDED} if WINDOWS else {}),
             )
         except OSError as exc:
@@ -464,7 +488,7 @@ def group_rss(pid: int) -> int:
                 continue
             try:
                 fields = (entry / "stat").read_text().rsplit(")", 1)[1].split()
-                if int(fields[2]) == pid:
+                if int(fields[3]) == pid:
                     total += max(0, int(fields[21])) * os.sysconf("SC_PAGE_SIZE")
             except (FileNotFoundError, ProcessLookupError):
                 continue  # A process disappeared between enumeration and measurement.

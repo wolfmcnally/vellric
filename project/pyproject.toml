@@ -1,6 +1,6 @@
 [project]
 name = "vellric"
-version = "0.2.5"
+version = "0.2.6"
 description = "Independent local PDF inspection, fidelity conversion, rendering and OCR."
 requires-python = ">=3.12"
 license = "AGPL-3.0-only"
@@ -12,6 +12,7 @@ dependencies = ["pymupdf==1.28.2", "pillow==12.3.0", "conric @ git+https://githu
 [project.optional-dependencies]
 ocr = ["ocrmypdf==17.7.0"]
 vision = ["anthropic==1.12.0"]
+bedrock = ["botocore==1.44.4"]
 
 [project.scripts]
 vellric = "vellric.cli:main"

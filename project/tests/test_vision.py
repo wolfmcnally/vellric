@@ -3,13 +3,19 @@ from __future__ import annotations
 import base64
 import json
 import os
+import select
 import subprocess
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from unittest.mock import Mock
 
 import pymupdf
 import pytest
+from PIL import Image
+
+from vellric import broker, cli, vision
+from vellric.runtime import JobError
 
 SECRET = "sk-test-0123456789-never-published"
 # Windows starts the stand-in program through a command file of the same name.
@@ -58,6 +64,7 @@ def adapter(tmp_path, name, replies, key="VELLRIC_VISION_PAGE"):
     script.write_text(
         f"#!{sys.executable}\n"
         "import json, os, sys, time\n"
+        "assert 'VELLRIC_TEST_COMMAND_ENV_DENIED' not in os.environ\n"
         "assert open(sys.argv[1], 'rb').read(8) == b'\\x89PNG\\r\\n\\x1a\\n'\n"
         "told = sys.stdin.read()\n"
         "assert told.startswith('You are the page-transcription stage'), told\n"
@@ -255,6 +262,8 @@ def test_hosted_provider_request_custody_and_typed_refusals(
         told, expected = body["system"][0]["text"], "Bedrock read.\n"
         # The key's access to the model was checked before the page was sent.
         assert [seen[0] for seen in Provider.seen] == [path, path]
+        assert Provider.seen[0][2]["inferenceConfig"] == {"maxTokens": 64}
+        assert "inferenceConfig" not in body
     assert base64.b64decode(image).startswith(b"\x89PNG")
     assert kind == "bedrock" or body["model"] == "ok"
     # The model is told what the tool is doing and only the declarations the user made.
@@ -516,3 +525,511 @@ def test_vision_settings_refuse_before_any_work(tmp_path, pdf, monkeypatch):
         code, status = job(pdf, out, *arguments)
         assert (code, status["code"]) == (2, "usage") and not out.exists(), arguments
         assert reason in status["message"], (arguments, status["message"])
+
+
+def broker_args(tmp_path, script, *, pass_fds=(), probe=False, pages="2", allow=True):
+    settings = tmp_path / "broker.json"
+    settings.write_text(
+        json.dumps(
+            {
+                "vellric": {
+                    "allow_brokered": allow,
+                    "ocr": {"mode": "never", "preflight": "off", "jobs": 3},
+                    "vision": {
+                        "provider": "bedrock",
+                        "region": "us-west-2",
+                        "model": "amazon.nova-lite-v1:0",
+                        "transport": "command",
+                        "probe": probe,
+                        "pages": pages,
+                        "command": {
+                            "argv": [sys.executable, "-I", "-c", script],
+                            "pass_fds": pass_fds,
+                        },
+                        "command_env": ["BROKER_TEST_ALLOWED"],
+                        "limits": {
+                            "max_concurrency": 1,
+                            "max_output_tokens": 9,
+                            "max_image_bytes": 4096,
+                            "max_image_side_px": 128,
+                        },
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    return ["--config", str(settings)]
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX pass_fds")
+@pytest.mark.parametrize("no_probe", [False, True])
+def test_broker_fd_custody_through_the_cli(tmp_path, pdf, monkeypatch, no_probe):
+    import fcntl
+
+    monkeypatch.setenv("BROKER_TEST_ALLOWED", "synthetic")
+    monkeypatch.setenv("BROKER_TEST_EXCLUDED", "sentinel")
+    with (tmp_path / "listed").open("w+b") as listed, (tmp_path / "other").open("w+b") as other:
+        listed.write(b"listed")
+        listed.flush()
+        other.write(b"unlisted")
+        other.flush()
+        selected = fcntl.fcntl(listed, fcntl.F_DUPFD_CLOEXEC, 100)
+        excluded = fcntl.fcntl(other, fcntl.F_DUPFD_CLOEXEC, 110)
+        script = f"""
+import base64, json, os, struct, sys
+from pathlib import Path
+assert os.pread({selected}, 20, 0) == b'listed'
+try:
+    assert os.pread({excluded}, 20, 0) != b'unlisted'
+except OSError:
+    pass
+assert os.environ['BROKER_TEST_ALLOWED'] == 'synthetic'
+assert 'BROKER_TEST_EXCLUDED' not in os.environ
+request = json.load(sys.stdin)
+assert set(request) == {{'schema', 'region', 'model', 'body'}}
+assert request['schema'] == 'bedrock-converse-request/1'
+assert request['region'] == 'us-west-2' and request['model'] == 'amazon.nova-lite-v1:0'
+body = request['body']
+block = body['messages'][0]['content'][0]
+if 'image' in block:
+    assert body['inferenceConfig']['maxTokens'] == 9
+    picture = block['image']
+    data = base64.b64decode(picture['source']['bytes'], validate=True)
+    assert len(data) <= 4096
+    if picture['format'] == 'png':
+        assert max(struct.unpack('>II', data[16:24])) <= 128
+    else:
+        assert picture['format'] == 'jpeg' and data.startswith(b'\\xff\\xd8')
+    event = 'page'
+else:
+    assert body['inferenceConfig']['maxTokens'] == 64
+    assert block == {{'text': 'Reply with the word ready.'}}
+    event = 'probe'
+with Path({str(tmp_path / "events")!r}).open('a') as log:
+    log.write(event + '\\n')
+json.dump({{'schema': 'bedrock-converse-response/1', 'status': 'ok', 'body': {{
+    'stopReason': 'end_turn', 'output': {{'message': {{
+        'role': 'assistant', 'content': [{{'text': 'Recognized text.'}}]
+    }}}}
+}}}}, sys.stdout)
+"""
+        try:
+            out = tmp_path / "out"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "vellric",
+                    "convert",
+                    str(pdf),
+                    "--out",
+                    str(out),
+                    "--status-json",
+                    "--progress",
+                    "none",
+                    *broker_args(tmp_path, script, pass_fds=[selected], probe=True),
+                    *(["--no-vision-probe"] if no_probe else []),
+                ],
+                pass_fds=(selected, excluded),
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        finally:
+            os.close(selected)
+            os.close(excluded)
+    assert result.returncode == 0, result.stdout + result.stderr
+    expected_events = ["page"] if no_probe else ["probe", "page"]
+    assert (tmp_path / "events").read_text().splitlines() == expected_events
+    assert (out / "pages/000002/vision.md").read_text() == "Recognized text.\n"
+    assert b"BROKER_TEST_ALLOWED" not in bundle_bytes(out)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX pass_fds")
+@pytest.mark.parametrize("allow", [False, True])
+def test_broker_refuses_before_input_and_spawn(tmp_path, monkeypatch, capsys, allow):
+    def unexpected(*args, **kwargs):
+        pytest.fail("input or subprocess accessed with a missing broker descriptor")
+
+    monkeypatch.setattr(cli, "snapshot", unexpected)
+    monkeypatch.setattr(cli.subprocess, "Popen", unexpected)
+    fstat = os.fstat
+
+    def closed(fd):
+        if fd == 255:
+            raise OSError("closed")
+        return fstat(fd)
+
+    monkeypatch.setattr(cli.os, "fstat", closed)
+    assert (
+        cli.main(
+            [
+                "convert",
+                "missing.pdf",
+                "--out",
+                str(tmp_path / "out"),
+                "--status-json",
+                *broker_args(tmp_path, "raise AssertionError", pass_fds=[255], allow=allow),
+            ]
+        )
+        == 2
+    )
+    status = json.loads(capsys.readouterr().out)
+    assert status["stage"] == "settings"
+    assert status["message"] == (
+        "A required broker descriptor is closed"
+        if allow
+        else "Bedrock command transport requires allow_brokered"
+    )
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX process groups")
+@pytest.mark.parametrize("probe", [False, True])
+def test_broker_failure_never_uses_cloud(tmp_path, monkeypatch, probe):
+    def unexpected(*args, **kwargs):
+        pytest.fail("broker failure attempted a cloud transport")
+
+    monkeypatch.setattr(vision, "_post", unexpected)
+    monkeypatch.setattr(vision, "signing_credentials", unexpected)
+    script = """import json, sys
+json.load(sys.stdin)
+json.dump({'schema': 'bedrock-converse-response/1', 'status': 'error',
+           'category': 'throttled'}, sys.stdout)
+"""
+    settings = {
+        "provider": "bedrock",
+        "transport": "command",
+        "region": "us-west-2",
+        "model": "amazon.nova-lite-v1:0",
+        "max_output_tokens": 5,
+        "limits": {},
+        "command": {"argv": [sys.executable, "-I", "-c", script], "pass_fds": []},
+        "declarations": [],
+        "env": {},
+    }
+    picture = tmp_path / "page.png"
+    Image.new("RGB", (8, 8)).save(picture)
+    with pytest.raises(JobError) as caught:
+        if probe:
+            vision.probe(settings, timeout=5, temp=tmp_path)
+        else:
+            vision.transcribe(picture, 1, settings, timeout=5, temp=tmp_path)
+    assert caught.value.code == "vision-operational"
+    assert caught.value.details == {"category": "throttled"}
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        b"\xff",
+        b"{}{}",
+        b'{"schema":"bedrock-converse-response/1","status":"error","category":"refused","text":"x"}',
+        b'{"schema":"bedrock-converse-response/1","status":"ok","body":{"stopReason":"end_turn"}}',
+    ],
+)
+def test_broker_rejects_malformed_response(raw):
+    with pytest.raises(JobError) as caught:
+        broker.decode(raw, 1)
+    assert caught.value.details == {"category": "invalid"}
+
+
+def test_bedrock_image_respects_encoded_bytes_and_dimensions(tmp_path):
+    picture = tmp_path / "page.png"
+    Image.new("RGB", (100, 64), "red").save(picture)
+    kind, payload = vision._bedrock_image(
+        picture, {"max_image_bytes": 1000, "max_image_side_px": 32}, 1
+    )
+    assert kind == "jpeg" and len(payload) <= 1000
+    with pytest.raises(JobError, match="exceeds"):
+        vision._bedrock_image(picture, {"max_image_bytes": 1}, 1)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX process groups")
+def test_broker_timeout_kills_descendants(tmp_path):
+    read_fd, write_fd = os.pipe()
+    script = f"""
+import json, os, sys, time
+json.load(sys.stdin)
+if os.fork() == 0:
+    os.write({write_fd}, b'alive')
+time.sleep(60)
+"""
+    settings = {
+        "region": "us-west-2",
+        "model": "amazon.nova-lite-v1:0",
+        "env": {},
+        "command": {"argv": [sys.executable, "-I", "-c", script], "pass_fds": [write_fd]},
+    }
+    try:
+        with pytest.raises(JobError) as caught:
+            broker.converse(settings, {}, 1, 1.5, tmp_path, None)
+        assert caught.value.details == {"category": "unavailable"}
+        os.close(write_fd)
+        write_fd = None
+        assert select.select([read_fd], [], [], 2)[0] == [read_fd]
+        assert os.read(read_fd, 10) == b"alive"
+        assert select.select([read_fd], [], [], 2)[0] == [read_fd]
+        assert os.read(read_fd, 10) == b""
+    finally:
+        os.close(read_fd)
+        if write_fd is not None:
+            os.close(write_fd)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX process groups")
+def test_broker_stdout_limit_is_enforced(tmp_path, monkeypatch):
+    monkeypatch.setattr(broker, "RESPONSE_LIMIT", 64)
+    settings = {
+        "region": "us-west-2",
+        "model": "amazon.nova-lite-v1:0",
+        "env": {},
+        "command": {
+            "argv": [sys.executable, "-I", "-c", "import sys; sys.stdin.read(); print('x' * 65)"],
+            "pass_fds": [],
+        },
+    }
+    with pytest.raises(JobError) as caught:
+        broker.converse(settings, {}, 1, 5, tmp_path, None)
+    assert caught.value.details == {"category": "limit"}
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX process groups")
+def test_broker_concurrency_caps_page_jobs(tmp_path, pdf):
+    script = """
+import fcntl, json, sys, time
+with open('helper-lock', 'a') as lock:
+    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    assert 'image' in json.load(sys.stdin)['body']['messages'][0]['content'][0]
+    time.sleep(0.15)
+    json.dump({'schema': 'bedrock-converse-response/1', 'status': 'ok', 'body': {
+        'stopReason': 'end_turn', 'output': {'message': {
+            'role': 'assistant', 'content': [{'text': 'Recognized text.'}],
+        }},
+    }}, sys.stdout)
+"""
+    out = tmp_path / "out"
+    code, status = job(pdf, out, *broker_args(tmp_path, script, pages="1-3"))
+    assert code == 0, status
+    assert len(list(out.glob("pages/*/vision.md"))) == 3
+
+
+def test_sigv4_signs_only_the_selected_bedrock_request(tmp_path, monkeypatch):
+    pytest.importorskip("botocore")
+
+    def post(url, body, headers, page, timeout):
+        assert url == (
+            "https://bedrock-runtime.us-west-2.amazonaws.com/model/amazon.nova-lite-v1%3A0/converse"
+        )
+        assert "/us-west-2/bedrock/aws4_request" in headers["Authorization"]
+        assert headers["X-Amz-Security-Token"] == "test-session-token"
+        assert json.loads(body)["inferenceConfig"] == {"maxTokens": 5}
+        return {}
+
+    monkeypatch.setattr(vision, "_post", post)
+    assert (
+        vision._converse(
+            {
+                "region": "us-west-2",
+                "model": "amazon.nova-lite-v1:0",
+                "transport": "sigv4",
+                "base_url": "https://bedrock-runtime.us-west-2.amazonaws.com",
+                "sigv4": ["test-key", "test-secret", "test-session-token"],
+                "max_output_tokens": 5,
+            },
+            {"messages": []},
+            1,
+            2,
+            temp=tmp_path,
+        )
+        == {}
+    )
+
+
+def test_markdown_command_receives_only_allowlisted_caller_variables(tmp_path, pdf, monkeypatch):
+    monkeypatch.setenv("VELLRIC_TEST_COMMAND_ENV_ALLOWED", "accepted")
+    monkeypatch.setenv("VELLRIC_TEST_COMMAND_ENV_DENIED", "excluded")
+    executable = adapter(
+        tmp_path,
+        "allowlisted",
+        {"accepted": "Filtered environment."},
+        key="VELLRIC_TEST_COMMAND_ENV_ALLOWED",
+    )
+    out = tmp_path / "out"
+    code, status = job(
+        pdf,
+        out,
+        "--vision-provider",
+        "command",
+        "--vision-command",
+        str(executable),
+        "--vision-command-env",
+        "VELLRIC_TEST_COMMAND_ENV_ALLOWED",
+        "--vision-pages",
+        "2",
+        "--ocr",
+        "never",
+    )
+    assert code == 0, status
+    assert (out / "pages/000002/vision.md").read_text() == "Filtered environment.\n"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX executable alias")
+def test_broker_preserves_configured_executable_alias(tmp_path):
+    alias = tmp_path / "venv-python"
+    alias.symlink_to(sys.executable)
+    config = tmp_path / "alias.json"
+    config.write_text(
+        json.dumps(
+            {
+                "vellric": {
+                    "allow_brokered": True,
+                    "vision": {
+                        "provider": "bedrock",
+                        "transport": "command",
+                        "region": "us-west-2",
+                        "model": "amazon.nova-lite-v1:0",
+                        "command": {"argv": [str(alias)]},
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    options = vars(
+        cli.parser().parse_args(
+            [
+                "convert",
+                "input",
+                "--out",
+                "out",
+                "--config",
+                str(config),
+            ]
+        )
+    )
+    cli.validate_options(options)
+    assert options["vision_command"]["argv"][0] == str(alias)
+
+
+def test_reaping_ignores_missing_or_foreign_broker_groups(tmp_path, monkeypatch):
+    for group in (101, 102, 103):
+        (tmp_path / f".broker-{group}").touch()
+    monkeypatch.setattr(
+        broker, "group_alive", lambda group, session: (group, session) == (102, 101)
+    )
+    killed = []
+    monkeypatch.setattr(broker, "kill_group", killed.append)
+    broker.reap_groups(tmp_path, 101)
+    assert killed == [102]
+
+
+def test_macos_broker_watchdog_counts_owned_subgroups(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli.sys, "platform", "darwin")
+    monkeypatch.setattr(cli, "group_rss", {10: 100, 11: 250, 12: 50}.__getitem__)
+
+    def active_groups(work, session):
+        assert (work, session) == (tmp_path, 10)
+        return iter((11, 12))
+
+    monkeypatch.setattr(broker, "active_groups", active_groups)
+    assert cli.supervised_rss(10, tmp_path, brokered=True) == 400
+    assert cli.supervised_rss(10, tmp_path, brokered=False) == 100
+
+
+def test_broker_observation_errors_report_dependency_unavailable(tmp_path, monkeypatch):
+    def denied(*args):
+        raise OSError("synthetic observer failure")
+
+    monkeypatch.setattr(cli.sys, "platform", "darwin")
+    monkeypatch.setattr(cli, "group_rss", lambda group: 100)
+    monkeypatch.setattr(broker, "active_groups", denied)
+    with pytest.raises(JobError) as caught:
+        cli.supervised_rss(10, tmp_path, brokered=True)
+    assert (caught.value.code, caught.value.stage) == ("dependency-unavailable", "supervision")
+
+    process = Mock(pid=100)
+    process.poll.return_value = 0
+    monkeypatch.setattr(broker, "group_alive", denied)
+    monkeypatch.setattr(broker.subprocess, "Popen", lambda *args, **kwargs: process)
+    monkeypatch.setattr(broker, "exchange", lambda *args: b"{}")
+    marker = tmp_path / ".broker-100"
+    marker.touch()
+    settings = {
+        "region": "us-west-2",
+        "model": "amazon.nova-lite-v1:0",
+        "env": {},
+        "command": {"argv": [sys.executable], "pass_fds": []},
+    }
+    with pytest.raises(JobError) as caught:
+        broker.converse(settings, {}, 1, 1, tmp_path, None)
+    assert (caught.value.code, caught.value.stage) == ("dependency-unavailable", "vision")
+    process.wait.assert_called_once()
+    process.stdin.close.assert_called_once()
+    process.stdout.close.assert_called_once()
+    assert marker.exists()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX process groups")
+@pytest.mark.parametrize("worker_succeeds", [True, False])
+def test_broker_reap_failure_preserves_publication_boundary(
+    tmp_path, pdf, monkeypatch, capsys, worker_succeeds
+):
+    response = {"schema": "bedrock-converse-response/1"}
+    if worker_succeeds:
+        response.update(
+            status="ok",
+            body={
+                "stopReason": "end_turn",
+                "output": {"message": {"role": "assistant", "content": [{"text": "Read."}]}},
+            },
+        )
+    else:
+        response.update(status="error", category="refused")
+    script = f"import sys; sys.stdin.read(); print({json.dumps(response)!r})"
+    calls = []
+
+    def denied(work, group):
+        calls.append(group)
+        raise OSError("synthetic broker observation fault")
+
+    monkeypatch.setattr(cli, "supervised_rss", lambda *args, **kwargs: 0)
+    monkeypatch.setattr(broker, "active_groups", denied)
+    out = tmp_path / "out"
+    result = cli.main(
+        [
+            "convert",
+            str(pdf),
+            "--out",
+            str(out),
+            "--status-json",
+            "--progress",
+            "none",
+            *broker_args(tmp_path, script),
+        ]
+    )
+    assert result != 0
+    status = json.loads(capsys.readouterr().out)
+    expected = (
+        ("dependency-unavailable", "supervision")
+        if worker_succeeds
+        else (
+            "vision-refused",
+            "vision",
+        )
+    )
+    assert (status["code"], status["stage"]) == expected
+    assert calls and not out.exists()
+    assert not list(tmp_path.glob(".out.vellric-*"))
+
+
+def test_signing_credentials_only_wraps_expected_provider_failures(monkeypatch):
+    session = pytest.importorskip("botocore.session")
+    exceptions = pytest.importorskip("botocore.exceptions")
+    get_credentials = Mock(side_effect=exceptions.ProfileNotFound(profile="synthetic"))
+    monkeypatch.setattr(session, "Session", lambda: Mock(get_credentials=get_credentials))
+    with pytest.raises(JobError, match="signing credentials are unavailable"):
+        vision.signing_credentials(explicit_config=False)
+    get_credentials.side_effect = RuntimeError("synthetic programming error")
+    with pytest.raises(RuntimeError, match="synthetic programming error"):
+        vision.signing_credentials(explicit_config=False)

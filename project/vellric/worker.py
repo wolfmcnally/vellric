@@ -7,7 +7,6 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
-import mimetypes
 import shutil
 import sys
 import threading
@@ -191,8 +190,18 @@ TESSERACT_RELEASE = "5.5.3" if WINDOWS else "5.5.2"
 QUALIFIED_TESSERACT = (
     f"tesseract v{TESSERACT_RELEASE}.20260724" if WINDOWS else f"tesseract {TESSERACT_RELEASE}"
 )
-# The built-in table alone: the system's own registrations differ from machine to machine.
-MEDIA_TYPES = mimetypes.MimeTypes()
+MEDIA_TYPES = {
+    ".csv": "text/csv",
+    ".jpeg": "image/jpeg",
+    ".jpg": "image/jpeg",
+    ".json": "application/json",
+    ".md": "text/markdown",
+    ".pdf": "application/pdf",
+    ".png": "image/png",
+    ".pnm": "image/x-portable-anymap",
+    ".tsv": "text/tab-separated-values",
+    ".txt": "text/plain",
+}
 
 
 def preflight(
@@ -226,6 +235,7 @@ def preflight(
         code="ocr-preflight-refused",
         stage="preflight",
         tessdata_dir=options.get("tessdata_dir"),
+        path=options.get("path"),
     )
     inspection = pdf_tools.page_texts(out)
     if inspection.page_count != count:
@@ -326,6 +336,16 @@ def execute(config: dict) -> dict:
             )
         reading = config.get("vision") if options["command"] == "convert" else None
         vision_pages = []
+        vision_timeout = options["page_timeout_seconds"]
+        vision_jobs = options["jobs"]
+        vision_side = options.get("vision_max_side")
+        if reading and reading["provider"] == "bedrock":
+            limits = reading["limits"]
+            vision_timeout = min(vision_timeout, limits.get("timeout_seconds", vision_timeout))
+            vision_jobs = min(vision_jobs, limits.get("max_concurrency", vision_jobs))
+            vision_side = min(
+                vision_side, limits.get("max_image_side_px", vision.BEDROCK_MAX_IMAGE_SIDE)
+            )
         if reading:
             vision_pages = (
                 page_range(options["vision_pages"], count)
@@ -342,9 +362,9 @@ def execute(config: dict) -> dict:
                 else []
             )
             prompt_identity = vision.prompt_sha256(reading["declarations"])
-            if vision_pages and reading["provider"] == "bedrock":
+            if vision_pages and reading["provider"] == "bedrock" and reading["probe"]:
                 for candidate in readers:
-                    vision.probe(candidate, timeout=options["page_timeout_seconds"])
+                    vision.probe(candidate, timeout=vision_timeout, temp=work)
         derivative_kind = None
         engine_facts = {}
         if prior and isinstance(prior.get("engines"), dict):
@@ -360,6 +380,8 @@ def execute(config: dict) -> dict:
                 language=options["language"],
                 tessdata_dir=options.get("tessdata_dir"),
                 include_osd=options["preflight"] == "on",
+                path=options.get("path"),
+                temp_dir=str(work),
             )
         if selected:
             if engine_facts.get("missing_languages"):
@@ -413,6 +435,7 @@ def execute(config: dict) -> dict:
                         timeout=options["page_timeout_seconds"],
                         diagnostics=root / "diagnostics" if options["diagnostics"] else None,
                         tessdata_dir=options.get("tessdata_dir"),
+                        path=options.get("path"),
                         cancel_event=cancel_event,
                     )
                 except JobError as exc:
@@ -508,7 +531,7 @@ def execute(config: dict) -> dict:
                 width, height = pdf_tools.page_size(source, number)
                 dpi = min(
                     float(options["dpi"]),
-                    options["vision_max_side"] * 72 / max(width, height, 1.0),
+                    vision_side * 72 / max(width, height, 1.0),
                 )
                 native_text = inspection.page_texts[number - 1]
                 reference = (
@@ -529,7 +552,7 @@ def execute(config: dict) -> dict:
                                 image,
                                 number,
                                 reader_settings,
-                                timeout=options["page_timeout_seconds"],
+                                timeout=vision_timeout,
                                 temp=work,
                                 cancel_event=vision_cancel,
                             )
@@ -599,7 +622,7 @@ def execute(config: dict) -> dict:
                     "attempts": attempts,
                 }
 
-            with ThreadPoolExecutor(max_workers=options["jobs"]) as pool:
+            with ThreadPoolExecutor(max_workers=vision_jobs) as pool:
                 futures = [pool.submit(read, number) for number in vision_pages]
                 try:
                     for done, future in enumerate(as_completed(futures), 1):
@@ -804,14 +827,23 @@ def execute(config: dict) -> dict:
                 "min_agreement": options["vision_min_agreement"],
                 "base_url": reading["base_url"],
                 "prompt_sha256": prompt_identity,
-                "max_side": options["vision_max_side"],
+                "max_side": vision_side,
                 "max_output_tokens": reading["max_output_tokens"],
                 "cross_check": options["vision_cross_check"],
             }
-            if reading["provider"] == "command":
+            if reading["provider"] == "bedrock":
+                fingerprint_extra["vision"].update(
+                    transport=reading["transport"],
+                    region=reading["region"],
+                    limits=reading["limits"],
+                    probe=reading["probe"],
+                )
+            command = reading.get("command")
+            if command:
+                executable = Path(command["argv"][0] if isinstance(command, dict) else command)
                 fingerprint_extra["vision"]["command"] = {
-                    "name": Path(reading["command"]).name,
-                    "sha256": digest(Path(reading["command"])),
+                    "name": executable.name,
+                    "sha256": digest(executable),
                 }
         if prior:
             earlier = prior.get("provenance")
@@ -826,8 +858,7 @@ def execute(config: dict) -> dict:
                         "path": path.relative_to(root).as_posix(),
                         "size": path.stat().st_size,
                         "sha256": digest(path),
-                        "media_type": MEDIA_TYPES.guess_type(path.name)[0]
-                        or "application/octet-stream",
+                        "media_type": MEDIA_TYPES.get(path.suffix, "application/octet-stream"),
                     }
                 )
         manifest = {
@@ -854,6 +885,7 @@ def execute(config: dict) -> dict:
                     "password_file",
                     "password_stdin",
                     "temp_dir",
+                    "path",
                     "tessdata_dir",
                     "vision_command",
                     "vision_api_key_env",
@@ -966,11 +998,10 @@ def execute(config: dict) -> dict:
 
 def main() -> int:
     config = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-    if config.get("vision"):
-        # Provider settings and their secret arrive on a pipe and never touch the disk.
-        config["vision"] = json.loads(sys.stdin.buffer.read())
     result = Path(config["result"])
     try:
+        # The supervisor sends passwords and provider credentials through this private pipe.
+        config.update(json.load(sys.stdin.buffer))
         manifest = execute(config)
         status = {
             "schema": "vellric.status/1.0",
