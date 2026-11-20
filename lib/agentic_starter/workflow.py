@@ -16,7 +16,7 @@ from typing import Any
 ROLES = ("planner", "reviewer", "coder", "critic")
 BUILTIN_TARGETS = {
     "astra": ("codex", "gpt-6-astra"),
-    "sol": ("codex", "gpt-6-sol"),
+    "sol": ("codex", "gpt-6.1-sol"),
     "terra": ("codex", "gpt-5.6-terra"),
     "luna": ("codex", "gpt-6-luna"),
     "fable": ("claude", "fable"),
@@ -29,8 +29,8 @@ DEFAULT_WORKFLOW = {
     "eligible_primary_models": ["opus", "sol", "fable", "astra"],
     "review_preference": "cross-vendor",
     "adviser_models": {
-        "claude": {"reviewer": ["astra"], "critic": ["astra"]},
-        "codex": {"reviewer": ["fable"], "critic": ["fable"]},
+        "claude": {"reviewer": ["sol"], "critic": ["sol"]},
+        "codex": {"reviewer": ["opus"], "critic": ["opus"]},
     },
     "allowed_harnesses": ["claude", "codex"],
     "targets": {},
@@ -255,14 +255,17 @@ def usage_windows(
     block = snapshot.get(deployment["provider"])
     if not isinstance(block, dict) or block.get("ok") is not True:
         raise WorkflowError(f"llm-usage failed for {deployment['provider']}")
+    # The tool caches its readings to stay inside its provider's rate limits,
+    # so a cached reading is accepted at whatever age the tool serves it. Only
+    # an age that is not a real, non-negative number refuses.
     age = block.get("cache_age_seconds")
     if age is not None and (
         not isinstance(age, (int, float))
         or isinstance(age, bool)
         or not math.isfinite(age)
-        or age > 900
+        or age < 0
     ):
-        raise WorkflowError("llm-usage snapshot is stale or has invalid cache age")
+        raise WorkflowError("llm-usage reported an invalid cache age")
     windows = block.get("windows")
     if not isinstance(windows, dict) or not windows:
         raise WorkflowError("llm-usage has no applicable window data")
@@ -307,7 +310,9 @@ def usage_windows(
         active = window.get("is_active")
         if active is not None and not isinstance(active, bool):
             raise WorkflowError("invalid usage window activity")
-        if active is False:
+        # A provider's activity flag never removes a shared account limit: it can
+        # mark the general windows inactive while a model-scoped one is active.
+        if active is False and not shared:
             continue
         percent, duration = window.get("utilization"), window.get("window_seconds")
         if (

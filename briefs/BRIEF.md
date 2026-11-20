@@ -222,7 +222,7 @@ Drawbridge keeps its own model stages, credentials and cost policy. This pass se
 
 ## Catalog
 
-See [project guidance](../CLAUDE.md#project-briefs) for this brief and the inherited methodology references. The local seed/setup checklist follows the compact acceptance sequence above; the release and consumer qualification steps bind exact candidate artifacts.
+See [project guidance](../AGENTS.md#project-briefs) for this brief and the inherited methodology references. The local seed/setup checklist follows the compact acceptance sequence above; the release and consumer qualification steps bind exact candidate artifacts.
 
 
 ## Native identity and derivative capabilities

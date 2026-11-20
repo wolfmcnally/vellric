@@ -28,7 +28,8 @@ def job(source, out, *args):
         + ["--preflight", "off", "--progress", "none", "--status-json", *args],
         capture_output=True,
         text=True,
-        timeout=60,
+        # A hang guard, not a speed check: a loaded machine runs parallel workers.
+        timeout=300,
     )
     return result.returncode, json.loads(result.stdout)
 

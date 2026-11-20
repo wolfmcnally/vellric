@@ -7,7 +7,7 @@ import sys
 
 import pymupdf
 import pytest
-from conftest import EXPECTED
+from rich_document import EXPECTED
 
 from vellric import cli, pdf_tools, runtime
 from vellric.fidelity import native_section, words

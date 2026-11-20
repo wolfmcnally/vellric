@@ -3,9 +3,13 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
 import shlex
+import shutil
+import stat
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -15,18 +19,445 @@ sys.path.insert(0, str(REPO_ROOT / "lib"))
 
 import agentic_starter.test_governance as governance  # noqa: E402
 
+EVIDENCE = {
+    "contract": "The fixture contract holds.",
+    "oracle": "A direct call observes the fixture outcome.",
+    "red_witness": "Removing the behavior makes the proof fail.",
+    "nearest_overlap": "None in this fixture.",
+    "replacement_evidence": "The named replacement covers the same contract.",
+    "rationale": "Fixture estate.",
+}
+SAMPLE = "pytest:tests/test_sample.py::"
 
-def test_live_reset_validates() -> None:
-    summary = governance.validate(REPO_ROOT)
-    assert summary["state"] == "valid"
-    current = json.loads((REPO_ROOT / "reports/test-governance/vellric-current.json").read_text())
-    assert governance.inventory(REPO_ROOT)["counts"] == current["counts"]
-    assert governance.inventory(REPO_ROOT)["by_kind"] == current["by_kind"]
-    assert summary["dispositions"]["delete"] > 0
-    assert summary["dispositions"]["consolidate"] > 0
+
+def _proof(node: str) -> dict[str, str]:
+    kind = node.split(":", 1)[0]
+    selector = node.removeprefix("pytest:") if kind == "pytest" else node
+    if kind == "gate":
+        selector = node.removeprefix("gate:")
+    family = governance._pytest_family(node) if kind == "pytest" else node
+    source = {
+        "pytest": selector.split("::", 1)[0],
+        "gate": "bin/check:1",
+        "hook": ".githooks/pre-commit:1",
+    }[kind]
+    return {"id": node, "family": family, "kind": kind, "selector": selector, "source_path": source}
 
 
-def test_size_ceilings_and_lane_budget_survive_timing_noise(
+def _write_estate(root: Path, *, pruned: bool) -> Path:
+    """A whole small repository the manager can inventory, with its own reset history.
+
+    Pruned, it is an estate with a past: a baseline proof deleted, one consolidated,
+    one admitted later with its witness receipt, and one retired later. Unpruned, it is
+    what a new repository has: every baseline proof retained and nothing yet witnessed.
+    """
+    files = {
+        "tests/test_sample.py": (
+            "import pytest\n\n\ndef test_kept():\n    pass\n\n\n"
+            '@pytest.mark.parametrize("case", [1, 2])\ndef test_cases(case):\n    pass\n\n\n'
+            "def test_admitted():\n    pass\n"
+        ),
+        "project/tests/test_product.py": "def test_product():\n    pass\n",
+        "bin/check": "run_gate policy-sample ./bin/sample\n",
+        ".githooks/pre-commit": "./bin/check-sample\n",
+        "bin/python": f'#!/bin/sh\nexec {shlex.quote(sys.executable)} "$@"\n',
+    }
+    for name, text in files.items():
+        (root / name).parent.mkdir(parents=True, exist_ok=True)
+        (root / name).write_text(text)
+    (root / "bin/python").chmod(0o755)
+
+    live = [
+        SAMPLE + "test_kept",
+        SAMPLE + "test_cases[1]",
+        SAMPLE + "test_cases[2]",
+        "pytest:project/tests/test_product.py::test_product",
+        "gate:policy-sample",
+        "hook:.githooks/pre-commit:./bin/check-sample",
+    ]
+    admitted = SAMPLE + "test_admitted"
+    gone = [SAMPLE + name for name in ("test_deleted", "test_folded", "test_retired")]
+    proofs = [_proof(node) for node in ([*live, *gone] if pruned else [*live, admitted])]
+    baseline: dict[str, object] = {
+        "schema": governance.BASELINE_SCHEMA,
+        "counts": {
+            "families": len({proof["family"] for proof in proofs}),
+            "leaves": len(proofs),
+        },
+        "proofs": proofs,
+    }
+    digest = hashlib.sha256(
+        json.dumps(baseline, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    baseline["inventory_sha256"] = digest
+
+    def row(record_type: str, node: str, disposition: str, replacement: str | None) -> dict:
+        return {
+            "record_type": record_type,
+            "proof_id": node,
+            "disposition": disposition,
+            "replacement": replacement,
+            "baseline_inventory_sha256": digest,
+            **EVIDENCE,
+        }
+
+    ledger = [row("proof_disposition", node, "retain", node) for node in live]
+    receipts: list[dict[str, object]] = []
+    if pruned:
+        deleted, folded, retired = gone
+        ledger += [
+            row("proof_disposition", deleted, "delete", None),
+            row("proof_disposition", folded, "consolidate", live[0]),
+            row("proof_disposition", retired, "retain", retired),
+            row("proof_admission", admitted, "retain", admitted),
+            row("proof_retirement", retired, "delete", None),
+        ]
+        receipts.append(
+            {
+                "record_type": "red_witness",
+                "proof_ids": [admitted],
+                "defect": "The admitted behavior is removed.",
+                "command": "./bin/test tests/test_sample.py -q",
+                "expect": "test_admitted",
+                "paths": ["tests/test_sample.py"],
+                "mutation_sha256": "0" * 64,
+                "red_output_sha256": "1" * 64,
+                "witnessed_on": "2026-01-01",
+            }
+        )
+    else:
+        ledger.append(row("proof_disposition", admitted, "retain", admitted))
+
+    def family(name: str, kind: str, selector: str, source: str) -> dict[str, object]:
+        declared: dict[str, object] = {
+            "id": name,
+            "kind": kind,
+            "selectors": [selector],
+            "source_paths": [source],
+            "covers": [source],
+            "contract": "The fixture contract holds.",
+            "risk_class": "fixture",
+            "oracle": "A direct call observes the fixture outcome.",
+            "admission": "Fixture estate.",
+            "nearest_overlap": "None in this fixture.",
+            "tier": "changed",
+            "flake_rate": 0.0,
+            "replacement_lineage": [],
+        }
+        return declared
+
+    manifest = {
+        "schema": governance.SCHEMA,
+        "baseline_report": "reports/baseline.json",
+        "audit_ledger": "reports/reset.jsonl",
+        "witness_ledger": "reports/witnesses.jsonl",
+        "mutation": {"tool": None, "reason": "The fixture declares no mutation tool."},
+        "adoption": {"mode": "complete"},
+        "hang_timeout_seconds": 1800,
+        "critical_risks": {
+            "custody": {"state": "applicable", "direct_proof": live[0]},
+            "deploy": {
+                "state": "not-applicable",
+                "rationale": "The fixture deploys nothing.",
+                "activation_trigger": "A deploy surface is added.",
+            },
+        },
+        "families": [
+            family("sample", "pytest", "tests/test_sample.py", "tests/test_sample.py"),
+            family(
+                "product",
+                "pytest",
+                "project/tests/test_product.py",
+                "project/tests/test_product.py",
+            ),
+            family("gates", "gate", "policy-sample", "bin/check"),
+            family("hooks", "hook", "hook:.githooks/pre-commit:*", ".githooks/pre-commit"),
+        ],
+    }
+    (root / "reports").mkdir()
+    (root / "tests/proof-estate.yaml").write_text(json.dumps(manifest))
+    (root / "reports/baseline.json").write_text(json.dumps(baseline))
+    for name, rows in (("reset.jsonl", ledger), ("witnesses.jsonl", receipts)):
+        (root / "reports" / name).write_text("".join(json.dumps(item) + "\n" for item in rows))
+    return root
+
+
+@pytest.fixture(scope="module")
+def estate():
+    storage = REPO_ROOT / ".kickoff/proof-runtime"
+    storage.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="estate-", dir=storage) as directory:
+        yield _write_estate(Path(directory), pruned=True)
+
+
+def test_admit_records_a_proof_only_after_seeing_it_fail_and_restoring_the_tree(
+    estate: Path, tmp_path: Path
+) -> None:
+    """Admission: admitting one test took a begin, a hand edit, a finish and an authoring call.
+
+    The single command is run against a copy of a valid estate; the oracle is the estate's
+    own validator plus the exact ledger rows and file bytes left behind, for a proof that
+    is seen to fail and for one whose defect cannot be planted.
+    """
+    authored = tmp_path / "authored"
+    shutil.copytree(estate, authored)
+    (authored / "guard.txt").write_text("deny\n")
+    os.utime(authored / "guard.txt", (0, 0))
+    check = authored / "check.sh"
+    check.write_text(
+        '#!/bin/sh\ngrep -qx deny guard.txt || { echo "E GUARD OPEN"; exit 1; }\necho checked\n'
+    )
+    check.chmod(0o755)
+    audit = authored / "reports/reset.jsonl"
+    witnesses = authored / "reports/witnesses.jsonl"
+    proof = {
+        "action": "modify",
+        "proof_id": SAMPLE + "test_admitted",
+        "defect": "The guard allows instead of denying.",
+        "expect": "GUARD OPEN",
+        "command": "./check.sh",
+        "plant": {"path": "guard.txt", "replace": "deny", "with": "allow"},
+        **EVIDENCE,
+    }
+    supplied = tmp_path / "admit.json"
+    supplied.write_text(json.dumps({"proofs": [proof]}))
+    before = len(governance.load_ledger(witnesses))
+    outcome = governance.admit(authored, supplied)
+    recorded = governance.load_ledger(audit)[-1]
+    settled = (audit.read_bytes(), witnesses.read_bytes())
+    supplied.write_text(
+        json.dumps({"proofs": [{**proof, "plant": {**proof["plant"], "replace": "absent"}}]})
+    )
+    with pytest.raises(governance.GovernanceError, match="exactly once"):
+        governance.admit(authored, supplied)
+    assert (
+        outcome == {"admitted": [proof["proof_id"]], "witnessed": 1}
+        and len(governance.load_ledger(witnesses)) == before + 1
+        and recorded["record_type"] == "proof_modification"
+        and recorded["witness_receipts"] == [before + 1]
+        and (authored / "guard.txt").read_bytes() == b"deny\n"
+        and not (authored / governance.WITNESS_PENDING).exists()
+        and (audit.read_bytes(), witnesses.read_bytes()) == settled
+        and governance.validate(authored)["state"] == "valid"
+    ), "ADMIT RECORDED AN UNSEEN FAILURE, LEFT A DEFECT PLANTED OR LOST A RECEIPT"
+
+
+def test_admit_refuses_before_witnessing_and_replays_a_recorded_defect(
+    estate: Path, tmp_path: Path
+) -> None:
+    """Admission: run on part of a batch, the command witnessed and then refused, leaving
+    receipts with no decision; and a receiver had to rediscover each defect to plant.
+
+    Against a copy of a valid estate that gains a second, unadmitted proof, the oracle is
+    the witness ledger's exact bytes after a refused partial input, and then a successful
+    admission that supplies no defect because one was recorded for the proof.
+    """
+    authored = tmp_path / "authored"
+    shutil.copytree(estate, authored)
+    (authored / "guard.txt").write_text("deny\n")
+    os.utime(authored / "guard.txt", (0, 0))
+    check = authored / "check.sh"
+    check.write_text(
+        '#!/bin/sh\ngrep -qx deny guard.txt || { echo "E GUARD OPEN"; exit 1; }\necho checked\n'
+    )
+    check.chmod(0o755)
+    witnesses = authored / "reports/witnesses.jsonl"
+    supplied = tmp_path / "admit.json"
+    defect = {
+        "defect": "The guard allows instead of denying.",
+        "expect": "GUARD OPEN",
+        "command": "./check.sh",
+        "plant": {"path": "guard.txt", "replace": "deny", "with": "allow"},
+    }
+    known = {"action": "modify", "proof_id": SAMPLE + "test_admitted", **EVIDENCE}
+    arriving = {"action": "admit", "proof_id": SAMPLE + "test_arriving", **EVIDENCE}
+
+    sample = authored / "tests/test_sample.py"
+    sample.write_text(sample.read_text() + "\n\ndef test_arriving():\n    pass\n")
+    before = witnesses.read_bytes()
+    supplied.write_text(json.dumps({"proofs": [{**known, **defect}]}))
+    with pytest.raises(governance.GovernanceError, match="nothing was witnessed") as refused:
+        governance.admit(authored, supplied)
+    untouched = witnesses.read_bytes() == before and "test_arriving" in str(refused.value)
+
+    supplied.write_text(json.dumps({"proofs": [{**known, **defect}, {**arriving, **defect}]}))
+    governance.admit(authored, supplied)
+    recorded = governance.recorded_plants(authored)
+    supplied.write_text(json.dumps({"proofs": [known]}))
+    replayed = governance.admit(authored, supplied)
+    assert (
+        untouched
+        and recorded[arriving["proof_id"]]["plant"] == defect["plant"]
+        and replayed == {"admitted": [known["proof_id"]], "witnessed": 1}
+        and len(governance.load_ledger(witnesses)) == len(before.splitlines()) + 3
+        and (authored / "guard.txt").read_bytes() == b"deny\n"
+        and governance.validate(authored)["state"] == "valid"
+    ), "ADMIT WITNESSED WHAT IT COULD NOT RECORD OR LOST THE RECORDED DEFECT"
+
+
+def test_admit_records_a_catch_up_that_retires_one_proof_while_another_arrives(
+    estate: Path, tmp_path: Path
+) -> None:
+    """Catch-up: a transfer that drops a proof while another arrives could record neither
+    half alone, so three recipients each invented a way round the prescribed order.
+
+    Against a copy of a valid estate that loses one proof and gains another, the oracle is
+    each half refused when recorded without the other, with nothing witnessed, and then
+    the two recorded together by one input, leaving a valid estate.
+    """
+    authored = tmp_path / "authored"
+    shutil.copytree(estate, authored)
+    (authored / "guard.txt").write_text("deny\n")
+    os.utime(authored / "guard.txt", (0, 0))
+    check = authored / "check.sh"
+    check.write_text(
+        '#!/bin/sh\ngrep -qx deny guard.txt || { echo "E GUARD OPEN"; exit 1; }\necho checked\n'
+    )
+    check.chmod(0o755)
+    sample = authored / "tests/test_sample.py"
+    sample.write_text(
+        sample.read_text().replace('"case", [1, 2]', '"case", [1]')
+        + "\n\ndef test_arriving():\n    pass\n"
+    )
+    witnesses = authored / "reports/witnesses.jsonl"
+    audit = authored / "reports/reset.jsonl"
+    before = (witnesses.read_bytes(), audit.read_bytes())
+    arriving = {
+        "action": "admit",
+        "proof_id": SAMPLE + "test_arriving",
+        "defect": "The guard allows instead of denying.",
+        "expect": "GUARD OPEN",
+        "command": "./check.sh",
+        "plant": {"path": "guard.txt", "replace": "deny", "with": "allow"},
+        **EVIDENCE,
+    }
+    leaving = {
+        "action": "retire",
+        "proof_id": SAMPLE + "test_cases[2]",
+        "disposition": "delete",
+        "replacement": None,
+        **EVIDENCE,
+    }
+    supplied = tmp_path / "admit.json"
+    supplied.write_text(json.dumps({"proofs": [arriving]}))
+    with pytest.raises(governance.GovernanceError, match="nothing was witnessed"):
+        governance.admit(authored, supplied)
+    alone = tmp_path / "retire.json"
+    alone.write_text(json.dumps({"families": [], "records": [leaving]}))
+    with pytest.raises(governance.GovernanceError):
+        governance.author_inputs(
+            authored,
+            alone,
+            hashlib.sha256((authored / "tests/proof-estate.yaml").read_bytes()).hexdigest(),
+            hashlib.sha256(audit.read_bytes()).hexdigest(),
+        )
+    halves_refused = (witnesses.read_bytes(), audit.read_bytes()) == before
+
+    supplied.write_text(json.dumps({"proofs": [arriving], "retirements": [arriving]}))
+    with pytest.raises(governance.GovernanceError, match="retire or disposition"):
+        governance.admit(authored, supplied)
+    supplied.write_text(json.dumps({"proofs": [arriving], "retirements": [leaving]}))
+    try:
+        outcome = governance.admit(authored, supplied)
+    except governance.GovernanceError as refusal:
+        outcome = {"refused": str(refusal)}
+    kinds = [row["record_type"] for row in governance.load_ledger(audit)[-2:]]
+    assert (
+        halves_refused
+        and outcome == {"admitted": [arriving["proof_id"]], "witnessed": 1}
+        and sorted(kinds) == ["proof_admission", "proof_retirement"]
+        and (authored / "guard.txt").read_bytes() == b"deny\n"
+        and governance.validate(authored)["state"] == "valid"
+    ), "CATCH-UP COULD NOT RECORD A RETIREMENT AND AN ARRIVAL TOGETHER"
+
+
+def test_inventory_counts_synthetic_estate_families_and_leaves(estate: Path) -> None:
+    observed = governance.inventory(estate)
+    assert observed["counts"] == {"families": 6, "leaves": 7}
+    assert observed["by_kind"]["pytest"] == {"families": 4, "leaves": 5}
+
+
+def test_live_reset_validates(estate: Path, tmp_path: Path) -> None:
+    summary = governance.validate(estate)
+    assert summary["dispositions"] == {"retain": 7, "repair": 0, "consolidate": 1, "delete": 1}
+    assert (summary["admissions"], summary["post_reset_retirements"]) == (1, 1)
+    assert (summary["witness_receipts"], summary["unwitnessed_baseline"]) == (1, 6)
+    status, _ = governance._witness_run("/usr/bin/true", estate)
+    assert status == 0
+    capture_root = estate / ".kickoff/witness/captures"
+    digest = governance.load_ledger(capture_root / "index.jsonl")[0]["sha256"]
+    stored = capture_root / "retained-artifacts" / digest
+    original = stored.read_bytes()
+    assert governance.validate(estate)["state"] == "valid"
+    for changed in (b"altered observation", None):
+        if changed is None:
+            stored.unlink()
+        else:
+            stored.write_bytes(changed)
+        refused = False
+        try:
+            governance.validate(estate)
+        except governance.GovernanceError as exc:
+            refused = "witness capture invalid" in str(exc)
+        assert refused, "DURABILITY WITNESS CORRUPTION ACCEPTED"
+    stored.write_bytes(original)
+    assert governance.validate(estate)["state"] == "valid"
+    # A new repository keeps every proof it was given and has witnessed nothing yet.
+    fresh = governance.validate(_write_estate(tmp_path / "fresh", pruned=False))
+    assert fresh["state"] == "valid"
+    assert fresh["dispositions"] == {"retain": 7, "repair": 0, "consolidate": 0, "delete": 0}
+    assert (fresh["witness_receipts"], fresh["unwitnessed_baseline"]) == (0, 7)
+    authored = tmp_path / "authored"
+    shutil.copytree(estate, authored)
+    manifest_path = authored / "tests/proof-estate.yaml"
+    audit_path = authored / "reports/reset.jsonl"
+    previous_manifest, previous_audit = manifest_path.read_bytes(), audit_path.read_bytes()
+    manifest = governance.load_yaml(manifest_path)
+    family = {**manifest["families"][0], "contract": "An explicitly revised contract."}
+    supplied = tmp_path / "proof-input.json"
+    semantic = {
+        "families": [family],
+        "records": [
+            {
+                "action": "modify",
+                "proof_id": SAMPLE + "test_admitted",
+                "witness_receipts": [1],
+                **EVIDENCE,
+            }
+        ],
+    }
+    supplied.write_text(json.dumps(semantic))
+    governance.author_inputs(
+        authored,
+        supplied,
+        hashlib.sha256(previous_manifest).hexdigest(),
+        hashlib.sha256(previous_audit).hexdigest(),
+    )
+    assert (
+        governance.validate(authored)["state"] == "valid"
+        and audit_path.read_bytes().startswith(previous_audit)
+        and governance.load_ledger(audit_path)[-1]["record_type"] == "proof_modification"
+        and governance.load_yaml(manifest_path)["families"][0]["contract"] == family["contract"]
+    ), "PROOF AUTHORING LOST FAMILY OR APPEND HISTORY"
+    current_manifest, current_audit = manifest_path.read_bytes(), audit_path.read_bytes()
+    semantic["records"][0]["rationale"] = ""
+    supplied.write_text(json.dumps(semantic))
+    with pytest.raises(governance.GovernanceError):
+        governance.author_inputs(
+            authored,
+            supplied,
+            hashlib.sha256(current_manifest).hexdigest(),
+            hashlib.sha256(current_audit).hexdigest(),
+        )
+    assert (
+        manifest_path.read_bytes() == current_manifest and audit_path.read_bytes() == current_audit
+    ), "PROOF AUTHORING REFUSAL MUTATED ORIGINALS"
+    # Last, because the live estate refuses while a red witness is pending in this checkout:
+    # a defect planted to challenge this proof has to fail a fixture assertion above.
+    assert governance.validate(REPO_ROOT)["state"] == "valid"
+
+
+def test_runtime_is_diagnostic_and_stale_records_are_unmeasured(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -43,20 +474,9 @@ def test_size_ceilings_and_lane_budget_survive_timing_noise(
         for item in (node, slow)
     ]
     manifest = {
-        "families": [
-            {
-                "id": "x",
-                "kind": "pytest",
-                "selectors": ["tests/test_x.py"],
-                "size": "small",
-            }
-        ],
-        "size_ceilings_seconds": {"small": 2, "medium": 20, "large": 200},
-        "time_budget": {
-            "test_lane_seconds": 10,
-            "tolerance": 0.25,
-            "reference_machine": governance.machine_fingerprint(),
-        },
+        "families": [{"id": "x", "kind": "pytest", "selectors": ["tests/test_x.py"]}],
+        "adoption": {"mode": "complete"},
+        "hang_timeout_seconds": 1800,
     }
     monkeypatch.setattr(governance, "inventory", lambda _root: {"proofs": proofs})
     monkeypatch.setattr(governance, "load_yaml", lambda _path: copy.deepcopy(manifest))
@@ -82,51 +502,43 @@ def test_size_ceilings_and_lane_budget_survive_timing_noise(
             + "</testsuite></testsuites>"
         )
 
-    assert governance.timing(tmp_path)["reason"] == "no full-run timing record"
+    # Large elapsed times remain diagnostic, with no hidden confirming reruns.
+    def no_automatic_run(*args, **kwargs):
+        pytest.fail("timing must read existing data without running tests")
+
+    monkeypatch.setattr(governance, "_run", no_automatic_run)
+
+    assert governance.timing(tmp_path)["state"] == "unmeasured", "missing timing must be unmeasured"
+    assert governance.timing(tmp_path)["reason"] == "no full-run timing record", (
+        "missing timing must explain the missing record"
+    )
     recorded(8.0, 1.5)
     observed = governance.timing(tmp_path)
-    assert (observed["state"], observed["budget"]) == ("measured", "within")
-    assert observed["slowest"][0] == {"proof": f"pytest:{slow}", "seconds": 1.5}
-
-    # One noisy run over budget-plus-tolerance is advisory; three confirming runs fail.
-    recorded(12.6, 1.5)
-    assert governance.timing(tmp_path)["budget"].startswith("advisory")
-    runs = iter([12.6, 12.7, 12.8])
-
-    def full_run(command: list[str], _root: Path, check: bool = True):
-        recorded(next(runs), 1.5)
-        return subprocess.CompletedProcess(command, 0, "", "")
-
-    monkeypatch.setattr(governance, "_run", full_run)
-    confirmed = governance.timing(tmp_path, samples=3)
-    assert (confirmed["state"], confirmed["budget"], confirmed["samples"]) == (
-        "fail",
-        "over",
-        3,
+    assert observed["state"] == "measured", "ordinary runtime is diagnostic"
+    assert observed["slowest"][0] == {"proof": f"pytest:{slow}", "seconds": 1.5}, (
+        "report the observed leaf duration"
     )
 
-    # A budget set on one machine is never judged on another, but size ceilings still bind.
-    manifest["time_budget"]["reference_machine"] = "0" * 16
-    recorded(99.0, 2.5)
-    foreign = governance.timing(tmp_path)
-    assert foreign["budget"] == "unmeasured: this is not the reference machine"
-    assert foreign["state"] == "fail"
-    assert "over the small ceiling of 2s for family x" in foreign["size_violations"][0]
+    recorded(9999.0, 2500.0)
+    slow_report = governance.timing(tmp_path)
+    assert slow_report["state"] == "measured", "slow runtime must remain diagnostic"
+    assert slow_report["test_lane_seconds"] == 9999.0, "report the observed suite duration"
 
     # A record from a different estate is stale, not a measurement.
     recorded(1.0, 0.1, cases=("fast", "slow", "gone"))
-    assert (
-        governance.timing(tmp_path)["reason"]
-        == "the timing record predates the current pytest estate"
-    )
+    assert governance.timing(tmp_path)["state"] == "unmeasured", "stale timing must be unmeasured"
+    assert governance.timing(tmp_path)["reason"] == (
+        "the timing record predates the current pytest estate"
+    ), "stale timing must explain the inventory mismatch"
     recorded(1.0, 0.1, cases=("fast",))
-    assert governance.timing(tmp_path)["state"] == "unmeasured"
-    manifest["size_ceilings_seconds"]["medium"] = 1
-    with pytest.raises(governance.GovernanceError, match="increase from small to large"):
+    assert governance.timing(tmp_path)["state"] == "unmeasured", "partial timing must be unmeasured"
+    manifest["hang_timeout_seconds"] = float("nan")
+    with pytest.raises(governance.GovernanceError, match="finite and positive"):
         governance.timing(tmp_path)
 
 
 def test_incomplete_disposition_evidence_fails_closed(
+    estate: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     original = governance.load_ledger
@@ -134,7 +546,7 @@ def test_incomplete_disposition_evidence_fails_closed(
 
     def malformed(path: Path):
         rows = original(path)
-        if path.name == "vellric-reset.jsonl":
+        if path.name == "reset.jsonl":
             if mode[0] == "missing":
                 rows.pop(0)
             else:
@@ -143,26 +555,21 @@ def test_incomplete_disposition_evidence_fails_closed(
 
     monkeypatch.setattr(governance, "load_ledger", malformed)
     with pytest.raises(governance.GovernanceError, match="misses 1 baseline proofs"):
-        governance.validate(REPO_ROOT)
+        governance.validate(estate)
     mode[0] = "evidence"
     with pytest.raises(governance.GovernanceError, match="wrong disposition fields"):
-        governance.validate(REPO_ROOT)
+        governance.validate(estate)
 
 
-def test_shadow_deleted_proof_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_shadow_deleted_proof_fails_closed(estate: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     original = governance.load_ledger
     mode = ["delete"]
 
     def shadowed(path: Path):
         rows = original(path)
-        if path.name == "vellric-reset.jsonl":
+        if path.name == "reset.jsonl":
             if mode[0] == "delete":
-                active_ids = {proof["id"] for proof in governance.inventory(REPO_ROOT)["proofs"]}
-                retained = next(
-                    row
-                    for row in rows
-                    if row["disposition"] == "retain" and row["proof_id"] in active_ids
-                )
+                retained = next(row for row in rows if row["disposition"] == "retain")
                 retained["disposition"] = "delete"
                 retained["replacement"] = None
             else:
@@ -172,130 +579,14 @@ def test_shadow_deleted_proof_fails_closed(monkeypatch: pytest.MonkeyPatch) -> N
 
     monkeypatch.setattr(governance, "load_ledger", shadowed)
     with pytest.raises(governance.GovernanceError, match="deleted proof still exists"):
-        governance.validate(REPO_ROOT)
+        governance.validate(estate)
     mode[0] = "replacement"
     with pytest.raises(governance.GovernanceError, match="invalid replacement"):
-        governance.validate(REPO_ROOT)
-
-
-def _synthetic_effectiveness(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> list[dict]:
-    """Exercise measured-history branches without copying donor history into the estate."""
-    original_yaml, original_ledger = governance.load_yaml, governance.load_ledger
-    manifest = original_yaml(REPO_ROOT / "tests/proof-estate.yaml")
-    cases, rows = [], []
-    for index, kind in enumerate(("historical_defect", "holdout_mutant")):
-        patch = tmp_path / f"synthetic-{index}.patch"
-        patch.write_text("Synthetic validation fixture; not a historical defect record.\n")
-        digest = hashlib.sha256(patch.read_bytes()).hexdigest()
-        case = dict(
-            id=f"synthetic-{index}",
-            **{"class": kind},
-            patch=str(patch),
-            patch_sha256=digest,
-            command="synthetic validation input",
-            cwd=".",
-            expected="Synthetic row is validated, not executed as an assay.",
-            owner="synthetic-unit-fixture",
-        )
-        cases.append(case)
-        rows.append(
-            dict(
-                record_type="effectiveness",
-                evidence_id=case["id"],
-                evidence_class=kind,
-                observed=True,
-                detected_by=[manifest["families"][0]["id"]],
-                command=case["command"],
-                patch_sha256=digest,
-                output_sha256="0" * 64,
-                assayed_on="2026-09-30",
-            )
-        )
-
-    def yaml_input(path: Path):
-        if path.name == "corpus.yaml":
-            return {"selection_frozen": True, "cases": copy.deepcopy(cases)}
-        return original_yaml(path)
-
-    def ledger_input(path: Path):
-        if path.name == "vellric-effectiveness.jsonl":
-            return copy.deepcopy(rows)
-        return original_ledger(path)
-
-    monkeypatch.setattr(governance, "load_yaml", yaml_input)
-    monkeypatch.setattr(governance, "load_ledger", ledger_input)
-    return rows
-
-
-def _synthetic_retirement(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Qualify lifecycle replay with a synthetic retirement, not donor ledger entries."""
-    original_ledger, original_inventory = governance.load_ledger, governance.inventory
-    critical = governance.load_yaml(REPO_ROOT / "tests/proof-estate.yaml")["critical_risks"]
-    protected = {x.get("direct_proof") for x in critical.values()}
-    ledger = original_ledger(REPO_ROOT / "reports/test-governance/vellric-reset.jsonl")
-    target = next(
-        x
-        for x in ledger
-        if x["disposition"] == "retain"
-        and x["proof_id"].startswith("pytest:tests/")
-        and x["proof_id"] not in protected
-    )
-    retirement = {
-        **target,
-        "record_type": "proof_retirement",
-        "disposition": "delete",
-        "replacement": None,
-    }
-
-    def ledger_input(path: Path):
-        rows = original_ledger(path)
-        return [*rows, copy.deepcopy(retirement)] if path.name == "vellric-reset.jsonl" else rows
-
-    def inventory_input(root: Path):
-        observed = original_inventory(root)
-        observed["proofs"] = [x for x in observed["proofs"] if x["id"] != target["proof_id"]]
-        return observed
-
-    monkeypatch.setattr(governance, "load_ledger", ledger_input)
-    monkeypatch.setattr(governance, "inventory", inventory_input)
-
-
-def test_recall_is_a_dated_sweep_measurement(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    rows = _synthetic_effectiveness(monkeypatch, tmp_path)
-    assert governance.validate(REPO_ROOT)["recall_as_of"] == min(row["assayed_on"] for row in rows)
-
-    original_ledger = governance.load_ledger
-    original_yaml = governance.load_yaml
-    stale = tmp_path / "stale.patch"
-    stale.write_text("--- a/nowhere.py\n+++ b/nowhere.py\n@@ -1,3 +1,3 @@\n a\n-b\n+c\n d\n")
-    stale_digest = hashlib.sha256(stale.read_bytes()).hexdigest()
-
-    def undated(path: Path):
-        loaded = original_ledger(path)
-        if path.name == "vellric-effectiveness.jsonl":
-            loaded[0]["assayed_on"] = "last week"
-            loaded[1]["patch_sha256"] = stale_digest
-        return loaded
-
-    def stranded(path: Path):
-        payload = original_yaml(path)
-        if path.name == "corpus.yaml":
-            payload["cases"][1]["patch"] = str(stale)
-            payload["cases"][1]["patch_sha256"] = stale_digest
-        return payload
-
-    monkeypatch.setattr(governance, "load_ledger", undated)
-    monkeypatch.setattr(governance, "load_yaml", stranded)
-    with pytest.raises(governance.GovernanceError) as refused:
-        governance.validate(REPO_ROOT)
-    # Only the undated row refuses; a patch the code has moved past waits for the next sweep.
-    errors = [line for line in str(refused.value).splitlines() if line.startswith("- ")]
-    assert len(errors) == 1 and errors[0].endswith("has no assay date"), errors
+        governance.validate(estate)
 
 
 def test_critical_risk_requires_a_retained_direct_proof(
+    estate: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     original = governance.load_yaml
@@ -308,111 +599,19 @@ def test_critical_risk_requires_a_retained_direct_proof(
 
     monkeypatch.setattr(governance, "load_yaml", missing)
     with pytest.raises(governance.GovernanceError, match="direct proof is not retained"):
-        governance.validate(REPO_ROOT)
+        governance.validate(estate)
 
 
-def test_recall_below_eighty_percent_fails_closed(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    _synthetic_effectiveness(monkeypatch, tmp_path)
-    original = governance.load_ledger
-
-    def weakened(path: Path):
-        rows = original(path)
-        if path.name == "vellric-effectiveness.jsonl":
-            for row in rows[:3]:
-                row["observed"] = False
-        return rows
-
-    monkeypatch.setattr(governance, "load_ledger", weakened)
-    with pytest.raises(governance.GovernanceError, match="recall below floor"):
-        governance.validate(REPO_ROOT)
-
-    monkeypatch.setattr(governance, "load_ledger", original)
-    _assert_corpus_floor_is_declared_not_constant(monkeypatch)
-    _assert_an_empty_declared_corpus_reports_unmeasured(monkeypatch)
-    original_yaml = governance.load_yaml
-
-    def drifted(path: Path):
-        payload = original_yaml(path)
-        if path.name == "corpus.yaml":
-            payload["cases"][0]["patch_sha256"] = "0" * 64
-        return payload
-
-    monkeypatch.setattr(governance, "load_yaml", drifted)
-    with pytest.raises(governance.GovernanceError, match="patch digest drifted"):
-        governance.validate(REPO_ROOT)
-
-    # A failure in an unmodified copy cannot count as mutation detection.
-    fixture = tmp_path / "assay"
-    fixture.mkdir()
-    (fixture / "flag").write_text("good\n")
-    (fixture / "alias").symlink_to("flag")
-    patch = fixture / "defect.patch"
-    patch.write_text("--- a/flag\n+++ b/flag\n@@ -1 +1 @@\n-good\n+bad\n")
-    command = shlex.join(
-        [
-            sys.executable,
-            "-c",
-            "from pathlib import Path; assert Path('alias').is_symlink(); "
-            "assert Path('alias').read_text() == 'good\\n'",
-        ]
-    )
-    corpus = {
-        "selection_frozen": True,
-        "cases": [
-            {
-                "id": "copied-link",
-                "class": "historical_defect",
-                "patch": "defect.patch",
-                "patch_sha256": hashlib.sha256(patch.read_bytes()).hexdigest(),
-                "command": command,
-                "owner": "fixture",
-            }
-        ],
-    }
-    monkeypatch.setattr(
-        governance,
-        "load_yaml",
-        lambda path: (
-            {"effectiveness_corpus": "corpus.yaml"}
-            if path.name == "proof-estate.yaml"
-            else copy.deepcopy(corpus)
-        ),
-    )
-    rows = governance.assay(fixture)
-    assert len(rows) == 1 and rows[0]["observed"] is True
-    assert (fixture / "flag").read_text() == "good\n"
-    (fixture / "alias").unlink()
-    (fixture / "alias").write_text("good\n")
-    with pytest.raises(governance.GovernanceError, match="assay baseline failed for copied-link"):
-        governance.assay(fixture)
-
-
-def test_lifecycle_replay_repairs_and_frozen_selection(
+def test_lifecycle_replay_and_repairs(
+    estate: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _synthetic_retirement(monkeypatch)
-    original = governance.load_yaml
-
-    def unfrozen(path: Path):
-        payload = original(path)
-        if path.name == "corpus.yaml":
-            payload["selection_frozen"] = False
-        return payload
-
-    monkeypatch.setattr(governance, "load_yaml", unfrozen)
-    with pytest.raises(governance.GovernanceError, match="selection must be frozen"):
-        governance.validate(REPO_ROOT)
-
-    monkeypatch.setattr(governance, "load_yaml", original)
     original_ledger = governance.load_ledger
     lifecycle_mode = ["twice"]
 
     def broken_lifecycle(path: Path):
         rows = original_ledger(path)
-        if path.name != "vellric-reset.jsonl":
+        if path.name != "reset.jsonl":
             return rows
         retirements = [row for row in rows if row.get("record_type") == "proof_retirement"]
         if lifecycle_mode[0] == "twice":
@@ -421,45 +620,43 @@ def test_lifecycle_replay_repairs_and_frozen_selection(
 
     monkeypatch.setattr(governance, "load_ledger", broken_lifecycle)
     with pytest.raises(governance.GovernanceError, match="retired more than once"):
-        governance.validate(REPO_ROOT)
+        governance.validate(estate)
     lifecycle_mode[0] = "missing"
     with pytest.raises(governance.GovernanceError, match="does not match inventory"):
-        governance.validate(REPO_ROOT)
+        governance.validate(estate)
 
     repair_mode = ["active"]
 
     def repaired_lifecycle(path: Path):
         rows = original_ledger(path)
-        if path.name != "vellric-reset.jsonl":
+        if path.name == "witnesses.jsonl" and repair_mode[0] != "unwitnessed":
+            return [*rows, {**rows[0], "proof_ids": [SAMPLE + "test_kept"]}]
+        if path.name != "reset.jsonl":
             return rows
-        active_ids = {proof["id"] for proof in governance.inventory(REPO_ROOT)["proofs"]}
-        retained = next(
-            row
-            for row in rows
-            if row.get("disposition") == "retain" and row["proof_id"] in active_ids
-        )
+        retained = next(row for row in rows if row.get("disposition") == "retain")
         if repair_mode[0] == "reset":
             retained["disposition"] = "repair"
             return rows
         retired = next(row for row in rows if row.get("record_type") == "proof_retirement")
-        target = retained if repair_mode[0] == "active" else retired
+        target = retired if repair_mode[0] == "retired" else retained
         repair = {**target, "record_type": "proof_repair", "disposition": "repair"}
         repair["replacement"] = target["proof_id"]
         return [*rows, repair]
 
-    existing_repairs = sum(
-        row.get("record_type") == "proof_repair"
-        for row in original_ledger(REPO_ROOT / "reports/test-governance/vellric-reset.jsonl")
-    )
     monkeypatch.setattr(governance, "load_ledger", repaired_lifecycle)
-    summary = governance.validate(REPO_ROOT)
-    assert summary["post_reset_repairs"] == existing_repairs + 1
+    summary = governance.validate(estate)
+    assert summary["post_reset_repairs"] == 1
     repair_mode[0] = "reset"
-    summary = governance.validate(REPO_ROOT)
+    summary = governance.validate(estate)
     assert summary["dispositions"]["repair"] == 1
     repair_mode[0] = "retired"
     with pytest.raises(governance.GovernanceError, match="repair target is not active"):
-        governance.validate(REPO_ROOT)
+        governance.validate(estate)
+    # A repair is a new claim that the proof can fail, so it needs its own observation.
+    repair_mode[0] = "unwitnessed"
+    with pytest.raises(governance.GovernanceError, match="test_kept") as refused:
+        governance.validate(estate)
+    assert "admitted or repaired proof has no witness receipt" in str(refused.value)
 
 
 def test_changed_selection_maps_documents_to_readers_and_widens_on_unmapped_code(
@@ -485,11 +682,11 @@ def test_changed_selection_maps_documents_to_readers_and_widens_on_unmapped_code
         "lib/example.py": 'RULES = ROOT / "policies" / "read-by-code.md"\n',
         "lib/twin.py": "base\n",
         "tests/test_reader.py": 'assert "policies/read-by-test.md"\n',
-        "bin/tool": "cat CLAUDE.md\n",
+        "bin/tool": "cat AGENTS.md\n",
         "policies/read-by-code.md": "one\n",
         "policies/read-by-test.md": "one\n",
         "policies/read-by-nothing.md": "one\n",
-        "CLAUDE.md": "one\n",
+        "AGENTS.md": "one\n",
         "plan/phase-1.md": "one\n",
     }
     files["tests/proof-estate.yaml"] += family("reader", "lib/reader_only.py")
@@ -518,20 +715,11 @@ def test_changed_selection_maps_documents_to_readers_and_widens_on_unmapped_code
     # A document no family covers selects the families of the files that name it.
     assert selection("policies/read-by-code.md") == ({"vital", "mapped"}, None)
     assert selection("policies/read-by-test.md") == ({"vital", "reader"}, None)
-    assert selection("CLAUDE.md") == ({"vital", "tool"}, None)
+    assert selection("AGENTS.md") == ({"vital", "tool"}, None)
     assert selection("policies/read-by-nothing.md") == ({"vital"}, None)
     # A document several families cover selects all of them; ambiguously covered code widens.
     assert selection("plan/phase-1.md") == ({"vital", "plans", "phases"}, None)
-    everything = {
-        "vital",
-        "mapped",
-        "twin",
-        "twin2",
-        "tool",
-        "plans",
-        "phases",
-        "reader",
-    }
+    everything = {"vital", "mapped", "twin", "twin2", "tool", "plans", "phases", "reader"}
     assert selection("lib/twin.py") == (everything, "ambiguous-change-map:lib/twin.py")
     assert selection("policies/read-by-nothing.md", "unknown") == (
         everything,
@@ -574,73 +762,1056 @@ def test_changed_code_selects_the_families_of_files_that_use_it(tmp_path: Path) 
     (tmp_path / "lib/pkg/helper.py").write_text("def shared():\n    return 3\n")
     chosen, widened = governance.selected_families(tmp_path, "changed", "HEAD")
     # The module that imports the helper brings its family; the untouched bystander does not.
-    assert ({item["id"] for item in chosen}, widened) == (
-        {"vital", "helper", "user"},
-        None,
-    )
+    assert ({item["id"] for item in chosen}, widened) == ({"vital", "helper", "user"}, None)
 
 
-def test_report_counts_the_frozen_baseline_and_current_estate() -> None:
-    payload = governance.report(REPO_ROOT)
-    baseline = json.loads(
-        (REPO_ROOT / "reports/test-governance/vellric-pre-reset-baseline.json").read_text()
-    )
-    assert payload["baseline"] == baseline["counts"]
-    assert payload["current"] == governance.inventory(REPO_ROOT)["counts"]
-
-
-def _manifest_with(limits: dict[str, object]) -> dict[str, object]:
-    manifest = copy.deepcopy(governance.load_yaml(REPO_ROOT / "tests/proof-estate.yaml"))
-    manifest["effectiveness_floors"].update(limits)
-    return manifest
-
-
-def _patched_yaml(monkeypatch: pytest.MonkeyPatch, manifest, corpus=None) -> None:
-    original_yaml = governance.load_yaml
-
-    def patched(path: Path):
-        if path.name == "proof-estate.yaml":
-            return copy.deepcopy(manifest)
-        if corpus is not None and path.name == "corpus.yaml":
-            return copy.deepcopy(corpus)
-        return original_yaml(path)
-
-    monkeypatch.setattr(governance, "load_yaml", patched)
-
-
-def _assert_corpus_floor_is_declared_not_constant(
-    monkeypatch: pytest.MonkeyPatch,
+def test_reuse_runs_only_what_changed_since_a_proven_tree_and_everything_when_unsure(
+    tmp_path: Path,
 ) -> None:
-    """A recipient declares its corpus floor; the estate must meet the number it declared."""
-    with monkeypatch.context() as patch:
-        _patched_yaml(patch, _manifest_with({"min_mutant_cases": 13}))
-        with pytest.raises(governance.GovernanceError, match="below the declared floor of 13"):
-            governance.validate(REPO_ROOT)
-    with monkeypatch.context() as patch:
-        _patched_yaml(patch, _manifest_with({"min_historical_cases": "twelve"}))
-        with pytest.raises(governance.GovernanceError, match="min_historical_cases must be"):
-            governance.validate(REPO_ROOT)
+    """Admission: the full gate re-ran every test after changes no test could observe.
 
+    A real git tree, the real tree-identity tool and the real selection are driven through
+    each state the reuse lane must tell apart. The oracle is the set of families selected
+    and the widening reason, compared with what each change can actually reach.
+    """
 
-def _assert_an_empty_declared_corpus_reports_unmeasured(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A freshly stamped recipient has no defect history; that reads as unmeasured, not as zero."""
-    original_ledger = governance.load_ledger
-    with monkeypatch.context() as patch:
-        _patched_yaml(
-            patch,
-            _manifest_with({"min_historical_cases": 0, "min_mutant_cases": 0}),
-            corpus={"selection_frozen": True, "cases": []},
+    def family(name: str, covers: str, tier: str = "changed") -> str:
+        return (
+            f"- id: {name}\n  tier: {tier}\n  kind: pytest\n"
+            f"  selectors: [tests/test_{name}.py]\n  covers: ['{covers}']\n"
+            f"  source_paths: [tests/test_{name}.py]\n"
         )
 
-        def empty_effectiveness(path: Path):
-            if path.name.endswith("effectiveness.jsonl"):
-                return []
-            return original_ledger(path)
+    files = {
+        "tests/proof-estate.yaml": "families:\n"
+        + family("vital", "known/**", tier="vital")
+        + family("mapped", "lib/example.py")
+        + family("other", "lib/other.py")
+        + family("records", "plan/events/*")
+        + family("ledger", "plan/events/*.json"),
+        "candidate-partition.yaml": "schema: agentic.candidate-partition.v1\nactive:\n"
+        '  - "/candidate-partition.yaml"\n  - "/lib/**"\n  - "/tests/**"\nbookkeeping:\n'
+        '  - "/EXECUTION_LOG.jsonl"\n  - "/plan/events/**"\n  - "/log/entries/**"\n',
+        ".gitignore": ".kickoff/\n",
+        "known/file": "base\n",
+        "lib/example.py": "VALUE = 1\n",
+        "lib/other.py": "VALUE = 2\n",
+        "plan/events/a.json": "{}\n",
+        "log/entries/x.md": "entry\n",
+        "EXECUTION_LOG.jsonl": "{}\n",
+        ".kickoff/runtime": "1" * 64 + "\n",
+    }
+    for name, text in files.items():
+        (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / name).write_text(text)
+    (tmp_path / "bin").mkdir()
+    (tmp_path / "lib/agentic_starter").mkdir()
+    shutil.copy2(REPO_ROOT / "bin/kickoff-tree-id", tmp_path / "bin/kickoff-tree-id")
+    for module in ("__init__.py", "candidate_boundaries.py"):
+        shutil.copy2(
+            REPO_ROOT / "lib/agentic_starter" / module, tmp_path / "lib/agentic_starter" / module
+        )
+    receipt = tmp_path / "bin/check-receipt"
+    receipt.write_text('#!/bin/sh\ncat "$(dirname "$0")/../.kickoff/runtime"\n')
+    receipt.chmod(0o755)
 
-        patch.setattr(governance, "load_ledger", empty_effectiveness)
-        summary = governance.validate(REPO_ROOT)
-    assert summary["state"] == "valid"
-    assert summary["recall"] == {}
-    assert summary["recall_unmeasured"] == ["historical_defect", "holdout_mutant"]
+    def git(*arguments: str) -> None:
+        subprocess.run(["git", *arguments], cwd=tmp_path, check=True, capture_output=True)
+
+    git("init", "-q")
+    git("config", "user.email", "test@example.invalid")
+    git("config", "user.name", "Test")
+    git("add", "-A")
+    git("commit", "-qm", "base")
+    record = tmp_path / governance.REUSE_RECORD
+
+    def edit(*changed: str) -> None:
+        for path in changed:
+            target = tmp_path / path
+            target.write_text((target.read_text() if target.exists() else "") + "# two\n")
+
+    def selection(*changed: str) -> tuple[set[str], str | None]:
+        edit(*changed)
+        chosen, widened = governance.selected_families(tmp_path, "reuse")
+        git("reset", "-q", "--hard", "HEAD")
+        git("clean", "-qfd")
+        return {item["id"] for item in chosen}, (widened or "").split(":")[0] or None
+
+    everything = {"vital", "mapped", "other", "records", "ledger"}
+    unknown_tree = selection()
+    governance.reuse_begin(tmp_path, "full")
+    proven = governance.reuse_finish(tmp_path, 0)
+    observed = {
+        "unchanged": selection(),
+        "records nobody reads": selection("log/entries/x.md", "EXECUTION_LOG.jsonl"),
+        "record two families cover": selection("plan/events/a.json"),
+        "covered code": selection("lib/example.py"),
+        "uncovered path": selection("new.txt"),
+        "selection inputs": selection("tests/proof-estate.yaml"),
+    }
+    (tmp_path / ".kickoff/runtime").write_text("2" * 64 + "\n")
+    observed["other runtime"] = selection()
+    (tmp_path / ".kickoff/runtime").write_text("1" * 64 + "\n")
+
+    # An uncached run fails a family that reuse would have skipped: the record is discarded.
+    edit("lib/other.py")
+    governance.reuse_begin(tmp_path, "full")
+    timing = tmp_path / governance.TIMING_RECORD
+    timing.parent.mkdir(parents=True, exist_ok=True)
+    timing.write_text(
+        '<testsuites><testsuite><testcase file="tests/test_mapped.py" name="t">'
+        "<failure/></testcase></testsuite></testsuites>"
+    )
+    unsound = governance.reuse_finish(tmp_path, 1)
+    discarded = not record.exists()
+    # A tree that moved while its tests ran is never recorded as proven.
+    governance.reuse_begin(tmp_path, "full")
+    edit("lib/example.py")
+    moved = governance.reuse_finish(tmp_path, 0)
+
+    assert (
+        unknown_tree == (everything, "no-proven-tree")
+        and proven.startswith("TEST REUSE RECORDED")
+        and observed
+        == {
+            "unchanged": (set(), None),
+            "records nobody reads": (set(), None),
+            "record two families cover": ({"records", "ledger"}, None),
+            "covered code": ({"mapped"}, None),
+            "uncovered path": (everything, "unmapped-changes"),
+            "selection inputs": (everything, "selection-inputs-changed"),
+            "other runtime": (everything, "no-proven-tree"),
+        }
+        and unsound.startswith("TEST REUSE UNSOUND mapped")
+        and discarded
+        and moved.startswith("TEST REUSE NOT RECORDED")
+        and not record.exists()
+    ), f"REUSE SKIPPED AN AFFECTED FAMILY OR RERAN AN UNAFFECTED ONE: {unknown_tree} {observed}"
+
+
+def test_a_command_family_is_inventoried_and_selected_for_its_own_runner(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Admission: only pytest families could be selected, so a deliverable in another
+    language always ran its whole suite. The oracle is the selection printed for a change
+    under the path the command family covers."""
+    files = {
+        "tests/proof-estate.yaml": "families:\n"
+        "- id: unit\n  tier: changed\n  kind: pytest\n  selectors: [tests/test_unit.py]\n"
+        "  covers: [lib/unit.py]\n  source_paths: [tests/test_unit.py]\n"
+        "- id: deliverable\n  tier: changed\n  kind: command\n"
+        "  selectors: ['project/tests/smoke.rs --quiet']\n"
+        "  covers: ['project/*']\n  source_paths: []\n",
+        "lib/unit.py": "VALUE = 1\n",
+        "project/src/lib.rs": "pub fn value() -> u8 { 1 }\n",
+    }
+    for name, text in files.items():
+        (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / name).write_text(text)
+
+    def git(*arguments: str) -> None:
+        subprocess.run(["git", *arguments], cwd=tmp_path, check=True, capture_output=True)
+
+    git("init", "-q")
+    git("config", "user.email", "test@example.invalid")
+    git("config", "user.name", "Test")
+    git("add", "-A")
+    git("commit", "-qm", "base")
+    (tmp_path / "project/src/lib.rs").write_text("pub fn value() -> u8 { 2 }\n")
+    status = governance.main(
+        ["--root", str(tmp_path), "select", "--changed-from", "HEAD", "--format", "lines"]
+    )
+    lines = capsys.readouterr().out.splitlines()
+    proofs = [(proof.proof_id, proof.kind) for proof in governance.collect_commands(tmp_path)]
+    assert (
+        status == 0
+        and lines[0] == "FOCUSED"
+        and lines[2:] == ["command project/tests/smoke.rs --quiet"]
+        and proofs == [("command:project/tests/smoke.rs --quiet", "command")]
+    ), f"NATIVE-RUNNER FAMILY NOT SELECTED OR NOT INVENTORIED: {lines} {proofs}"
+
+
+def test_report_counts_the_frozen_baseline_and_current_estate(estate: Path) -> None:
+    payload = governance.report(estate)
+    assert payload["baseline"] == {"families": 8, "leaves": 9}
+    assert payload["current"] == {"families": 6, "leaves": 7}
+
+
+def test_a_mutation_declaration_names_its_tool_scope_and_budget_or_says_why_not() -> None:
+    measured = {"tool": "any-tool", "paths": ["lib/*.py"], "budget_seconds": 300}
+    unmeasured = {"tool": None, "reason": "No tool is maintained for this language."}
+    assert governance.mutation_errors({"mutation": measured}) == []
+    assert governance.mutation_errors({"mutation": unmeasured}) == []
+    refused = {
+        "mutation must be a mapping": None,
+        "carries only tool and reason": {**unmeasured, "paths": ["lib/*.py"]},
+        "must say why no mutation tool is declared": {"tool": None, "reason": " "},
+        "carries tool, paths and budget_seconds": {**measured, "reason": "extra"},
+        "must be null or the name of the tool": {**measured, "tool": " "},
+        "mutation.paths must be a nonempty list": {**measured, "paths": []},
+        "mutation.budget_seconds must be a positive number": {**measured, "budget_seconds": 0},
+    }
+    for message, declared in refused.items():
+        errors = governance.mutation_errors({"mutation": declared})
+        assert len(errors) == 1 and message in errors[0], (message, errors)
+    assert governance.mutation_errors({"mutation": {**measured, "budget_seconds": 1}}) == []
+    # A missing field is refused as surely as an extra one.
+    assert governance.mutation_errors({"mutation": {"tool": None}}) != []
+    assert governance.mutation_errors({"mutation": {"tool": "any-tool", "paths": ["a"]}}) != []
+    assert governance.mutation_errors({"mutation": {**measured, "budget_seconds": -1}}) != []
+    assert governance.mutation_errors({"mutation": {**measured, "paths": [7]}}) != []
+    assert governance.mutation_errors({"mutation": {**measured, "budget_seconds": True}}) != []
+
+
+WITNESS = {
+    "proof_ids": ["pytest:tests/test_sample.py::test_admitted"],
+    "defect": "The guard allows instead of denying.",
+    "expect": "GUARD OPEN",
+    "command": "./check.sh",
+    "paths": ["guard.txt"],
+}
+
+
+def _witness_repo(root: Path, guard: str = "deny\n", *, validates_itself: bool = False) -> Path:
+    """A repository whose only proof is a shell script, so nothing here depends on pytest."""
+    (root / "tests").mkdir(parents=True)
+    (root / "tests/proof-estate.yaml").write_text(
+        json.dumps({"witness_ledger": "reports/witnesses.jsonl"})
+    )
+    (root / "guard.txt").write_text(guard)
+    (root / "guard.txt").chmod(0o640)
+    # An old file, as real source usually is: begin has no fresh write to wait out.
+    os.utime(root / "guard.txt", (0, 0))
+    (root / "check.sh").write_text(
+        '#!/bin/sh\ngrep -qx deny guard.txt || { echo "GUARD OPEN"; exit 1; }\n'
+        + (
+            # Like a proof that validates its own estate: green only with no witness pending.
+            f"test ! -e {governance.WITNESS_PENDING}/request.json"
+            ' || { echo "PENDING"; exit 1; }\n'
+            if validates_itself
+            else ""
+        )
+        + "echo checked\n"
+    )
+    (root / "check.sh").chmod(0o755)
+    return root
+
+
+def test_witness_observes_red_restores_exactly_and_records_a_receipt(
+    tmp_path: Path,
+) -> None:
+    root = _witness_repo(tmp_path, validates_itself=True)
+    check = root / "check.sh"
+    check.write_text(check.read_text().replace("exit 1", "exit 101"))
+    governance.witness_begin(root, failure_exit=101, **WITNESS)
+    (root / "guard.txt").write_text("allow\n")
+    planted_second = int((root / "guard.txt").stat().st_mtime)
+    receipt = governance.witness_finish(root)
+    assert (root / "guard.txt").read_bytes() == b"deny\n"
+    # A cache keyed on size and whole-second time must see the restored file as new.
+    assert int((root / "guard.txt").stat().st_mtime) > planted_second
+    assert not (root / governance.WITNESS_PENDING).exists()
+    assert governance.load_ledger(root / "reports/witnesses.jsonl") == [receipt]
+    capture_root = root / ".kickoff/witness/captures"
+    captures = [
+        json.loads((capture_root / "retained-artifacts" / row["sha256"]).read_text())
+        for row in governance.load_ledger(capture_root / "index.jsonl")
+    ]
+    assert [item["exit_code"] for item in captures].count(0) == 2, (
+        "DURABILITY WITNESS CAPTURE LOST RED STATUS"
+    )
+    red = [item for item in captures if item["exit_code"] == 101]
+    assert (
+        len(red) == 1
+        and hashlib.sha256(red[0]["output"].encode()).hexdigest() == receipt["red_output_sha256"]
+    ), "DURABILITY WITNESS CAPTURE LOST RED STATUS"
+    assert (
+        receipt["paths"] == ["guard.txt"]
+        and receipt["defect"] == "Completed failure exit 101: " + WITNESS["defect"]
+    )
+    assert governance._receipt_errors(receipt, 1, set(WITNESS["proof_ids"])) == []
+
+    with pytest.raises(governance.GovernanceError, match="failure-exit must identify"):
+        governance.witness_begin(root, failure_exit=124, **WITNESS)
+    with tempfile.TemporaryDirectory() as temporary:
+        with pytest.raises(governance.GovernanceError, match="temporary storage"):
+            governance._witness_run("/usr/bin/true", Path(temporary))
+
+
+def test_witness_refuses_anything_short_of_the_named_failure(tmp_path: Path) -> None:
+    def attempt(name: str, *, guard: str = "deny\n", planted: str | None, **changed: str) -> Path:
+        root = _witness_repo(tmp_path / name, guard)
+        governance.witness_begin(root, **{**WITNESS, **changed})
+        if planted is not None:
+            (root / "guard.txt").write_text(planted)
+        governance.witness_finish(root)
+        return root
+
+    refusals = {
+        "the baseline is already red": (
+            "baseline is not green",
+            {"guard": "allow\n", "planted": None},
+        ),
+        "the expected text shows while green": (
+            "already appears while the command passes",
+            {"planted": None, "expect": "checked"},
+        ),
+        "nothing was planted": ("no journaled path has changed", {"planted": None}),
+        "the mutant survives": (
+            "NOT WITNESSED: the command still passed",
+            {"planted": "deny\nextra\n"},
+        ),
+        "it fails for another reason": (
+            "NOT WITNESSED: the command failed, but not with the expected text",
+            {"planted": "allow\n", "expect": "A DIFFERENT GUARD"},
+        ),
+    }
+    for number, (reason, (message, arguments)) in enumerate(refusals.items()):
+        root = tmp_path / str(number)
+        with pytest.raises(governance.GovernanceError, match=message):
+            attempt(str(number), **arguments)
+        assert (root / "guard.txt").read_text() == arguments.get("guard", "deny\n"), reason
+        assert not (root / "reports/witnesses.jsonl").exists(), reason
+
+
+def test_witness_expect_must_appear_in_a_declared_failure_line(tmp_path: Path) -> None:
+    """An echoed assertion message cannot witness a run that failed for another reason."""
+
+    def attempt(name: str, failure: str) -> Path:
+        root = _witness_repo(tmp_path / name)
+        (root / "tests/proof-estate.yaml").write_text(
+            json.dumps(
+                {"witness_ledger": "reports/witnesses.jsonl", "witness_failure_lines": "^E "}
+            )
+        )
+        (root / "check.sh").write_text(
+            "#!/bin/sh\n"
+            "grep -qx deny guard.txt || {\n"
+            "  echo '>       assert guard, \"GUARD OPEN\"'\n"
+            f"  echo '{failure}'\n"
+            "  exit 1\n"
+            "}\n"
+            "echo checked\n"
+        )
+        governance.witness_begin(root, **WITNESS)
+        (root / "guard.txt").write_text("allow\n")
+        governance.witness_finish(root)
+        return root
+
+    refused = False
+    try:
+        attempt("echoed", "E       ValueError: guard is not in list")
+    except governance.GovernanceError as exc:
+        refused = "outside the declared failure lines" in str(exc)
+    assert refused, "WITNESS ACCEPTED AN ECHOED MESSAGE"
+
+    root = attempt("failed", "E       AssertionError: GUARD OPEN")
+    assert len(governance.load_ledger(root / "reports/witnesses.jsonl")) == 1
+
+    bad = _witness_repo(tmp_path / "bad")
+    (bad / "tests/proof-estate.yaml").write_text(
+        json.dumps({"witness_ledger": "reports/witnesses.jsonl", "witness_failure_lines": "("})
+    )
+    governance.witness_begin(bad, **WITNESS)
+    (bad / "guard.txt").write_text("allow\n")
+    with pytest.raises(governance.GovernanceError, match="not a valid regular expression"):
+        governance.witness_finish(bad)
+
+
+def test_a_pending_witness_blocks_validation_until_it_is_aborted(tmp_path: Path) -> None:
+    root = _witness_repo(tmp_path)
+    governance.witness_begin(root, **WITNESS)
+    # The planted defect here is the file's removal, as an interrupted run would leave it.
+    (root / "guard.txt").unlink()
+    with pytest.raises(governance.GovernanceError, match="a red witness is pending"):
+        governance.validate(root)
+    with pytest.raises(governance.GovernanceError, match="a red witness is pending"):
+        governance.witness_begin(root, **WITNESS)
+    assert governance.witness_abort(root) == {"state": "aborted", "restored": ["guard.txt"]}
+    assert (root / "guard.txt").read_bytes() == b"deny\n"
+    assert stat.S_IMODE((root / "guard.txt").stat().st_mode) == 0o640
+    assert not (root / governance.WITNESS_PENDING).exists()
+    with pytest.raises(governance.GovernanceError, match="no red witness is pending"):
+        governance.witness_abort(root)
+
+
+def test_receipts_are_validated_and_an_admitted_proof_must_have_one(
+    estate: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = governance.load_ledger
+    change: list[object] = [None]
+
+    def altered(path: Path):
+        rows = original(path)
+        if path.name == "witnesses.jsonl":
+            return change[0](rows)
+        return rows
+
+    monkeypatch.setattr(governance, "load_ledger", altered)
+    change[0] = lambda rows: []
+    with pytest.raises(governance.GovernanceError, match="test_admitted") as refused:
+        governance.validate(estate)
+    assert "admitted or repaired proof has no witness receipt" in str(refused.value)
+    malformed = {
+        "has wrong fields": lambda row: row.pop("expect"),
+        "names a proof the audit ledger does not know": lambda row: row.update(
+            proof_ids=["pytest:absent"]
+        ),
+        "has no witness date": lambda row: row.update(witnessed_on="last week"),
+        "mutation_sha256 must be a SHA-256 digest": lambda row: row.update(mutation_sha256="0"),
+    }
+    for message, damage in malformed.items():
+
+        def damaged(rows, damage=damage):
+            damage(rows[0])
+            return rows
+
+        change[0] = damaged
+        with pytest.raises(governance.GovernanceError, match=message):
+            governance.validate(estate)
+
+
+def test_bounded_adoption_reports_pending_without_discarding_proofs(
+    estate: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original_yaml, original_ledger, original_inventory = (
+        governance.load_yaml,
+        governance.load_ledger,
+        governance.inventory,
+    )
+    step = [0]
+    kept, case = SAMPLE + "test_kept", SAMPLE + "test_cases[1]"
+    keeper = SAMPLE + "test_cases[2]"
+
+    def bounded(path):
+        result = original_yaml(path)
+        result["adoption"] = {
+            "mode": "complete" if step[0] == 4 else "bounded",
+            "reason": "One named fixture contract per batch.",
+        }
+        if step[0] >= 2:
+            result["critical_risks"]["custody"]["direct_proof"] = keeper
+        return result
+
+    def progression(path):
+        rows = original_ledger(path)
+        if path.name == "witnesses.jsonl":
+            return rows + [{**rows[0], "proof_ids": [kept]}]
+        if path.name != "reset.jsonl":
+            return rows
+        retained = [
+            r
+            for r in rows
+            if r["record_type"] == "proof_disposition" and r["disposition"] == "retain"
+        ]
+        result = [r for r in rows if r not in retained]
+        source = next(r for r in retained if r["proof_id"] == kept)
+        if step[0] >= 1:
+            result.append(
+                {
+                    **source,
+                    "record_type": "proof_modification",
+                    "disposition": "repair",
+                    "witness_receipts": [2],
+                }
+            )
+        if step[0] >= 2:
+            result.append({**source, "disposition": "consolidate", "replacement": keeper})
+        if step[0] >= 3:
+            result.append(
+                {
+                    **source,
+                    "record_type": "proof_retirement",
+                    "proof_id": case,
+                    "disposition": "consolidate",
+                    "replacement": keeper,
+                }
+            )
+        if step[0] == 4:
+            retired = {r["proof_id"] for r in result if r["record_type"] == "proof_retirement"}
+            result.extend(r for r in retained if r["proof_id"] not in retired | {kept})
+        return result
+
+    def live(root):
+        result = original_inventory(root)
+        removed = ({kept} if step[0] >= 2 else set()) | ({case} if step[0] >= 3 else set())
+        result["proofs"] = [r for r in result["proofs"] if r["id"] not in removed]
+        return result
+
+    monkeypatch.setattr(governance, "load_yaml", bounded)
+    monkeypatch.setattr(governance, "load_ledger", progression)
+    monkeypatch.setattr(governance, "inventory", live)
+    for stage, pending in enumerate((6, 6, 5, 4, 0)):
+        step[0] = stage
+        assert governance.validate(estate)["pending_baseline_review"] == pending, (
+            f"pending review count at batch {stage}"
+        )
+
+
+def test_modification_must_reference_its_own_unreused_observation(
+    estate: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = governance.load_ledger
+    mode = ["valid"]
+
+    def modified(path):
+        rows = original(path)
+        if path.name == "reset.jsonl":
+            admission = next(row for row in rows if row["record_type"] == "proof_admission")
+            event = {
+                **admission,
+                "record_type": "proof_modification",
+                "disposition": "repair",
+                "witness_receipts": [1],
+            }
+            rows.append(event)
+            if mode[0] == "reused":
+                rows.append(dict(event))
+            elif mode[0] == "absent":
+                event["witness_receipts"] = []
+            elif mode[0] == "wrong":
+                event["witness_receipts"] = [999]
+            elif mode[0] == "other-proof":
+                event["witness_receipts"] = [2]
+        elif path.name == "witnesses.jsonl":
+            rows.append({**rows[0], "proof_ids": [SAMPLE + "test_kept"]})
+        return rows
+
+    monkeypatch.setattr(governance, "load_ledger", modified)
+    # Successful status shape is already proved by test_live_reset_validates.
+    governance.validate(estate)
+
+    def refuses(value: str, message: str) -> None:
+        mode[0] = value
+        try:
+            governance.validate(estate)
+        except governance.GovernanceError as exc:
+            assert message in str(exc), f"wrong refusal for {value}"
+        else:
+            pytest.fail(f"modification incorrectly accepted {value}")
+
+    refuses("reused", "reuses an earlier")
+    refuses("absent", "needs witness")
+    refuses("wrong", "invalid witness")
+    refuses("other-proof", "does not witness its proof")
+
+
+def test_hang_supervision_preserves_failures_and_stops_chattering_children(tmp_path: Path) -> None:
+    import os
+    import sys
+    import time
+
+    from agentic_starter.test_runner import run_command
+
+    failed = run_command(
+        [sys.executable, "-c", "print('expected assertion'); raise SystemExit(1)"],
+        cwd=tmp_path,
+        capture=True,
+    )
+    assert failed.returncode == 1, "completed failure status must survive"
+    assert "expected assertion" in failed.stdout, "completed failure output must survive"
+    child_pid = tmp_path / "child.pid"
+    child = "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(30)"
+    code = (
+        "import subprocess,sys,time,pathlib; "
+        f"p=subprocess.Popen([sys.executable,'-c',{child!r}]); "
+        f"pathlib.Path({str(child_pid)!r}).write_text(str(p.pid)); "
+        "exec('while True: print(\"alive\",flush=True); time.sleep(.02)')"
+    )
+    result = run_command([sys.executable, "-c", code], cwd=tmp_path, timeout=5, capture=True)
+    assert child_pid.exists(), "SETUP INCOMPLETE: child never reached readiness"
+    pid = int(child_pid.read_text())
+    try:
+        assert result.returncode == 124, "hang must be incomplete"
+        assert "INCOMPLETE" in result.stderr, "hang must have an incomplete diagnostic"
+        assert "alive" in result.stdout, "partial chatter output must survive cleanup"
+        for _ in range(50):
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                break
+            time.sleep(0.02)
+        else:
+            pytest.fail("inherited child survived timeout cleanup")
+    finally:
+        # The fixture owns exactly this non-forking child, even during red challenges.
+        import signal
+
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
+def test_incomplete_exit_cannot_supply_a_red_witness(tmp_path: Path) -> None:
+    root = _witness_repo(tmp_path)
+    governance.witness_begin(root, **WITNESS)
+    (root / "guard.txt").write_text("allow\n")
+    original = governance._witness_run
+    try:
+        governance._witness_run = lambda command, root: (
+            (124, WITNESS["expect"])
+            if (root / "guard.txt").read_text() == "allow\n"
+            else original(command, root)
+        )
+        with pytest.raises(governance.GovernanceError, match="incomplete, interrupted"):
+            governance.witness_finish(root)
+    finally:
+        governance._witness_run = original
+    assert (root / "guard.txt").read_text() == "deny\n"
+    assert not (root / "reports/witnesses.jsonl").exists()
+
+
+def test_governance_child_incomplete_remains_incomplete(
+    estate: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def interrupted_collection(root):
+        return governance._run([sys.executable, "-c", "raise SystemExit(124)"], root)
+
+    monkeypatch.setattr(governance, "collect_pytest", interrupted_collection)
+    result = governance.main(["--root", str(estate), "inventory"])
+    error = capsys.readouterr().err
+    assert result == 124, "governance must preserve the incomplete exit"
+    assert "TEST GOVERNANCE INCOMPLETE" in error, "governance must label incomplete collection"
+    assert "TEST GOVERNANCE ERROR" not in error, "incomplete collection is not a refusal"
+
+
+@pytest.mark.parametrize("leader_exit", [0, 1])
+def test_outstanding_child_makes_completed_leader_incomplete(
+    tmp_path: Path, leader_exit: int
+) -> None:
+    import signal
+    import time
+
+    from agentic_starter.test_runner import run_command
+
+    ready = tmp_path / "ready"
+    child = (
+        "import os,signal,time,pathlib; signal.signal(signal.SIGTERM,signal.SIG_IGN); "
+        f"pathlib.Path({str(ready)!r}).write_text(str(os.getpid())); time.sleep(30)"
+    )
+    leader = (
+        "import subprocess,sys,pathlib,time; "
+        f"subprocess.Popen([sys.executable,'-c',{child!r}],"
+        "stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL); "
+        f"ready=pathlib.Path({str(ready)!r}); "
+        "deadline=time.monotonic()+10; "
+        "exec('while not ready.exists() and time.monotonic()<deadline: time.sleep(.02)'); "
+        f"raise SystemExit({leader_exit})"
+    )
+    pid = None
+    try:
+        result = run_command([sys.executable, "-c", leader], cwd=tmp_path, capture=True)
+        assert ready.exists(), "SETUP INCOMPLETE: leftover child never became ready"
+        pid = int(ready.read_text())
+        assert result.returncode == 124, f"outstanding group after exit {leader_exit} is incomplete"
+        assert "INCOMPLETE" in result.stderr, (
+            f"outstanding group after exit {leader_exit} needs a diagnostic"
+        )
+        for _ in range(50):
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                break
+            time.sleep(0.02)
+        else:
+            pytest.fail(f"outstanding child after exit {leader_exit} survived cleanup")
+    finally:
+        if pid is None and ready.exists():
+            pid = int(ready.read_text())
+        if pid is not None:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+
+def test_a_refused_liveness_probe_is_settled_before_a_finished_command_is_called_incomplete(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Admission: under parallel load a finished two-line command was reported incomplete,
+    twice in one day in two repositories, because one refused probe was read as a live child.
+
+    The refusal is injected at the system call, so the oracle is the supervisor's own
+    result for a probe that clears after a few refusals and for one that never clears.
+    """
+    from agentic_starter import test_runner
+
+    real = os.killpg
+    refusals = {"left": 3}
+
+    def probe(group: int, signum: int) -> None:
+        if signum == 0 and refusals["left"] != 0:
+            refusals["left"] -= 1
+            raise PermissionError(1, "Operation not permitted")
+        if signum == 0:
+            raise ProcessLookupError(3, "No such process")
+        real(group, signum)
+
+    monkeypatch.setattr(test_runner.os, "killpg", probe)
+    command = [sys.executable, "-c", "print('done')"]
+    settled = test_runner.run_command(command, cwd=tmp_path, capture=True, cleanup_grace=2)
+    refusals["left"] = -1  # never clears
+    unprovable = test_runner.run_command(command, cwd=tmp_path, capture=True, cleanup_grace=0.05)
+    assert (
+        (settled.returncode, settled.stdout.strip()) == (0, "done")
+        and "INCOMPLETE" not in settled.stderr
+        and unprovable.returncode == 124
+        and "INCOMPLETE" in unprovable.stderr
+    ), f"REFUSED PROBE MISREAD: {settled.returncode} {settled.stderr!r} {unprovable.returncode}"
+
+
+def test_governance_allows_nested_supervisor_cleanup(tmp_path: Path, monkeypatch) -> None:
+    import functools
+    import signal
+    import time
+
+    ready = tmp_path / "ready"
+    child = (
+        "import os,signal,time,pathlib; signal.signal(signal.SIGTERM,signal.SIG_IGN); "
+        f"pathlib.Path({str(ready)!r}).write_text(str(os.getpid())); time.sleep(30)"
+    )
+    inner = (
+        "import sys; from pathlib import Path; "
+        f"sys.path.insert(0,{str(REPO_ROOT / 'lib')!r}); "
+        "from agentic_starter.test_runner import run_command; "
+        f"r=run_command([sys.executable,'-c',{child!r}],cwd=Path.cwd(),timeout=30); "
+        "raise SystemExit(r.returncode)"
+    )
+    monkeypatch.setattr(
+        governance, "run_command", functools.partial(governance.run_command, timeout=5)
+    )
+    pid = None
+    try:
+        result = governance._run([sys.executable, "-c", inner], tmp_path, check=False)
+        assert ready.exists(), "SETUP INCOMPLETE: nested child never became ready"
+        pid = int(ready.read_text())
+        assert result.returncode == 124, "nested incomplete status must survive governance"
+        for _ in range(50):
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                break
+            time.sleep(0.02)
+        else:
+            pytest.fail("outer supervisor killed inner cleanup before its resistant child")
+    finally:
+        if pid is None and ready.exists():
+            pid = int(ready.read_text())
+        if pid is not None:
+            try:
+                os.killpg(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+
+@pytest.mark.parametrize("mode", ["timeout", "term", "double-term", "hup", "completed-error"])
+def test_real_supervisor_entrypoint_handles_deadlines_and_signals(
+    tmp_path: Path, mode: str
+) -> None:
+    import os
+    import signal
+    import time
+
+    root = tmp_path / "runner"
+    script = root / "lib/agentic_starter/test_runner.py"
+    script.parent.mkdir(parents=True)
+    script.write_bytes((REPO_ROOT / "lib/agentic_starter/test_runner.py").read_bytes())
+    (root / "tests").mkdir()
+    (root / "tests/proof-estate.yaml").write_text(
+        "hang_timeout_seconds: " + ("5" if mode == "timeout" else "30")
+    )
+    ready = root / "ready"
+    code = (
+        "import os,signal,time,pathlib; signal.signal(signal.SIGTERM,signal.SIG_IGN); "
+        f"pathlib.Path({str(ready)!r}).write_text(str(os.getpid())); "
+        "print('ready',flush=True); time.sleep(30)"
+    )
+    if mode == "completed-error":
+        code = "raise SystemExit(2)"
+    process = subprocess.Popen(
+        [sys.executable, str(script), "-c", code],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    )
+    child_pid = None
+    try:
+        if mode != "completed-error":
+            deadline = time.monotonic() + 10
+            while not ready.exists() and process.poll() is None and time.monotonic() < deadline:
+                time.sleep(0.02)
+            assert ready.exists(), "SETUP INCOMPLETE: supervised child never became ready"
+            child_pid = int(ready.read_text())
+        if mode in ("term", "double-term", "hup"):
+            process.send_signal(signal.SIGHUP if mode == "hup" else signal.SIGTERM)
+            if mode == "double-term":
+                time.sleep(0.05)
+                process.send_signal(signal.SIGTERM)
+        try:
+            process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            pytest.fail("supervisor did not terminate its invocation")
+        if mode == "completed-error":
+            assert process.returncode == 2, "completed non-assertion error status must survive"
+        else:
+            assert process.returncode == 124, "entrypoint interruption must remain incomplete"
+            for _ in range(50):
+                try:
+                    os.kill(child_pid, 0)
+                except ProcessLookupError:
+                    break
+                time.sleep(0.02)
+            else:
+                pytest.fail("supervisor left its inherited child alive")
+        output, error = process.communicate(timeout=2)
+        if mode != "completed-error":
+            assert "INCOMPLETE" in error, "entrypoint must label incomplete outcomes"
+    finally:
+        # Only these two fixture-owned, non-forking groups are in the cleanup set.
+        for group in (child_pid, process.pid):
+            if group is not None:
+                try:
+                    os.killpg(group, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+        process.communicate(timeout=2)
+
+
+def test_parallel_pytest_keeps_coverage_isolation_and_failure_truth(tmp_path: Path) -> None:
+    """Exercise real workers, not a mock of their scheduling or terminal reports."""
+    import time
+    import xml.etree.ElementTree as ET
+
+    root = tmp_path / "parallel"
+    script = root / "lib/agentic_starter/test_runner.py"
+    script.parent.mkdir(parents=True)
+    script.write_bytes((REPO_ROOT / "lib/agentic_starter/test_runner.py").read_bytes())
+    (root / "tests").mkdir()
+    (root / "tests/proof-estate.yaml").write_text("hang_timeout_seconds: 20\n")
+    environment = os.environ.copy()
+    environment.pop("PYTEST_XDIST_WORKER", None)
+    environment.pop("PYTEST_XDIST_WORKER_COUNT", None)
+    environment.pop("PYTEST_ADDOPTS", None)
+    environment["PYTEST_XDIST_AUTO_NUM_WORKERS"] = "2"
+    (root / "conftest.py").write_text(
+        "from pathlib import Path\n"
+        "def pytest_testnodeready(node):\n"
+        "    with (Path(__file__).parent / 'worker-starts').open('a') as f:\n"
+        "        f.write(node.gateway.id + '\\n')\n"
+    )
+    fixture = root / "test_parallel.py"
+    fixture.write_text("""import os, pathlib, subprocess, sys, time
+import pytest
+ROOT = pathlib.Path(__file__).parent
+@pytest.mark.parametrize("case", [0, 1])
+def test_independent(case):
+    (ROOT / ("ready-" + str(case))).write_text(os.environ["PYTEST_XDIST_WORKER"])
+    deadline = time.monotonic() + 5
+    while len(list(ROOT.glob("ready-*"))) < 2 and time.monotonic() < deadline:
+        time.sleep(.01)
+    assert len(list(ROOT.glob("ready-*"))) == 2, "PARALLEL WORK WAS SERIALIZED"
+@pytest.mark.xdist_group("exclusive")
+@pytest.mark.parametrize("case", [0, 1])
+def test_shared_resource(case):
+    lock = ROOT / "exclusive"
+    with lock.open("x"):
+        time.sleep(.05)
+    lock.unlink()
+    (ROOT / ("group-" + str(case))).write_text(os.environ["PYTEST_XDIST_WORKER"])
+def test_nested():
+    nested = ROOT / "nested.py"
+    nested.write_text("def test_child(request):\\n"
+        "    assert not hasattr(request.config, 'workerinput'), 'NESTED WORKER POOL'\\n")
+    result = subprocess.run([sys.executable, str(ROOT / "lib/agentic_starter/test_runner.py"),
+        "-m", "pytest", "-q", "-n", "2", str(nested)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+""")
+
+    def run(*args: str, timeout: int = 30):
+        return subprocess.run(
+            [sys.executable, str(script), "-m", "pytest", "-q", *args],
+            cwd=root,
+            env=environment,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+
+    xml = root / "parallel.xml"
+    result = run("--junitxml=" + str(xml), str(fixture))
+    assert result.returncode == 0, "PARALLEL CONTRACT FAILED: " + result.stdout + result.stderr
+    observed = list(ET.parse(xml).getroot().iter("testcase"))
+    assert len(observed) == 5, "PARALLEL COVERAGE LOST"
+    assert len({p.read_text() for p in root.glob("ready-*")}) == 2, "WORKERS NOT DISTINCT"
+    assert len({p.read_text() for p in root.glob("group-*")}) == 1, "RESOURCE GROUP SPLIT"
+    serial = root / "serial.py"
+    serial.write_text("def test_one():\n    assert True\ndef test_two():\n    assert True\n")
+    serial_xml, worker_xml = root / "serial.xml", root / "worker.xml"
+    for workers, output in (("0", serial_xml), ("2", worker_xml)):
+        result = run("-n", workers, "--junitxml=" + str(output), str(serial))
+        assert result.returncode == 0, result.stdout + result.stderr
+
+    def identities(path):
+        return sorted((c.get("classname"), c.get("name")) for c in ET.parse(path).iter("testcase"))
+
+    assert identities(serial_xml) == identities(worker_xml), "PARALLEL IDENTITIES DIFFER"
+    for mode in ("failure", "crash", "hang"):
+        target = root / (mode + ".py")
+        if mode == "failure":
+            target.write_text("def test_failed():\n    assert False, 'INTENDED FAILURE'\n")
+        elif mode == "crash":
+            target.write_text(
+                "import os,pathlib\ndef test_crash():\n"
+                "    p=pathlib.Path(__file__).with_suffix('.calls')\n"
+                "    with p.open('a') as f: f.write('attempt\\n')\n    os._exit(7)\n"
+            )
+        else:
+            (root / "tests/proof-estate.yaml").write_text("hang_timeout_seconds: 5\n")
+            target.write_text(
+                "import os,pathlib,time\ndef test_hang():\n"
+                "    pathlib.Path(__file__).with_suffix('.pid').write_text(str(os.getpid()))\n"
+                "    time.sleep(60)\n"
+            )
+        starts_before = len((root / "worker-starts").read_text().splitlines())
+        result = run("-n", "2", str(target))
+        if mode == "hang":
+            assert result.returncode == 124 and "INCOMPLETE" in result.stderr, (
+                "PARALLEL HANG PASSED"
+            )
+            pid = int(target.with_suffix(".pid").read_text())
+            deadline = time.monotonic() + 3
+            while time.monotonic() < deadline:
+                try:
+                    os.kill(pid, 0)
+                except ProcessLookupError:
+                    break
+                time.sleep(0.02)
+            else:
+                pytest.fail("PARALLEL WORKER SURVIVED CLEANUP")
+        else:
+            assert result.returncode == 1, (
+                "PARALLEL FAILURE PASSED: " + result.stdout + result.stderr
+            )
+        if mode == "crash":
+            assert (
+                target.with_suffix(".calls").read_text() == "attempt\n"
+                and len((root / "worker-starts").read_text().splitlines()) - starts_before == 2
+            ), "WORKER CRASH RETRIED"
+
+
+def test_script_tool_environments_are_built_before_parallel_workers_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Admission: parallel workers raced the first build of a script tool's environment.
+
+    A parallel run prepares exactly the tools that declare their own environment, one at a
+    time and before pytest starts; a single-worker run prepares none.
+    """
+    import agentic_starter.test_runner as runner
+
+    root = tmp_path / "repo"
+    (root / "bin").mkdir(parents=True)
+    (root / "bin/declares").write_text("#!/usr/bin/env -S uv run --script\n# /// script\n# ///\n")
+    (root / "bin/plain").write_text("#!/usr/bin/env bash\n")
+    log = tmp_path / "uv.log"
+    stub = tmp_path / "stubs"
+    stub.mkdir()
+    (stub / "uv").write_text(f'#!/bin/sh\necho "$@" >> {log}\n')
+    (stub / "uv").chmod(0o755)
+    monkeypatch.setenv("PATH", f"{stub}:{os.environ['PATH']}")
+
+    parallel = runner.prepare_script_environments(root, ["-m", "pytest", "-n", "auto", "tests"])
+    serial = runner.prepare_script_environments(root, ["-m", "pytest", "-n", "0", "tests"])
+    order = []
+    monkeypatch.setattr(runner, "prepare_script_environments", lambda *a: order.append("prepare"))
+    monkeypatch.setattr(
+        runner,
+        "run_command",
+        lambda *a, **k: order.append("pytest") or subprocess.CompletedProcess([], 0, "", ""),
+    )
+    monkeypatch.setattr(sys, "argv", ["test_runner.py", "-m", "pytest", "tests"])
+    runner.main()
+    assert (
+        parallel == ["declares"]
+        and serial == []
+        and log.read_text().splitlines() == [f"sync --script {root / 'bin/declares'} --quiet"]
+        and order == ["prepare", "pytest"]
+    ), f"SCRIPT ENVIRONMENTS NOT PREPARED BEFORE WORKERS: {parallel} {serial} {order}"
+
+
+def test_script_environments_are_prepared_in_the_cache_the_caller_names(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Admission: a project with per-worker caches raced a cold cache inside one worker.
+
+    The supervisor's build lands in the supervisor's cache. A worker that keeps its own
+    cache passes its environment, and the build lands there instead.
+    """
+    import agentic_starter.test_runner as runner
+
+    root = tmp_path / "repo"
+    (root / "bin").mkdir(parents=True)
+    (root / "bin/declares").write_text("#!/usr/bin/env -S uv run --script\n# /// script\n# ///\n")
+    log = tmp_path / "uv.log"
+    stub = tmp_path / "stubs"
+    stub.mkdir()
+    (stub / "uv").write_text(f'#!/bin/sh\necho "$UV_CACHE_DIR" >> {log}\n')
+    (stub / "uv").chmod(0o755)
+    path = f"{stub}:{os.environ['PATH']}"
+    monkeypatch.setenv("PATH", path)
+    monkeypatch.setenv("UV_CACHE_DIR", str(tmp_path / "shared"))
+    private = {**os.environ, "UV_CACHE_DIR": str(tmp_path / "worker-3")}
+
+    runner.prepare_script_environments(root, ["-m", "pytest", "-n", "auto", "tests"])
+    runner.prepare_script_environments(root, ["-m", "pytest", "-n", "auto", "tests"], private)
+    assert log.read_text().splitlines() == [
+        str(tmp_path / "shared"),
+        str(tmp_path / "worker-3"),
+    ], f"SCRIPT ENVIRONMENT BUILT IN THE WRONG CACHE: {log.read_text()!r}"
+
+
+def test_fixture_repositories_never_sign_whatever_the_machine_configures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Admission: fixture commits inherited the machine's signing and failed in parallel.
+
+    A machine that signs every commit, with a signing program that refuses, still lets a
+    fixture repository commit and tag; a caller's own entries survive and a nested run
+    adds nothing twice.
+    """
+    import conftest
+
+    refusing = tmp_path / "refusing-gpg"
+    refusing.write_text("#!/bin/sh\nexit 1\n")
+    refusing.chmod(0o755)
+    machine = tmp_path / "machine.gitconfig"
+    machine.write_text(
+        "[user]\n\tname = Fixture\n\temail = fixture@example.invalid\n"
+        f"[commit]\n\tgpgsign = true\n[tag]\n\tgpgsign = true\n[gpg]\n\tprogram = {refusing}\n"
+    )
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(machine))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    repository = tmp_path / "fixture"
+    repository.mkdir()
+
+    def git(*arguments: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", "-C", str(repository), *arguments], capture_output=True, text=True
+        )
+
+    assert git("init", "-q").returncode == 0
+    committed = git("commit", "-q", "--allow-empty", "-m", "fixture")
+    tagged = git("tag", "-a", "fixture", "-m", "fixture")
+    supplied = {"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "core.pager", "GIT_CONFIG_VALUE_0": ""}
+    conftest.isolate_fixture_git_signing(supplied)
+    once = dict(supplied)
+    conftest.isolate_fixture_git_signing(supplied)
+    assert (
+        committed.returncode == 0
+        and tagged.returncode == 0
+        and supplied == once
+        and supplied["GIT_CONFIG_KEY_0"] == "core.pager"
+        and supplied["GIT_CONFIG_COUNT"] == "3"
+    ), f"FIXTURE REPOSITORY SIGNED: {committed.stderr} {tagged.stderr} {supplied}"

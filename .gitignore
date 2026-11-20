@@ -21,3 +21,5 @@ __pycache__/
 
 # Local credentials for live checks; never committed
 .secrets/
+
+/.collaboration-views/

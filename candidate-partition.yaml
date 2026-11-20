@@ -1,18 +1,16 @@
-# Root-anchored JSON-quoted patterns; *, ? stay within a segment; ** spans segments.
-# Bookkeeping carves out of active. Unclassified tracked paths refuse; unclassified
-# nonignored untracked files remain included in product identity until classified.
 schema: agentic.candidate-partition.v1
 active:
   - "/candidate-partition.yaml"
   - "/.gitattributes"
   - "/.gitignore"
   - "/AGENTS.md"
-  - "/CLAUDE.md"
   - "/LICENSE"
   - "/LICENSES/**"
   - "/THIRD_PARTY.md"
   - "/README.md"
   - "/WINDOWS-RELEASE.md"
+  - "/documentation.toml"
+  - "/manual/**"
   - "/kickoff.yaml"
   - "/.agents/**"
   - "/.claude/**"
@@ -24,14 +22,16 @@ active:
   - "/docs/**"
   - "/lib/**"
   - "/plan/**"
+  - "/log/**"
+  - "/collaboration/**"
   - "/policies/**"
   - "/project/**"
   - "/reports/**"
   - "/tests/**"
 bookkeeping:
-  - "/LOG*.md"
   - "/EXECUTION_LOG.jsonl"
-  - "/plan/INDEX.md"
+  - "/plan/events/**"
+  - "/log/entries/**"
   - "/lessons/**"
   - "/lessons-archived/**"
   - "/user-actions/**"

@@ -1,0 +1,15 @@
+{
+  "active_imports": [],
+  "adopted": true,
+  "format": "starter.multioperator.v1",
+  "migration_tool_sha256": "0630fa4c705003f38a9803c99524fb056c4aeeed93c9b870e0f680cb36251db0",
+  "original_log_bytes": 19846,
+  "original_log_sha256": "3b4b1f3057a0c57d9838e1443bee28802cdf90de68a604dde3f4899d7ea7a6a2",
+  "phase_mapping": {
+    "1": "pdf-conversion-checklist",
+    "2": "offline-brokered-vision"
+  },
+  "source_archive_sha256": "b7dffa5ff18a31f2ab71e56583bb591773fe18e3ec01c6fa5a8d36acaeb81731",
+  "source_commit": "f7146a9a52b8b5ff767d22c76720cde66c5bb1c9",
+  "writer": "vellric-maintainer"
+}

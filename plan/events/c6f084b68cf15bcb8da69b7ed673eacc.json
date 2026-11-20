@@ -1,0 +1,11 @@
+{
+  "from": null,
+  "id": "c6f084b68cf15bcb8da69b7ed673eacc",
+  "owner": null,
+  "phase": "offline-brokered-vision",
+  "previous": null,
+  "reason": "Imported source state, not a new acceptance or lease",
+  "source_phase": "2",
+  "state": "next",
+  "writer": "vellric-maintainer"
+}

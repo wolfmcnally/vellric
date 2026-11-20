@@ -2,13 +2,11 @@
 name: kickoff
 description: >-
   Orchestrate a single phase of plan/ end-to-end: pick up the next phase,
-  plan, review plan, implement, review code, build/test, update status
-  markers in plan/INDEX.md, and log; route later test- or user-driven
+  plan, review plan, implement, review code, build/test, append phase events and immutable log entries; route later test- or user-driven
   corrections by risk, size and the operator's phase/inter-phase ruling. Language- and surface-agnostic; the project's
-  CLAUDE.md and phase file declare which build gates to run.
-  Invoke as /kickoff in Claude Code or $kickoff in Codex (picks up the ⬅️
-  phase); append "phase N" to target a specific phase.
-last-reviewed: 2026-09-29
+  AGENTS.md and phase file declare which build gates to run.
+  Invoke as /kickoff in Claude Code or $kickoff in Codex (selects the operator’s next phase); append "phase <id>" for explicit selection.
+last-reviewed: 2026-10-26
 ---
 
 # Kickoff: Single-Phase Session
@@ -20,7 +18,7 @@ Methodology work, including teach/learn, never enters phase orchestration: the p
 For product work, preflight freezes primary or delegated authority. Primary mode keeps planning and coding on this instance and obtains bounded advisory reports; delegated mode retains the four-role approval loop. Follow the primary branches in planning/implementation resources when selected. Do not let the delegated procedures or verdict vocabulary silently override advisory authority. Optional `llm-usage` checking occurs at kickoff before any model-backed preflight or phase mutation.
 
 
-Orchestrate one independently acceptable phase under `plan/`: plan → independent plan review → implementation → independent code critique → candidate gate → accepted evidence close → bookkeeping → handoff gate → delivery. This is the entry point; the adjacent resources carry the execution procedure. Read `CLAUDE.md`, the phase and its named authorities. The invoking session owns orchestration, logs, telemetry and both close gates; the primary owns inline implementation in primary mode; the coder owns it in delegated mode. Do not proceed to another phase without authorization.
+Orchestrate one independently acceptable phase under `plan/`: plan → independent plan review → implementation → independent code critique → candidate gate → accepted evidence close → bookkeeping → handoff gate → delivery. This is the entry point; the adjacent resources carry the execution procedure. Read `AGENTS.md`, the phase and its named authorities. The invoking session owns orchestration, logs, telemetry and both close gates; the primary owns inline implementation in primary mode; the coder owns it in delegated mode. Do not proceed to another phase without authorization.
 
 ## Parse arguments
 
@@ -28,13 +26,13 @@ Before selecting work, apply [methodology routing](../../../policies/review-lane
 
 Raw arguments: `$ARGUMENTS`
 
-- Empty: select the single `⬅️` row in `plan/INDEX.md`.
-- `phase N` or `phase N.M`: select that explicit phase. Resuming a `🚧` row requires explicit selection; do not infer it from an absent arrow.
+- Empty: run `./bin/multioperator select --root . --owner <operator>` and verify the selected work and external custody.
+- `phase <id>`: select the permanent slug explicitly with the same command plus `--phase <id>`. An active phase needs explicit resume and its current claim; do not infer custody from a marker or directory.
 - `one-shot`: invocation-only request under [review-lanes.md](../../../policies/review-lanes.md); check eligibility before skipping planning. Never select it autonomously or declare it in frontmatter.
 - Concrete feedback or a build/test failure after initial critique, or an approved preparation/qualification continuation: use the corresponding route in [recovery.md](recovery.md).
-- Other text: match a phase row; unresolved ambiguity goes to the operator through recovery's input-park procedure.
+- Other text: match a canonical phase definition; unresolved ambiguity goes to the operator through recovery's input-park procedure.
 
-Inspect the current branch, authoritative phase table and relevant recent log directly. Report missing files, command failures and invalid ledgers explicitly; never default a failed status probe to a benign state.
+Inspect the current branch, canonical phase events and relevant recent log directly. Report missing files, command failures and invalid ledgers explicitly; never default a failed status probe to a benign state.
 
 ## Required resources and order
 
@@ -54,6 +52,7 @@ Full initial lane: preflight → dispatch + planning → dispatch + implementati
 
 ## Essential controls
 
+- Prefer available supported cross-harness launch and communication capabilities under [role-model policy](../../../policies/role-models.md#optional-cross-harness-coordination). Missing optional capabilities retain the direct native/watched-CLI path; no new dependency, grant or delegation authority follows. Read dispatch's transport selection before launching.
 - Resolve per-role venue/model/effort from `kickoff.yaml`; live preflight precedes phase mutation. Freeze runtime selection with the run. No silent substitution or permission changes. Retain configured timeouts, self-resume limits and recursion guard. [Role authority](../../../policies/role-models.md) governs admissible recovery.
 - Keep coherent outcomes intact. Decompose only at an authorized consequential decision, independently accepted prerequisite, deployment/migration/human seam or demonstrated coherence limit. Surface count and missing child files are not boundaries. Planning settles consequential interfaces; ordinary implementation choices and approved deletions belong to the coder.
 - Mark major work `🚧` before whole-file authority capture. Approved governing-prose preparation ends in a truthful park; a fresh run captures final authority before real remaining qualification work. Later authority changes require a new park/rebind. Never edit hashes or normalize unrelated ledgers.

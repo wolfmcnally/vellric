@@ -40,7 +40,7 @@ uv pip install --python .venv/bin/python ./vellric-0.2.6-py3-none-any.whl
 
 ## Repository development
 
-The package lives in project/. The repository retains the Starter methodology, proof estate, skills, policies and tooling; they are not removed from the public source tree. [CLAUDE.md](CLAUDE.md), [plan](plan/INDEX.md), [policies](policies/README.md), [provenance](THIRD_PARTY.md) and the [seed brief](briefs/BRIEF.md) explain that workspace.
+The package lives in project/. The repository retains the Starter methodology, proof estate, skills, policies and tooling; they are not removed from the public source tree. [AGENTS.md](AGENTS.md), [plan](plan/INDEX.md), [policies](policies/README.md), [provenance](THIRD_PARTY.md) and the [seed brief](briefs/BRIEF.md) explain that workspace.
 
 ```bash
 ./bin/setup

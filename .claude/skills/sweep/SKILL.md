@@ -11,7 +11,7 @@ description: >-
   /sweep in Claude Code or $sweep in Codex; an optional focus argument narrows
   the pass (e.g. "skills", "lessons", "policies").
 argument-hint: "[<focus>]"
-last-reviewed: 2026-09-29
+last-reviewed: 2026-10-26
 ---
 
 # Sweep — Prune and graduate the rule surfaces
@@ -50,16 +50,11 @@ Run the mechanical checks first — they are deterministic and their output anch
    no pin linking outside `docs/`), and the lifecycle-aware phase-ledger state machine.
 2. `./bin/lessons validate` — ledger schema health.
 3. `./bin/lessons candidates` — graduation-ready lessons (≥3 occurrences).
-4. `./bin/test-governance reassess` when the proof-estate bundle exists —
-   frozen baseline, complete dispositions and admissions, direct
-   critical risks, effectiveness floors, sizes, and the time-budget declaration. Run
-   `./bin/test-governance timing --samples 3` on the reference machine. Rerun `assay`
-   every sweep, re-anchor or retire any case whose patch no longer applies, and carry
-   every dominated-proof finding into the decision queue. Then make the junk-pattern read and layer pass that `policies/test-suite-governance.md` § Reassessment and transfer requires; each proposed retirement is decided individually, and each ratified batch passes that policy's preservation review before it is applied.
+4. `./bin/test-governance reassess` when the bundle exists: validate local inventory, dispositions/admissions, direct risks, witness references and explicit pending baseline review. Read existing diagnostic timing with `./bin/test-governance timing`; no automatic resampling. Choose a bounded batch only for a concrete changed behavior, defect, cost or overlap signal. Report pending groups and their age from adoption/history records. No full-estate audit or forced shrinkage applies. Each proposed retirement goes into the decision queue and each ratified batch receives the scenario-preservation assessment required by the selected review lane (primary-owned for methodology work). Mutation tools require a specific operator request over any requested new or committed subset and duration; propose a survey with its expected cost only when the evidence warrants it, and record its dated outcome if requested.
 
 Then the judgment audits, each producing candidate findings:
 
-5. **Policies.** Read `policies/` against `LOG.md`, `lessons/`, and the repo's current shape. Flag: rules that contradict each other or a newer policy; rules describing machinery that no longer exists; rules that have never prevented anything (no LOG/lesson/finding has referenced them since adoption — a candidate for merging or retirement, not automatic deletion); policy examples that have drifted from the files they cite. Apply the doctrine's growth rule ([`briefs/methodology.md`](../../../briefs/methodology.md) § Orchestration runtime doctrine) to every binding orchestration step: a step that cannot name the park it prevents or cite its motivating incident, or whose failure family a later structural fix made dead, is a deletion or demote-to-advisory candidate.
+5. **Policies.** Read `policies/` against `log/entries/`, `lessons/`, and the repo's current shape. Flag: rules that contradict each other or a newer policy; rules describing machinery that no longer exists; rules that have never prevented anything (no LOG/lesson/finding has referenced them since adoption — a candidate for merging or retirement, not automatic deletion); policy examples that have drifted from the files they cite. Apply the doctrine's growth rule ([`briefs/methodology.md`](../../../briefs/methodology.md) § Orchestration runtime doctrine) to every binding orchestration step: a step that cannot name the park it prevents or cite its motivating incident, or whose failure family a later structural fix made dead, is a deletion or demote-to-advisory candidate.
 6. **Briefs.** Check each brief's `status` against reality per [`policies/briefs.md`](../../../policies/briefs.md): an `implemented` brief whose design has been superseded belongs at `historical`; a `draft` that has quietly become load-bearing needs promotion or a decision. Briefs decay if not maintained — this is the check behind that warning.
 7. **Skills and agents.** Compare each `.claude/skills/*/SKILL.md` `last-reviewed:` date against the sweep date; re-read any skill past ~90 days or whose subject matter changed since its stamp. For agent definitions (no frontmatter date), use `git log -1 --format=%cs -- <file>` as the staleness heuristic. Flag steps that reference renamed files, retired tools, or contradicted policies.
 8. **Lessons ledger.** Beyond the mechanical candidates list: run `./bin/lessons aged` and propose every listed lesson for closing as not recurring, in one batch (`policies/lessons.md` § Lifecycle, Age out); in a template repo, propose closing any open lesson that fails the scope test in `policies/lessons.md`; flag `candidate` lessons that have sat unratified across multiple sweeps (propose graduate or reject — an undecided ledger is a silent backlog), and near-duplicate lessons that should merge (only when their *remedies* coincide — [`policies/lessons.md`](../../../policies/lessons.md) § Named families). **Read each occurrence `ref` against its own body**: a row that narrates several distinct instances is under-counting the lesson and silently suppressing the three-occurrence graduation trigger (the counting rule in `policies/lessons.md`) — this audit is the only enforcement that has ever caught it, because the lexical detectors built for it were all cut as hopeless. Treat catalog completeness and internal-link integrity as separate claims even though one deterministic checker now enforces both.
@@ -156,7 +151,7 @@ Use this shape:
 ## Proposed LOG.md entry
 ```
 
-The `SWEEP (<focus>)` entry is an authorized `LOG.md` entry kind — see the entry-kind table in [`policies/log-discipline.md`](../../../policies/log-discipline.md) § What `LOG.md` is. Write it; do not re-decide whether a sweep earns one.
+The `SWEEP (<focus>)` entry is an authorized `log/entries/` entry kind — see the entry-kind table in [`policies/log-discipline.md`](../../../policies/log-discipline.md) § What `log/entries/` is. Write it; do not re-decide whether a sweep earns one.
 
 An empty plan ("nothing stale") is a valid, reportable outcome.
 
@@ -178,10 +173,11 @@ Graduating a lesson into a rule surface and retiring a policy are exactly the hu
 On approval:
 
 1. Apply the approved edits (AUTO batch plus each ratified DECIDE).
-2. For each graduated lesson: make the ratified edit to the target surface, then archive the lesson (`status: codified`, `closed:`, `graduated_to:`) into `lessons-archived/`. For each rejected lesson: archive with `status: rejected`. Run `./bin/lessons validate`.
-3. Update `last-reviewed:` to today's date on every skill the sweep actually re-read — including ones with no findings.
-4. Re-run the mechanical checks (`./bin/check-catalogs`, `./bin/lessons validate`) and finish with `./bin/check all`.
-5. After the unchanged approved sweep passes `./bin/check all`, re-check the live tree, stage only its explicit paths, inspect the staged diff, create an ordinary factual commit, verify the resulting commit's file set, and make a non-force push to one unambiguous configured upstream, then verify clean aligned tips ([`policies/human-in-the-loop.md`](../../../policies/human-in-the-loop.md); [`policies/commit-staging.md`](../../../policies/commit-staging.md)). Park delivery on any unexpected path, unresolved shared-file ownership, unresolved gate, missing or ambiguous upstream, divergence, or destructive Git need. Then report: findings by area, what was applied, what was declined, what remains open, and delivery status.
+2. For every ratified change that adopts, corrects or retires a rule, retire what the old rule produced ([`policies/review-lanes.md`](../../../policies/review-lanes.md) § Methodology improvements): search by concept for statements, tools and artifacts written under the old rule, dispose of each, and record the search in the `SWEEP` entry.
+3. For each graduated lesson: make the ratified edit to the target surface, then archive the lesson (`status: codified`, `closed:`, `graduated_to:`) into `lessons-archived/`. For each rejected lesson: archive with `status: rejected`. Run `./bin/lessons validate`.
+4. Update `last-reviewed:` to today's date on every skill the sweep actually re-read — including ones with no findings.
+5. Re-run the mechanical checks (`./bin/check-catalogs`, `./bin/lessons validate`) and finish with `./bin/check all`.
+6. After the unchanged approved sweep passes `./bin/check all`, re-check the live tree, stage only its explicit paths, inspect the staged diff, create an ordinary factual commit, verify the resulting commit's file set, and make a non-force push to one unambiguous configured upstream, then verify clean aligned tips ([`policies/human-in-the-loop.md`](../../../policies/human-in-the-loop.md); [`policies/commit-staging.md`](../../../policies/commit-staging.md)). Park delivery on any unexpected path, unresolved shared-file ownership, unresolved gate, missing or ambiguous upstream, divergence, or destructive Git need. Then report: findings by area, what was applied, what was declined, what remains open, and delivery status.
 
 ## Rules
 

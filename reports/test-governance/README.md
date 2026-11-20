@@ -1,19 +1,20 @@
 # Test-governance reports
 
 This directory records the recipient's own proof-estate reset. The frozen
-pre-reset baseline is immutable. The append-only reset ledger dispositions every
-baseline proof and records admissions, repairs and retirements. Replaying the
+pre-reset baseline is immutable. The append-only ledger records baseline dispositions, admissions, repairs, modifications and retirements. Bounded adoption keeps undispositioned baseline proofs active and reports them as pending review; completed resets remain complete. Modification events link one-based fresh witness receipt numbers; independent review checks their assertion-level relevance. Replaying the
 ledger must reproduce the live inventory exactly; a missing event, repeated
-retirement, or shadow proof fails validation. The effectiveness report is the
-observed result of the frozen historical and held-out corpora; misses remain
-visible, each observation binds the exact mutation-patch digest and carries the date it
-was measured. Recall is reported as of the oldest observation; patches stranded
-by later edits are repaired or retired at the next sweep's assay. Per-test timings are machine-local and live in the
+retirement, or shadow proof fails validation. The witness ledger holds one receipt per
+observed red witness: the proofs, the named defect, the command, the text its failure
+had to contain, the files the defect was planted in, digests of the planted bytes and of
+the failing output, and the date. Receipts are appended only by
+`./bin/test-governance witness finish`; no planted defect is stored. Per-test timings are machine-local and live in the
 ignored `.kickoff/test-timing/` record, never here.
+
+The history report also carries the dated counts of each mutation survey (`./bin/mutate`), with its state: a partial or unmeasured survey is recorded as that.
 
 These files are evidence, not portable judgments. A stamped, taught, or learning
 recipient regenerates them from its own estate and never copies survivors,
-selectors, corpora, timings, risk applicability, or dispositions.
+selectors, witness receipts, timings, risk applicability, or dispositions.
 
 The executable authority is:
 
@@ -23,13 +24,6 @@ The executable authority is:
 ./bin/test-governance reassess
 ```
 
-`assay` reruns corpus patches in disposable copies. Run it at every governed sweep. Routine vital and
-changed lanes never replace the full handoff gate.
+Routine vital and changed lanes never replace the full handoff gate. The frozen reset summary remains a historical snapshot; use `reassess` for current totals and for the count of proofs that still have no receipt.
 
-As of 2026-09-05, `assay` preserves symlinks in each disposable copy and requires each case command to pass on that copy before applying the frozen mutation. A failing baseline stops measurement instead of increasing recall. The effectiveness rows report the subsequent mutated command outcomes; inspect their full diagnostics to distinguish intended detections from unrelated failures. A stored report is the most recent assay observation, not something `validate` or either full close gate regenerates. The frozen reset summary remains a historical snapshot; use `reassess` for current totals and recall.
-
-As of 2026-09-05, readiness qualification detects 12/12 historical defects and 11/12 held-out mutations, with the original corpus and thresholds unchanged. The preflight inventory and receipt-candidate cases are now detected by strengthened existing proofs. `vital-substitutes-for-full` remains a recorded miss: its frozen command runs the governance-manager tests rather than the modified full-gate entry point. A separate disposable control ran `tests/test_check.py::test_all_is_default_locked_ordered_and_cwd_independent`: the unmodified command passed, and the frozen mutation failed its ordered-call assertion because it selected the vital lane instead of the full test estate. This diagnoses the corpus command's scope; it does not credit the frozen assay with an extra detection.
-
-Run long assays from a frozen disposable source snapshot. Review corrections made while an earlier live-tree assay was running required replacing that preliminary evidence; the final report was generated from the independently reviewed code snapshot. Qualification also exercised major, child and nested final-child acceptance, exact ledger application, repeated closes, tampered records, and actual fast-forward delivery to seeded disposable remotes. An isolated product gate and a root-level lifecycle fixture cover both product layouts; recipient-local delivery tests separately qualified preservation of a recipient's stronger delivery identity. These are local workflow checks, not live-model performance measurements or completed teaching passes.
-
-As of 2026-09-29, the count caps and one-for-one growth budget were replaced by per-family size ceilings and a test-lane time budget (`policies/test-suite-governance.md` § Time budget). The two holdout mutants that seeded defects into the removed count cap were retired from the corpus and replaced by two that seed defects into the time budget (`single-run-confirms-overrun`, `foreign-machine-budget-judged`); four others were re-anchored to the same defects after manager edits moved their context lines, two of them already stranded by the previous commit. The assay was then rerun from the live tree with no edits during the run.
+A witness plants its defect in the live tree. While one is pending, `validate` refuses, so neither the commit hook nor the full gate can pass a planted defect; `./bin/test-governance witness abort` restores an interrupted run. To witness a proof of the governance manager itself, run the command from an untouched copy of the manager and its test_runner module with `--root` pointing here, so the planted defect cannot change how the observation is made. When challenging test_runner itself, run pytest through the repository interpreter under the untouched observer rather than through the runner being challenged; otherwise a planted exit-status defect can mask the expected failure.

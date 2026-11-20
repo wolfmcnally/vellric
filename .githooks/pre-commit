@@ -7,7 +7,7 @@ repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 ./bin/check-harness-parity
 ./bin/check-toolchain-callers
-./bin/check-log --staged
+./bin/multioperator validate --root . --staged
 ./bin/check-candidate-partition --staged
 ./bin/test-governance validate
 ./bin/python project/packaging/release_version.py --staged

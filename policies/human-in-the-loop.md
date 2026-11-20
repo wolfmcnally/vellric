@@ -36,7 +36,7 @@ Every acceptance criterion is one of two kinds, and the kind decides who closes 
 - **Never claims subjective acceptance.** It surfaces manual criteria and demo protocols verbatim; it does not say "I listened and it sounds great" — it cannot.
 - **Never adds work the plan doesn't authorize.** Drift is contained to the plan that was actually approved. Anything extra is reported as a Note.
 - **Never silently reopens closed phases.** A `✅` phase keeps its status and historical blocks. For high-risk or large/cross-cutting corrections, recommend an inserted phase, normally a current-phase sub-phase, under [`review-lanes.md`](review-lanes.md). Honor the operator's ruling: a chosen phase/sub-phase has its own formal planning/reviews and START/END records; a chosen inter-phase implementation has no formal review and appends an `END (correction)` record. New consequential scope needs explicit authorization; route choice never waives validation/tests, safety/permissions or original history.
-- **Never modifies `policies/` or top-level `CLAUDE.md` without explicit instruction.** Those are the rules of the road; the orchestrator and the four canonical agents serve them, they do not amend them.
+- **Never modifies `policies/` or top-level `AGENTS.md` without explicit instruction.** Those are the rules of the road; the orchestrator and the four canonical agents serve them, they do not amend them.
 
 ## What parks delivery
 
@@ -49,6 +49,42 @@ Any of these stops the commit or the push, is reported truthfully, and is never 
 An open parked criterion is **not** on that list. It does not park delivery; it stays open for the user after the phase is delivered, and the END block records it as such.
 
 None of those authorizes the orchestrator to select a remote, create an upstream, force, tag, reconcile history, or bypass a hook. Those are destructive or custody-bearing Git boundaries and they belong to the human, always.
+
+## Delivery resource disposition
+
+Operator-ratified 2026-10-28. Delivery completion includes disposing of temporary worktrees, temporary branches and generated outputs created for that scope. Inventory them explicitly, even when none exist. Each is **retired**, **retained for a named current purpose**, or **blocked with an exact reason**. Source delivery may succeed while cleanup is blocked; report both states. Dirty flags alone neither prove unique work nor justify indefinite retention, and age alone never authorizes a purge.
+
+Before routine retirement, verify integration into the intended main repository/branch, obtain current released ownership, await terminal commands/reviewers and read back actual state. Reconcile dirty paths and unique commits against the integrated result, not just a clean/dirty flag. Preserve required unique evidence in its canonical durable home and verify its bytes there before removing its temporary container. Do not create redundant archives when the required bytes already exist. Preserve immutable tools, qualifying preimages, failed/incomplete histories and valid rejected records required by policy. Uncertain custody, active work, unmerged unique history, forced deletion or irrecoverable loss blocks retirement.
+
+**Keep the inventory true from the start, so a release never finds a surprise.** Whoever creates a temporary worktree records its path, owner and purpose when it is created, in the run's evidence for a phase or in the scope record of the activity log for other work; a worktree with no recorded owner is uncertain custody from its first minute. At every lane or phase handback the coordinator receiving the work checks each temporary worktree the lane used: its unique commits, changes and evidence are delivered or preserved where they can be recovered, and an eligible worktree is then retired explicitly with the ordinary nonforced commands below. A dirty or abandoned handoff is reconciled promptly: it keeps a named owner and a precise hold stating what is unresolved and who decides, and it is never cleared by discarding, resetting or forcing. No timer, supervisor or automatic deletion does this work; it is a step of handback.
+
+Incrementally updated build directories are explicitly allowed to remain. Retain useful dependency caches and environments with a named current purpose; do not purge them or force rebuilds just to satisfy cleanup. A retain reason names what uses the resource now; a blocker names the missing fact, owner decision or safe boundary and next action.
+
+The orchestrator may perform scope-owned routine completion cleanup under the authorized delivery scope: ordinary nonforced worktree removal and `git branch -d` for a verified integrated temporary branch, after the checks above. Never use `--force`, `-D`, broad recursive deletion or `git clean` as a substitute for resolving unique content or ownership. Remove only enumerated disposable generated outputs, through their existing safe cleanup command or exact owned paths. Platform restrictions, custom action approvals and grants still bind; this authority grants none. Tags, history rewriting, remote changes and all other destructive Git actions remain human-owned. A nonforced command refusal is evidence to diagnose, not permission to force it.
+
+Record completion privately in durable ignored storage or outside the reviewable tree. Use the existing evidence manager after the actual cleanup/readback:
+
+```sh
+./bin/kickoff-evidence verify-completion --repository "$REPOSITORY" --record "$COMPLETION_RECORD"
+```
+
+The JSON record has exactly `scope` (nonempty text), `inventory_complete` (literal true, the owning writer's explicit inventory attestation), and `resources` (a list, possibly empty). Each resource has exactly `kind` (`worktree`, `branch`, `generated-output`), `target` (absolute path or local branch name), `disposition` (`retired`, `retained`, `blocked`), `reason` (named current purpose or exact retirement/blocker reason), `required_evidence` (list of canonical retained-byte references, explicitly empty only when no required evidence belongs to it), and `retirement` (null unless retired).
+
+A retired resource's `retirement` has exactly `integration`, `released_ownership` and `terminal` (references to actual integration, current ownership-release and terminal-command evidence), plus `tip` and `integrated_into` (exact original/integrated commit identities for a branch; null for other kinds). Every evidence reference is an object with absolute `path` and `sha256`; it points to the existing canonical bytes, not a new redundant copy. The checker verifies retained bytes, branch ancestry and actual target absence/registration for retirement, and target presence for retention; a blocked disposition returns exit 2 with `complete: false`. Query errors refuse rather than becoming absence. Its stdout binds the record digest and actual result; retain that output with the record.
+
+This is read-only validation, not a deletion service, process inventory, authentication mechanism or proof that the writer enumerated every resource or interpreted its evidence correctly. The owning orchestrator must inspect the factual evidence and current custody before each action. Preparing a record is not executing cleanup; a queued action or message is not terminal/readback evidence. Post-delivery records never rewrite accepted phase evidence or require a fabricated new run. If a tracked completion summary is wanted, write it before the handoff gate and keep subsequent actual outcomes in the private record and user report.
+
+### Before a tag or publication: one clean checkout
+
+Operator-directed 2026-11-20. A release is cut from one checkout, and work left in another registered worktree of the same repository is invisible from it. So a release requires that the repository has **exactly one** registered worktree, the checkout being released, with no tracked, staged or untracked change. Any other registered worktree blocks the release, clean or not, as does a locked, prunable, bare, missing or unreadable registration.
+
+```sh
+./bin/check-release-worktrees
+```
+
+The check is mechanical, read-only and fail-closed: it never removes, prunes, moves, resets or unlocks anything, and a failed or unparsable Git answer is an error, never a clean result. Run it twice in every release. First, at the very start of release preparation, before the costly qualification gate, so a stray worktree stops the release in seconds. Second, immediately before each tag or publication action; run it again if anything material happened in between. The early run never stands in for the later one. Its pass line states what it scanned; ignored files are outside it. A refusal names each worktree and its observed state. The remedy is the disposition procedure above, by each worktree's owner, with nonforced commands and after confirming nothing unique would be lost; it is never a forced removal to make the check pass.
+
+This proves repository hygiene only. That the released artifact is correct is a separate proof, made by the release gate on the exact tree; neither stands in for the other. The check is not part of the ordinary full gate, because a linked worktree is legitimate during development.
 
 ## Correcting a diagnosed hook refusal
 
@@ -64,7 +100,7 @@ This authorizes correction, never circumvention. Do not disable, weaken or bypas
 - **Owns the parked criteria.** Nothing closes them but the human.
 - **Authors and amends briefs.** Briefs document the human's intent. Agents propose in their reports; the human is the editor of record.
 - **Authors and amends policies.** Agents propose policies; humans approve them.
-- **Owns the destructive and custody-bearing Git surface** — force, history rewrite, tags, remotes, branch deletion.
+- **Owns the destructive and custody-bearing Git surface** — force, history rewrite, tags, remotes and branch deletion outside the narrowly authorized nonforced routine completion above.
 - **Decides when to break a phase, merge phases, or abandon a phase.** Methodology step 11 ("stay agile") belongs to the human.
 
 ## Why this is the trade

@@ -29,11 +29,11 @@ Candidate ids supplied by the orchestrator bind the product identity under `cand
 ### 1. Re-read the authorities you need
 
 1. **`plan/INDEX.md`** for cross-cutting concerns.
-2. **`plan/phase-<id>.md`** for the target phase context. (For sub-phases, also the parent `plan/phase-<N>.md`.)
+2. **`plan/phases/<id>.md`** for the target phase context. (For sub-phases, also the parent `plan/phases/<parent-id>.md`.)
 3. **Every brief listed under "Brief refs"** in the phase file — these are the contracts the implementation realizes. Refer to numbered sections by id when applicable. Read every pinned document under `docs/` that the plan or a cited brief names — it is retrieval, not research, and it is the text to implement against rather than the live URL (`policies/docs.md`).
-4. Every file listed in the phase frontmatter `depends_on`.
+4. The phase file of every phase id in the phase frontmatter `depends_on` (`plan/phases/<id>.md`).
 5. The immediately preceding completed phase in `plan/INDEX.md`.
-6. **`CLAUDE.md`** for invariants and the project's conventions (language, tooling, formatting, file shapes).
+6. **`AGENTS.md`** for invariants and the project's conventions (language, tooling, formatting, file shapes).
 7. **Every policy** under `policies/` that the plan's "Policy Constraints" section names — and any policy whose subject the plan touches.
 8. Existing files named in the plan's Modified Files section, plus any structural dependencies (project metadata file, sibling modules, fixtures).
 
@@ -87,7 +87,7 @@ Do not hand back broken code. A focused green result is evidence for its named s
 
 **Every test names its falsifier.** For each test you add or materially change, name the one-line mutation of the code under test that would turn it red, and record the pair in Change Evidence `falsifiers`. If you cannot name one, the test is scoring a stand-in for the property — the implementation's own output, a constant lifted from the code, a count preserved by any write — and it is rewritten or deleted before handoff, per `policies/acceptance-empirical.md`. This is the largest category of code findings and the one you can close alone.
 
-**Every new test passes the admission gate.** Before writing a test, answer the four admission questions in `policies/test-suite-governance.md` § Judging a proof, and check it against that section's junk patterns. A test that needs an export, flag, or injection hook no production caller uses moves to the real boundary instead of adding the seam. A regression test is observed red on the pre-fix code before the fix lands.
+**Every new test passes the admission gate.** Before writing a test, answer the admission questions in `policies/test-suite-governance.md` § Judging a proof, and check it against that section's junk patterns. A test that needs an export, flag, or injection hook no production caller uses moves to the real boundary instead of adding the seam. A regression test is observed red on the pre-fix code before the fix lands. Every created or modified test assertion gets an assertion-specific observed-red receipt from `./bin/test-governance witness` (same policy, § Removal and growth): begin, plant the defect the test exists to catch, finish. A sentence saying it would fail is not a witness. Do not run the mutation survey on your own initiative; it is opt-in (same policy, § Mutation survey). Only when a specifically approved plan names the requested survey, run `./bin/mutate` as the plan states and act on every survivor in the requested scope: kill it with a stronger test, or disposition it in your report as equivalent or outside any contract. Report an `unmeasured` or `partial` result as that, never as clean.
 
 Remain sensitive to human wall-clock cost while implementing. If an operation materially dominates the work and a substantial, low-risk improvement is reasonably apparent, make one bounded assessment and use an existing safe acceleration when available. Otherwise surface the concrete opportunity once and continue. Do not pursue marginal savings, invent fixed thresholds, start speculative profiling, attempt unproven parallelism, expand the phase, or weaken effectiveness, coverage, determinism, review, or either close gate.
 
@@ -192,7 +192,7 @@ passes this object unchanged to
 - Follow the approved plan. Implement no more and no less. A finding you can refute goes back as `rejected-with-evidence` with the refuting observation in Finding Resolution; do not implement a non-requirement to make a finding go away, and do not defend against an actor no phase, brief, or policy names — that is an owner question, and the critic is told to route it as one.
 - A focused test that mirrors the implementation is not evidence.
 - Fix the class, not the site. When a finding names one site, enumerate the siblings (grep the pattern) and fix them together or state why the site is singular; three projects filed the same lesson before it became this rule.
-- On a revision round, re-run every inventory the edit touches: mutation patches anchored on changed lines, prose and docstrings that name changed identifiers, floors and counts, generated inventories. A revision that resolves the named findings and regresses a neighbor comes back as `introduced-by-revision`.
+- On a revision round, re-run every inventory the edit touches: prose and docstrings that name changed identifiers, floors and counts, generated inventories. A revision that resolves the named findings and regresses a neighbor comes back as `introduced-by-revision`.
 - Idiomatic code in the project's primary language. Match existing style; do not introduce a different formatting convention.
 - Type hints / type signatures on new public APIs when the language supports them.
 - Explicit error types over generic exception types where possible.
