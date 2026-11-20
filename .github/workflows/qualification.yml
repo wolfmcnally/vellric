@@ -41,6 +41,13 @@ jobs:
           ./bin/install-hooks
           uv sync --locked --extra ocr --project project
           ln -s "$RUNNER_TEMP/ocr/bin/tesseract" project/.venv/bin/tesseract
+      - name: Provision the pinned manual tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          rust="$(./bin/python -c 'import tomllib; print(tomllib.load(open("documentation.toml", "rb"))["tools"]["rust"])')"
+          rustup toolchain install "$rust" --profile minimal
+          ./bin/docs setup
       - name: Qualify the exact source tree
         run: ./bin/check all
       - name: Qualify a fresh installed wheel with native and OCR jobs
