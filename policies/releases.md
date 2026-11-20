@@ -75,6 +75,8 @@ Everything below runs on the exact commit that will be tagged:
 5. Every file in `user-actions/` whose `blocks` names this release, or a capability it advertises, is closed.
 6. Hashes, receipts and install results go into the local release evidence (`release-receipt.json` and its companion files). That evidence is never committed to the public tree, and the public history never carries private development records.
 
+The [one clean checkout](human-in-the-loop.md#before-a-tag-or-publication-one-clean-checkout) rule already applies to every release; this section only places it in the release order. Run `./bin/check-release-worktrees` at the very start of release preparation, before item 1, and again immediately before each tag or publication action. That policy states the requirement and its remedy; nothing here adds to it or relaxes it.
+
 ## GitHub release
 
 - Titled `Vellric X.Y.Z` and attached to tag `vX.Y.Z`, with the full commit ID as its target. It is not a prerelease.
@@ -118,6 +120,6 @@ Everything below runs on the exact commit that will be tagged:
 ## Open decisions (owner)
 
 1. Whether 0.2.0 is published from its existing tag, and when 0.2.1 gets a GitHub release.
-2. Whether a release is recorded in `LOG.md`. No release has been so far.
+2. Whether a release is recorded in `log/entries/`. No release has been so far.
 3. Historical sharing decision resolved by the 2026-11-02 instruction above; exact binary source/notice/redistribution closure remains an executable preparation obligation, not an inferred waiver of third-party terms.
 4. Whether the locally built Vellric and Conric wheels must build byte-identically on every system. The likely cause of the Windows difference is unconfirmed: license and notice files have no fixed line ending in `.gitattributes`, so a Windows checkout may give them CRLF.
