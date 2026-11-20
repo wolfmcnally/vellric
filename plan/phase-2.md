@@ -1,5 +1,5 @@
 ---
-id: phase-2
+id: "2"
 title: Offline Linux arm64 configuration and brokered vision
 depends_on: []
 informs: []

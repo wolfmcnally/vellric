@@ -1,5 +1,5 @@
 ---
-id: phase-1
+id: "1"
 title: PDF extraction and conversion checklist
 depends_on: []
 informs: []
