@@ -343,6 +343,15 @@
       "with": "    return text\n"
     }
   },
+  "pytest:tests/test_execution_dashboard.py::test_handoff_refuses_any_absolute_posix_path_and_keeps_relative_labels": {
+    "defect": "The public handoff guard recognises only macOS home and Windows drive paths, so a Linux absolute path is accepted.",
+    "expect": "Failed: DID NOT RAISE ValidationError",
+    "plant": {
+      "path": "lib/agentic_starter/execution_dashboard.py",
+      "replace": "        r\"(?:^|[\\s\\\"'(\\[{=,;])/[^\\s/]\",\n",
+      "with": ""
+    }
+  },
   "pytest:tests/test_execution_dashboard.py::test_handoff_schema_rejects_private_or_malformed_content[<lambda>-missing fields]": {
     "defect": "A handoff missing a required field passes the key-set check.",
     "expect": "KeyError: 'project'",
