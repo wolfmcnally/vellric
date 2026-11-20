@@ -1,4 +1,4 @@
-# Install Vellric 0.2.5
+# Install Vellric 0.2.6
 
 As of 2026-10-21 this version uses an exact public MIT-licensed Conric 0.1.0 Git dependency, pinned to commit ed9286297e92b8c049f70eb15a3b5556ed107ff0 at https://github.com/wolfmcnally/conric.git. The package lives at the repository root; no subdirectory selector is used. The project wheel's metadata carries that source reference; the Windows bundle's copy names Conric by version instead (see [Windows](#windows)). The source integration is public; tagged release artifacts require repository release qualification. No package-index publication is authorized. A release requires passing exact-commit public CI and the Windows bundle pipeline, as recorded in the matching GitHub release. Since 0.2.4 each GitHub release also carries a separately qualified Windows bundle, described under [Windows](#windows). No credentials or artifact feed are provisioned. See [configuration](CONFIGURATION.md).
 
@@ -10,7 +10,7 @@ Build the candidate wheel locally, or use the matching locally prepared source. 
 
 ```bash
 uv venv --python 3.12 .venv
-uv pip install --python .venv/bin/python ./vellric-0.2.5-py3-none-any.whl
+uv pip install --python .venv/bin/python ./vellric-0.2.6-py3-none-any.whl
 .venv/bin/vellric --version
 .venv/bin/vellric doctor --json
 ```
@@ -20,7 +20,7 @@ From extracted source, replace the wheel argument with `.`. For exact locked ins
 ## Scan OCR
 
 ```bash
-uv pip install --python .venv/bin/python './vellric-0.2.5-py3-none-any.whl[ocr]'
+uv pip install --python .venv/bin/python './vellric-0.2.6-py3-none-any.whl[ocr]'
 .venv/bin/vellric doctor --json
 ```
 
@@ -41,7 +41,7 @@ The directory must contain the requested traineddata. Do not copy the illustrati
 
 Vellric runs natively on 64-bit Windows with Python 3.12.4 or later; earlier Python releases create the private workspace readable by other accounts, and jobs refuse. Native PDF work and a vision-model pass need no Linux subsystem or container, and nothing in them asks for an administrator.
 
-The Windows bundle, `vellric-0.2.5-windows-x64-py313.zip`, is attached to the GitHub release. It holds Vellric, every locked Python dependency of the OCR extra as Windows wheels for Python 3.13, the guides and an `INSTALL.txt`. Installing it needs no network access at all: no package index, no GitHub and no Git, so it works on a machine that cannot reach the internet. Its exact-commit automated proof is a release gate; desktop owner acceptance remains open. Unpack it, and in PowerShell run these commands from inside the unpacked folder:
+The Windows bundle, `vellric-0.2.6-windows-x64-py313.zip`, is attached to the GitHub release. It holds Vellric, every locked Python dependency of the OCR extra as Windows wheels for Python 3.13, the guides and an `INSTALL.txt`. Installing it needs no network access at all: no package index, no GitHub and no Git, so it works on a machine that cannot reach the internet. Its exact-commit automated proof is a release gate; desktop owner acceptance remains open. Unpack it, and in PowerShell run these commands from inside the unpacked folder:
 
 ```powershell
 python -m venv "$env:LOCALAPPDATA\vellric"

@@ -964,11 +964,58 @@ def test_broker_observation_errors_report_dependency_unavailable(tmp_path, monke
     }
     with pytest.raises(JobError) as caught:
         broker.converse(settings, {}, 1, 1, tmp_path, None)
-    assert (caught.value.code, caught.value.stage) == ("dependency-unavailable", "vision")
+    if broker.WINDOWS:
+        # No POSIX process groups to observe: the broker's own refusal stands.
+        assert (caught.value.code, caught.value.details) == (
+            "vision-operational",
+            {"category": "invalid"},
+        )
+        assert not marker.exists()
+    else:
+        assert (caught.value.code, caught.value.stage) == ("dependency-unavailable", "vision")
+        assert marker.exists()
     process.wait.assert_called_once()
     process.stdin.close.assert_called_once()
     process.stdout.close.assert_called_once()
-    assert marker.exists()
+
+
+@pytest.mark.parametrize("leader_running", [True, False])
+def test_broker_cleanup_without_posix_sessions_keeps_the_broker_error(
+    tmp_path, monkeypatch, leader_running
+):
+    """Admission: on Windows the cleanup called os.getsid and replaced the broker's error."""
+    monkeypatch.setattr(broker, "WINDOWS", True)
+    monkeypatch.delattr(broker.os, "getsid", raising=False)
+
+    def observed(*args):
+        raise AssertionError("POSIX process groups observed on Windows")
+
+    monkeypatch.setattr(broker, "group_alive", observed)
+    monkeypatch.setattr(broker, "kill_group", observed)
+    process = Mock(pid=100)
+    process.poll.return_value = None if leader_running else 0
+    monkeypatch.setattr(broker.subprocess, "Popen", lambda *args, **kwargs: process)
+    monkeypatch.setattr(broker, "exchange", lambda *args: b"{}")
+    marker = tmp_path / ".broker-100"
+    marker.touch()
+    settings = {
+        "region": "us-west-2",
+        "model": "amazon.nova-lite-v1:0",
+        "env": {},
+        "command": {"argv": [sys.executable], "pass_fds": []},
+    }
+    with pytest.raises(JobError) as caught:
+        broker.converse(settings, {}, 1, 1, tmp_path, None)
+    assert (caught.value.code, caught.value.stage, caught.value.details) == (
+        "vision-operational",
+        "vision",
+        {"category": "invalid"},
+    ), "BROKER ERROR REPLACED BY CLEANUP"
+    assert process.kill.call_count == (1 if leader_running else 0)
+    process.wait.assert_called_once()
+    process.stdin.close.assert_called_once()
+    process.stdout.close.assert_called_once()
+    assert not marker.exists()
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX process groups")

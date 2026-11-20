@@ -1,6 +1,10 @@
 # Prepared standalone release route
 
-## Current 0.2.5 scope
+## Current 0.2.6 scope
+
+Version 0.2.6 adds explicit conversion configuration through a Conric `--config` file, selectable Bedrock vision transports and a broker cleanup that keeps the broker's own error on Windows; see [RELEASE.md](RELEASE.md). The project wheel and source archive keep the exact Git-sourced Conric requirement, and their build and locked-install route below is unchanged apart from the version.
+
+## 0.2.5 scope (historical)
 
 Version 0.2.5 changes only the Windows bundle's copy of the Vellric wheel, which names Conric by version so that the bundle installs with no Git or network access; see [RELEASE.md](RELEASE.md). The project wheel and source archive below keep the exact Git-sourced Conric requirement, and their build and locked-install route is unchanged.
 
@@ -62,7 +66,7 @@ uv pip install --python /absolute/isolated/vellric-env/bin/python --no-deps -r r
 ```
 
 ```bash
-uv pip install --python /absolute/isolated/vellric-env/bin/python --no-deps dist/vellric-0.2.5-py3-none-any.whl
+uv pip install --python /absolute/isolated/vellric-env/bin/python --no-deps dist/vellric-0.2.6-py3-none-any.whl
 ```
 
 ```bash

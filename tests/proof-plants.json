@@ -19,6 +19,33 @@
       "with": ""
     }
   },
+  "pytest:project/tests/test_vision.py::test_broker_cleanup_without_posix_sessions_keeps_the_broker_error[False]": {
+    "defect": "Broker cleanup consults POSIX sessions on Windows, where os.getsid does not exist.",
+    "expect": "AttributeError: module 'os' has no attribute 'getsid'",
+    "plant": {
+      "path": "project/vellric/broker.py",
+      "replace": "            if WINDOWS:\n",
+      "with": "            if False:\n"
+    }
+  },
+  "pytest:project/tests/test_vision.py::test_broker_cleanup_without_posix_sessions_keeps_the_broker_error[True]": {
+    "defect": "Broker cleanup observes and kills POSIX process groups on Windows instead of ending the running leader.",
+    "expect": "AssertionError: POSIX process groups observed on Windows",
+    "plant": {
+      "path": "project/vellric/broker.py",
+      "replace": "            if WINDOWS:\n",
+      "with": "            if False:\n"
+    }
+  },
+  "pytest:project/tests/test_vision.py::test_broker_observation_errors_report_dependency_unavailable": {
+    "defect": "A failed broker-group observation is reported at the wrong stage.",
+    "expect": "At index 1 diff: 'supervision' != 'vision'",
+    "plant": {
+      "path": "project/vellric/broker.py",
+      "replace": "                \"Cannot observe broker process groups\",\n                stage=\"vision\",",
+      "with": "                \"Cannot observe broker process groups\",\n                stage=\"supervision\","
+    }
+  },
   "pytest:tests/test_check.py::test_all_is_default_locked_ordered_and_cwd_independent": {
     "defect": "Route the gate's test lane back to the uncached full suite",
     "expect": "GATE OMITTED OR REORDERED REQUIRED COMMAND",

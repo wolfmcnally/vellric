@@ -11,7 +11,7 @@ import time
 from collections.abc import Iterator
 from pathlib import Path
 
-from .runtime import JobError, kill_group, require_open_fds
+from .runtime import WINDOWS, JobError, kill_group, require_open_fds
 
 REQUEST_SCHEMA = "bedrock-converse-request/1"
 RESPONSE_SCHEMA = "bedrock-converse-response/1"
@@ -260,7 +260,13 @@ def converse(settings: dict, body: dict, page, timeout: float, work: Path, cance
     finally:
         marker = work / f".broker-{process.pid}"
         try:
-            if process.poll() is None or group_alive(process.pid, os.getsid(0)):
+            if WINDOWS:
+                # Windows has no POSIX sessions or process groups, and the command
+                # transport is refused there before any broker starts; the broker
+                # leader is the only process this call owns.
+                if process.poll() is None:
+                    process.kill()
+            elif process.poll() is None or group_alive(process.pid, os.getsid(0)):
                 kill_group(process.pid)
         except OSError as exc:
             # Keep the marker so the supervisor can retry observing any descendants.
