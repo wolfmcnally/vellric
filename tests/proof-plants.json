@@ -1108,6 +1108,15 @@
       "with": ""
     }
   },
+  "pytest:tests/test_windows_release.py::test_candidate_zip_is_the_release_payload_but_never_a_release": {
+    "defect": "Candidate assembly accepts a native observation of another project tree, because it binds only the checkout commit.",
+    "expect": "DID NOT RAISE",
+    "plant": {
+      "path": "bin/windows-release",
+      "replace": "        bound += [\"build_checkout\", \"project_tree\"]\n",
+      "with": "        bound += [\"build_checkout\"]\n"
+    }
+  },
   "pytest:tests/test_windows_release.py::test_inventory_refuses_unlocked_or_unreleased_artifacts": {
     "defect": "The release inventory accepts a bundle whose Conric wheel is a different build than the pinned official release wheel.",
     "expect": "DID NOT RAISE",

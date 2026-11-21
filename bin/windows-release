@@ -217,13 +217,40 @@ def assemble(
     sources: Path,
     output: Path,
     proof: Path,
-    expected_tag: str,
+    release_tag: str | None = None,
+    candidate: str | None = None,
 ) -> dict:
+    """Assemble the release ZIP from a tag, or an untagged candidate ZIP that is never a release.
+
+    A candidate runs every check the release does; only its provenance differs, and its name and
+    WINDOWS-RELEASE.json say so.
+    """
+    if (release_tag is None) == (candidate is None):
+        raise ValueError("Assembly needs exactly one of a release tag or a candidate commit")
     report = inventory(bundle, source)
-    if report["release_source"] is None:
-        raise ValueError("Release assembly requires an existing immutable source tag")
-    if expected_tag != report["tag"]:
-        raise ValueError("Requested release tag differs from the project version")
+    bound = ["raw_bundle_sha256", "release_source", "uv_lock_sha256"]
+    if release_tag is not None:
+        if report["release_source"] is None:
+            raise ValueError("Release assembly requires an existing immutable source tag")
+        if release_tag != report["tag"]:
+            raise ValueError("Requested release tag differs from the project version")
+    else:
+        if not re.fullmatch(r"[0-9a-f]{40}", candidate) or candidate not in {
+            report["build_checkout"]
+        } & {report["tooling_commit"]}:
+            raise ValueError("Candidate commit differs from the checked-out source or its tooling")
+        if report["release_source"] is not None:
+            raise ValueError("Candidate assembly refuses a version that is already tagged")
+        name = f"vellric-{report['version']}-candidate-{candidate[:12]}-windows-x64-py313.zip"
+        if output.name != name:
+            raise ValueError("Candidate ZIP filename must name the candidate, never the release")
+        # With no tag to bind, the observation must come from this exact commit and project.
+        bound += ["build_checkout", "project_tree"]
+        report["tag"] = None
+        report["candidate"] = {
+            "commit": candidate,
+            "status": "untagged candidate; not a release asset",
+        }
     declaration = json.loads(closure.read_text())
     if declaration.get("status") != "qualified":
         raise ValueError(
@@ -232,7 +259,7 @@ def assemble(
     if declaration["uv_lock_sha256"] != report["uv_lock_sha256"]:
         raise ValueError("Closure declaration belongs to a different dependency lock")
     observed = json.loads(proof.read_text())
-    for key in ["raw_bundle_sha256", "release_source", "uv_lock_sha256"]:
+    for key in bound:
         if observed[key] != report[key]:
             raise ValueError("Native Windows observation belongs to another artifact/source")
     required_versions = declaration["native_versions"]
@@ -374,7 +401,9 @@ def main() -> int:
         if name == "inventory":
             command.add_argument("--probe-native", action="store_true")
         else:
-            command.add_argument("--tag", required=True)
+            mode = command.add_mutually_exclusive_group(required=True)
+            mode.add_argument("--tag")
+            mode.add_argument("--candidate", help="full untagged commit ID; never a release")
             command.add_argument("--closure", type=Path, required=True)
             command.add_argument("--sources", type=Path, required=True)
             command.add_argument("--provenance", type=Path, required=True)
@@ -391,9 +420,10 @@ def main() -> int:
                 report["native_probe"] = probe_native()
             args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
         else:
-            expected_name = f"vellric-{args.tag.removeprefix('v')}-windows-x64-py313.zip"
-            if args.output.name != expected_name:
-                raise ValueError("Release ZIP filename differs from the requested version")
+            if args.tag is not None:
+                expected_name = f"vellric-{args.tag.removeprefix('v')}-windows-x64-py313.zip"
+                if args.output.name != expected_name:
+                    raise ValueError("Release ZIP filename differs from the requested version")
             report = assemble(
                 args.bundle,
                 args.source_root,
@@ -401,7 +431,8 @@ def main() -> int:
                 args.sources,
                 args.output,
                 args.provenance,
-                args.tag,
+                release_tag=args.tag,
+                candidate=args.candidate,
             )
         print(
             json.dumps(report if args.command != "inventory" else {"inventory": str(args.output)})

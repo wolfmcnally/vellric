@@ -338,3 +338,103 @@ def test_inventory_refuses_unlocked_or_unreleased_artifacts(tmp_path):
     if sys.platform != "win32":
         with pytest.raises(ValueError, match="actual Windows installed-wheel environment"):
             RELEASE.probe_native()
+
+
+def test_candidate_zip_is_the_release_payload_but_never_a_release(tmp_path, monkeypatch):
+    root, bundle, closure, sources, proof, _ = fixture(tmp_path)
+    head = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
+    name = f"vellric-0.2.4-candidate-{head[:12]}-windows-x64-py313.zip"
+    fixture_proof = proof.read_text()
+
+    def tag(present):
+        # Only the disposable synthetic repository's tag is moved.
+        command = ["tag", "v0.2.4"] if present else ["update-ref", "-d", "refs/tags/v0.2.4"]
+        subprocess.run(["git", "-C", str(root), *command], check=True)
+
+    def observe():
+        observation = RELEASE.inventory(bundle, root)
+        observation["native_probe"] = {"demo": "1.0"}
+        proof.write_text(json.dumps(observation))
+        return observation
+
+    # The real tooling runs from this repository, not from the synthetic candidate commit.
+    tag(False)
+    observe()
+    with pytest.raises(ValueError, match="or its tooling"):
+        RELEASE.assemble(bundle, root, closure, sources, root / name, proof, candidate=head)
+    assert not (root / name).exists()
+    # From here the synthetic candidate stands for the commit the tooling runs from.
+    real_inventory = RELEASE.inventory
+    monkeypatch.setattr(
+        RELEASE, "inventory", lambda *a: dict(real_inventory(*a), tooling_commit=head)
+    )
+    tag(True)
+    proof.write_text(fixture_proof)
+    released = root / "vellric-0.2.4-windows-x64-py313.zip"
+    RELEASE.assemble(bundle, root, closure, sources, released, proof, "v0.2.4")
+    release_proof = proof.read_text()
+    tag(False)
+    observed = observe()
+    candidate = root / name
+    RELEASE.assemble(bundle, root, closure, sources, candidate, proof, candidate=head)
+
+    with zipfile.ZipFile(released) as a, zipfile.ZipFile(candidate) as b:
+        release_files = {n: a.read(n) for n in a.namelist()}
+        candidate_files = {n: b.read(n) for n in b.namelist()}
+    assert release_files.keys() == candidate_files.keys()
+    differing = {n for n in release_files if release_files[n] != candidate_files[n]}
+    assert differing == {"WINDOWS-RELEASE.json"}
+    as_released, as_candidate = (
+        json.loads(files["WINDOWS-RELEASE.json"]) for files in (release_files, candidate_files)
+    )
+    keys = as_released.keys() | as_candidate.keys()
+    assert {k for k in keys if as_released.get(k) != as_candidate.get(k)} == {
+        "release_source",
+        "tag",
+        "candidate",
+    }
+    assert as_candidate["release_source"] is None and as_candidate["tag"] is None
+    assert as_candidate["candidate"] == {
+        "commit": head,
+        "status": "untagged candidate; not a release asset",
+    }
+
+    candidate = candidate.rename(root / "kept-candidate.zip")
+    refused = root / name.replace(head[:12], "0" * 12)
+    stale = dict(observed, build_checkout="0" * 40)
+    elsewhere = dict(observed, project_tree="0" * 40)
+    for arguments, observation, message in [
+        ({"candidate": "0" * 40}, observed, "Candidate commit differs"),
+        ({"candidate": head[:12]}, observed, "Candidate commit differs"),
+        ({"release_tag": "v0.2.4", "candidate": head}, observed, "exactly one"),
+        ({"candidate": head}, json.loads(release_proof), "another artifact/source"),
+        ({"candidate": head}, stale, "another artifact/source"),
+        ({"candidate": head}, elsewhere, "another artifact/source"),
+    ]:
+        proof.write_text(json.dumps(observation))
+        output = root / name if arguments.get("candidate") == head else refused
+        output.unlink(missing_ok=True)
+        with pytest.raises(ValueError, match=message):
+            RELEASE.assemble(bundle, root, closure, sources, output, proof, **arguments)
+        assert not output.exists()
+    proof.write_text(json.dumps(observed))
+    # A candidate may never carry the release's name, nor the release a candidate's.
+    with pytest.raises(ValueError, match="never the release"):
+        RELEASE.assemble(
+            bundle, root, closure, sources, released.with_name("x.zip"), proof, candidate=head
+        )
+    tag(True)
+    with pytest.raises(ValueError, match="already tagged"):
+        RELEASE.assemble(bundle, root, closure, sources, root / name, proof, candidate=head)
+    common = ["--source-root", str(root), "--closure", str(closure), "--sources", str(sources)]
+    common += ["--provenance", str(proof)]
+    monkeypatch.setattr(
+        "sys.argv",
+        ["windows-release", "assemble", "--bundle", str(bundle), *common, "--tag", "v0.2.4"]
+        + ["--output", str(root / name)],
+    )
+    assert RELEASE.main() == 1 and not (root / name).exists()
+    # Nor does the release accept the candidate's untagged observation.
+    with pytest.raises(ValueError, match="another artifact/source"):
+        RELEASE.assemble(bundle, root, closure, sources, root / "refused.zip", proof, "v0.2.4")
+    assert not (root / "refused.zip").exists()

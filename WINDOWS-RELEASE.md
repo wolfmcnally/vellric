@@ -20,6 +20,14 @@ Retain the actual returned/run-query identity and verify its repository, source,
 
 Before assembly, the raw bundle is also installed with the resolving `pip install --no-index --find-links wheels "vellric[ocr]==X.Y.Z"` while Git may use no transport, proving that installing `vellric[ocr]` from the bundle by name needs no Git source. The install uses `--no-cache-dir`, because the build step's own Conric wheel would otherwise sit in pip's cache and let a Git-sourced requirement pass without a clone. The source-closed ZIP is assembled twice from the identical raw bundle, native observation and source materials; the two actual SHA-256 values must match before retention. It is then expanded and installed into a fresh Windows venv with `--no-index --require-hashes --no-deps`. Dependency checks, doctor, inspect and native/OCR fixture conversions must succeed on the installed copy. Match the final ZIP digest/size with `windows-release-asset.json`. Preserve real engine/version results, warnings and failures. Existing Parallels Windows may provide additional local qualification without resetting or discarding saved work; report ARM emulation separately from GitHub's real x64 runner. No human desktop acceptance is claimed by either automated route.
 
+Before any tag exists, the same workflow qualifies the exact untagged candidate with every release check: the closure's material downloads at their digests, two byte-identical assemblies, the Conric check inside the ZIP, and a fresh offline hash-locked install with `pip check`, `doctor`, inspection and both OCR fixture conversions. Dispatch it on the commit `main` points to, giving that commit's full ID:
+
+```sh
+gh workflow run windows.yml --ref main -f candidate_sha=FULL_COMMIT_ID
+```
+
+The run refuses a candidate that is not the workflow's own commit or whose version is already tagged, locally or on GitHub. Its ZIP is named `vellric-X.Y.Z-candidate-<first 12 hex>-windows-x64-py313.zip`, is retained only as the `windows-candidate-zip` artifact, and its `WINDOWS-RELEASE.json` has no tag or release source and says it is an untagged candidate. It is never a release asset: the release ZIP still comes only from the tag-bound run above, after the tag.
+
 ## Add only the qualified asset
 
 Read the existing release/tag target and complete asset inventory first. Match the exact tagged project source, raw wheel inventory, source closure and final installed-ZIP result. Keep current version authorization and any redistribution-rights evidence in the private release receipt. No new repository token scope or workflow write permission is needed: use the existing owner-authorized CLI release route.

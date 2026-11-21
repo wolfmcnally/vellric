@@ -11,6 +11,11 @@ on:
         required: false
         type: string
         default: ""
+      candidate_sha:
+        description: Full untagged commit ID of the dispatched workflow commit to qualify as a candidate ZIP; never a release asset
+        required: false
+        type: string
+        default: ""
 permissions:
   contents: read
 jobs:
@@ -42,6 +47,7 @@ jobs:
         working-directory: source
     env:
       RELEASE_REF: ${{ inputs.release_ref || github.event.release.tag_name || '' }}
+      CANDIDATE: ${{ inputs.candidate_sha || '' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -60,6 +66,23 @@ jobs:
             $tag = git rev-parse "refs/tags/$env:RELEASE_REF"
             $head = git rev-parse HEAD
             if ($tag -ne $head) { throw 'Checkout differs from requested release tag' }
+          }
+          if ($env:CANDIDATE) {
+            # A candidate is the exact commit this workflow and its tooling run from, and its
+            # version must not be tagged anywhere yet.
+            if ($env:RELEASE_REF) { throw 'A candidate run takes no release tag' }
+            if ($env:CANDIDATE -cnotmatch '^[0-9a-f]{40}$') { throw 'A candidate is a full lowercase commit ID' }
+            if ((git rev-parse HEAD) -ne $env:CANDIDATE -or $env:GITHUB_SHA -ne $env:CANDIDATE) { throw 'Candidate differs from the checkout or the workflow commit' }
+            $version = (Select-String -Path project\pyproject.toml -Pattern '^version = "([0-9]+\.[0-9]+\.[0-9]+)"$' | Select-Object -First 1).Matches.Groups[1].Value
+            if (-not $version) { throw 'The project version could not be read' }
+            $PSNativeCommandUseErrorActionPreference = $false
+            git show-ref --verify --quiet "refs/tags/v$version"
+            $localTag = $LASTEXITCODE
+            git ls-remote --exit-code --tags origin "refs/tags/v$version" | Out-Null
+            $remoteTag = $LASTEXITCODE
+            $PSNativeCommandUseErrorActionPreference = $true
+            if ($localTag -ne 1 -or $remoteTag -ne 2) { throw "v$version is tagged, or its absence could not be confirmed" }
+            "CANDIDATE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           }
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
         with:
@@ -187,21 +210,33 @@ jobs:
           foreach ($name in 'Fake_Doc_watermarked', 'Fake_Math_Doc_watermarked') {
             & $env:VELLRIC convert "project\tests\fixtures\$name.pdf" --out "measured\$name" --ocr auto --status-json
           }
-      - name: Assemble source-closed release ZIP
-        if: env.RELEASE_REF != ''
+      - name: Assemble the source-closed release or candidate ZIP
+        if: env.RELEASE_REF != '' || env.CANDIDATE != ''
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
           $python = "$env:RUNNER_TEMP\vellric\Scripts\python.exe"
           $tool = '..\release-tools\bin\windows-release'
           $closure = '..\release-tools\lib\windows-release-sources.json'
           & $python $tool fetch --closure $closure --directory corresponding-sources
-          New-Item -ItemType Directory release-dist | Out-Null
-          $zip = "release-dist\vellric-$($env:RELEASE_REF.Substring(1))-windows-x64-py313.zip"
-          & $python $tool assemble --bundle (Get-Item dist\*.zip).FullName --source-root . --closure $closure --sources corresponding-sources --provenance measured\windows-bundle-provenance.json --tag $env:RELEASE_REF --output $zip | Tee-Object measured\windows-release-asset.json
-          New-Item -ItemType Directory release-reproduced | Out-Null
-          $reproduced = "release-reproduced\vellric-$($env:RELEASE_REF.Substring(1))-windows-x64-py313.zip"
-          & $python $tool assemble --bundle (Get-Item dist\*.zip).FullName --source-root . --closure $closure --sources corresponding-sources --provenance measured\windows-bundle-provenance.json --tag $env:RELEASE_REF --output $reproduced | Out-File measured\windows-release-reproduction.json -Encoding utf8
-          if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne (Get-FileHash $reproduced -Algorithm SHA256).Hash) { throw 'Release ZIP assembly was not reproducible' }
+          if ($env:RELEASE_REF) {
+            $mode = '--tag', $env:RELEASE_REF
+            $dist, $again = 'release-dist', 'release-reproduced'
+            $asset, $repeat = 'windows-release-asset.json', 'windows-release-reproduction.json'
+            $name = "vellric-$($env:RELEASE_REF.Substring(1))-windows-x64-py313.zip"
+          } else {
+            # Every check the release runs, under a name and report that say candidate.
+            $mode = '--candidate', $env:CANDIDATE
+            $dist, $again = 'candidate-dist', 'candidate-reproduced'
+            $asset, $repeat = 'windows-candidate-asset.json', 'windows-candidate-reproduction.json'
+            $name = "vellric-$env:CANDIDATE_VERSION-candidate-$($env:CANDIDATE.Substring(0, 12))-windows-x64-py313.zip"
+          }
+          New-Item -ItemType Directory $dist | Out-Null
+          $zip = "$dist\$name"
+          & $python $tool assemble --bundle (Get-Item dist\*.zip).FullName --source-root . --closure $closure --sources corresponding-sources --provenance measured\windows-bundle-provenance.json @mode --output $zip | Tee-Object "measured\$asset"
+          New-Item -ItemType Directory $again | Out-Null
+          $reproduced = "$again\$name"
+          & $python $tool assemble --bundle (Get-Item dist\*.zip).FullName --source-root . --closure $closure --sources corresponding-sources --provenance measured\windows-bundle-provenance.json @mode --output $reproduced | Out-File "measured\$repeat" -Encoding utf8
+          if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne (Get-FileHash $reproduced -Algorithm SHA256).Hash) { throw "Assembly of $name was not reproducible" }
           Expand-Archive $zip -DestinationPath released-bundle
           python -m venv "$env:RUNNER_TEMP\released-vellric"
           Push-Location released-bundle
@@ -224,6 +259,13 @@ jobs:
           name: windows-release-zip
           if-no-files-found: error
           path: source/release-dist/*.zip
+      - name: Retain the qualified candidate ZIP, which is never a release asset
+        if: success() && env.CANDIDATE != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-candidate-zip
+          if-no-files-found: error
+          path: source/candidate-dist/*.zip
       - name: Keep the measured results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
