@@ -154,11 +154,17 @@ jobs:
       - name: Run the project tests with the engines present
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
-          uv sync --locked --project project --extra ocr --python 3.13
+          uv sync --locked --project project --extra ocr --extra bedrock --python 3.13
           Set-Location project
-          # With the engines present nothing may be skipped: a skip would be the engines not found.
+          # With the engines present a skip would be the engines not found. Only tests that need a
+          # POSIX facility Windows lacks may skip, each by its declared reason.
           uv run --no-sync python -X utf8 -m pytest -q -rs | Tee-Object -Variable report
-          if ($report -match 'skipped') { throw 'A test was skipped with the engines installed' }
+          # Each "SKIPPED [n] path:line: reason" line passes only when its whole reason is one of these.
+          $posixOnly = 'POSIX pass_fds', 'POSIX process groups', 'POSIX executable alias', 'Uses an executable fixture with a shebang'
+          $skipped = @($report | Where-Object { $_ -like 'SKIPPED*' } | Where-Object {
+            -not ($_ -match '^SKIPPED \[\d+\] .+?:\d+: (.*)$' -and $posixOnly -ccontains $Matches[1].TrimEnd())
+          })
+          if ($skipped.Count) { throw "A test was skipped with the engines installed: $($skipped -join '; ')" }
       - name: Convert the fixtures with the installed tool
         if: success() || failure()
         run: |
