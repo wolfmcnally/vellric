@@ -72,6 +72,21 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           New-Item -ItemType Directory measured | Out-Null
           python project/packaging/windows_bundle.py --out dist | Tee-Object measured\bundle-contents.txt
+      - name: Rebuild the exact Vellric source archive
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          # Build from the committed blobs: a checkout with no line-ending conversion, so the
+          # fixed-epoch archive is the same bytes on every platform. The release assembly's fetch
+          # accepts it only at the closure's pinned digest.
+          $clean = "$env:RUNNER_TEMP\vellric-source"
+          git clone --quiet --no-local --no-checkout --config core.autocrlf=false --config core.eol=lf . $clean
+          git -C $clean checkout --quiet --detach (git rev-parse HEAD)
+          $converted = @(git -C $clean ls-files --eol -- project | Select-String '^i/lf\s+w/crlf')
+          if ($converted.Count) { throw "Checked out with converted line endings: $($converted -join '; ')" }
+          $env:SOURCE_DATE_EPOCH = '1609459200'
+          uv build "$clean\project" --sdist --build-constraints "$clean\project\build-constraints.txt" --out-dir corresponding-sources
+          Remove-Item Env:SOURCE_DATE_EPOCH
+          Get-FileHash corresponding-sources\vellric-*.tar.gz -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower()) $(Split-Path $_.Path -Leaf)" } | Tee-Object measured\vellric-source-archive.txt
       - name: Install the bundle with no package index
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
