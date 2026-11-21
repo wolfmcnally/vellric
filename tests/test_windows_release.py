@@ -47,6 +47,8 @@ def fixture(tmp_path):
     source_sha = hashlib.sha256(source_bytes).hexdigest()
     digest = hashlib.sha256(data["demo"]).hexdigest()
     revision = "1" * 40
+    # The synthetic Conric wheel stands in for the pinned official one.
+    RELEASE.CONRIC_WHEEL_SHA256 = hashlib.sha256(data["conric"]).hexdigest()
     (project / "uv.lock").write_text(f"""[[package]]
 name="vellric"
 version="0.2.4"
@@ -78,6 +80,8 @@ wheels=[{{hash="sha256:{digest}"}}]
         for name, content in data.items():
             version = {"vellric": "0.2.4", "conric": "0.1.0", "demo": "1.0"}[name]
             path = f"wheels/{name}-{version}-cp313-cp313-win_amd64.whl"
+            if name == "conric":
+                path = RELEASE.CONRIC_WHEEL
             archive.writestr(path, content)
             requirements.append(f"./{path} --hash=sha256:{hashlib.sha256(content).hexdigest()}")
         archive.writestr("requirements-wheels.txt", "\n".join(requirements) + "\n")
@@ -272,7 +276,25 @@ def test_inventory_refuses_unlocked_or_unreleased_artifacts(tmp_path):
                 z.writestr(name, data)
 
     demo_name = next(n for n in payload if "/demo-" in n)
+    conric_requirement = f"./{RELEASE.CONRIC_WHEEL} --hash=sha256:"
+    rebuilt_conric = wheel("conric", "0.1.0") + b"differently built bytes"
+    rebuilt_requirements = b"".join(
+        (
+            f"{conric_requirement}{hashlib.sha256(rebuilt_conric).hexdigest()}\n"
+            if line.startswith(conric_requirement)
+            else line + "\n"
+        ).encode()
+        for line in payload["requirements-wheels.txt"].decode().splitlines()
+    )
     for changed, message in [
+        (
+            payload
+            | {
+                RELEASE.CONRIC_WHEEL: rebuilt_conric,
+                "requirements-wheels.txt": rebuilt_requirements,
+            },
+            "Conric wheel is not the pinned official release wheel",
+        ),
         (payload | {demo_name: wheel("demo", "1.0", False)}, "Wheel hash is not in the exact lock"),
         (payload | {"SOURCE.txt": b"different source"}, "Conric source declaration"),
         (payload | {"requirements-wheels.txt": b""}, "Offline requirements"),

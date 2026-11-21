@@ -204,3 +204,55 @@ def test_the_bundled_wheel_names_conric_by_version(tmp_path, monkeypatch):
     with pytest.raises(SystemExit, match="exact locked Conric source"):
         windows_bundle.pin_bundled_conric(other, source, "conric==0.1.0")
     assert other.read_bytes() == before
+
+
+def test_the_bundle_takes_conric_as_its_pinned_official_wheel(tmp_path, monkeypatch):
+    import hashlib
+
+    windows_bundle = load("windows_bundle", monkeypatch)
+    commit = windows_bundle.CONRIC_SOURCE.rsplit("@", 1)[1]
+    project = tmp_path / "project"
+    project.mkdir()
+    monkeypatch.setattr(windows_bundle, "PROJECT", project)
+
+    def lock(revision: str) -> None:
+        (project / "uv.lock").write_text(
+            '[[package]]\nname = "conric"\nversion = "0.1.0"\nsource = { git = '
+            f'"https://github.com/wolfmcnally/conric.git?rev={revision}#{revision}" }}\n'
+        )
+
+    registry = "pillow==1.0 \\\n    --hash=sha256:" + "0" * 64 + "\n    # via vellric\n"
+    selected = tmp_path / "selected.txt"
+    compiled = f"{registry}{windows_bundle.CONRIC_SOURCE}\n    # via vellric\n"
+    selected.write_text(compiled)
+    lock(commit)
+    assert windows_bundle.select_official_conric(selected) == (
+        windows_bundle.CONRIC_SOURCE,
+        "conric==0.1.0",
+    )
+    official = f"conric @ {windows_bundle.CONRIC_WHEEL} --hash=sha256:"
+    assert selected.read_text() == compiled.replace(
+        windows_bundle.CONRIC_SOURCE, official + windows_bundle.CONRIC_WHEEL_SHA256
+    )
+    # A lock, and so a selection, that moves Conric to another commit no longer matches the
+    # pinned wheel.
+    moved = compiled.replace(commit, "f" * 40)
+    selected.write_text(moved)
+    lock("f" * 40)
+    with pytest.raises(SystemExit, match="not the commit its pinned wheel was built from"):
+        windows_bundle.select_official_conric(selected)
+    assert selected.read_text() == moved
+
+    wheels = tmp_path / "wheels"
+    wheels.mkdir()
+    fetched = wheels / windows_bundle.CONRIC_WHEEL.rsplit("/", 1)[1]
+    fetched.write_bytes(b"a locally built Conric wheel")
+    with pytest.raises(SystemExit, match="differs from its pinned hash"):
+        windows_bundle.check_conric_wheel(wheels)
+    monkeypatch.setattr(
+        windows_bundle, "CONRIC_WHEEL_SHA256", hashlib.sha256(fetched.read_bytes()).hexdigest()
+    )
+    windows_bundle.check_conric_wheel(wheels)
+    (wheels / "conric-0.1.0-cp313-cp313-win_amd64.whl").write_bytes(b"a second Conric")
+    with pytest.raises(SystemExit, match="exactly the pinned Conric wheel"):
+        windows_bundle.check_conric_wheel(wheels)

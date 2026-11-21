@@ -1,7 +1,8 @@
 """Build the self-contained Windows bundle: Vellric, its locked dependencies and install notes.
 
 The bundle installs on 64-bit Windows without network resolution. Build it with Python 3.12+,
-uv and Git. Registry wheels use published hashes; Conric is built from its exact locked commit.
+uv and Git. Registry wheels use published hashes; Conric is its official release wheel of the
+exact locked commit, pinned by hash.
 Every local wheel's hash is recorded in the bundle:
 
     python packaging/windows_bundle.py --out dist
@@ -34,6 +35,14 @@ import release_version
 PROJECT = Path(__file__).resolve().parent.parent
 EPOCH = 1609459200  # The build time the release procedure fixes, so equal inputs give equal bytes.
 PIP_TOOL = "pip==26.2.2"
+# Conric's official release wheel, built from the commit the lock names. The wheel is pinned by
+# its own hash: the release page that serves it is not trusted for its content.
+CONRIC_SOURCE = "conric @ git+https://github.com/wolfmcnally/conric.git@ed9286297e92b8c049f70eb15a3b5556ed107ff0"
+CONRIC_VERSION = "0.1.0"
+CONRIC_WHEEL = (
+    "https://github.com/wolfmcnally/conric/releases/download/v0.1.0/conric-0.1.0-py3-none-any.whl"
+)
+CONRIC_WHEEL_SHA256 = "b2afe9998bf6a3a192c5fe6f86c4513cd2e64ed17932f497d3889c883f7bb92c"
 
 INSTALL = """\
 Vellric {version} for Windows x64, Python {python}
@@ -138,8 +147,8 @@ def pin_bundled_conric(wheel: Path, source: str, pinned: str) -> None:
             archive.writestr(info, files[info.filename])
 
 
-def materialize_conric(selected: Path, wheels: Path) -> tuple[str, str]:
-    """Build the exact locked public source; leave registry requirements hash-checked.
+def select_official_conric(selected: Path) -> tuple[str, str]:
+    """Fetch Conric as its pinned official wheel instead of building the locked Git source.
 
     Returns the Git requirement the project names and the version requirement the bundle uses.
     """
@@ -153,32 +162,26 @@ def materialize_conric(selected: Path, wheels: Path) -> tuple[str, str]:
         raise SystemExit("Conric bundle source must be an exact flat-root Git commit")
     url = urllib.parse.urlunsplit(source._replace(query="", fragment=""))
     requirement = f"conric @ git+{url}@{commit}"
+    if requirement != CONRIC_SOURCE or package["version"] != CONRIC_VERSION:
+        raise SystemExit("The locked Conric is not the commit its pinned wheel was built from")
     lines = selected.read_text(encoding="utf-8").splitlines(keepends=True)
     references = [line for line in lines if line.startswith("conric @")]
     if [line.strip() for line in references] != [requirement]:
         raise SystemExit("Selected Conric source does not match the exact lock")
-    run(
-        "uv",
-        "tool",
-        "run",
-        "--from",
-        PIP_TOOL,
-        "--python",
-        sys.executable,
-        "pip",
-        "wheel",
-        "--no-deps",
-        "--build-constraint",
-        "build-constraints.txt",
-        "--wheel-dir",
-        str(wheels),
-        requirement,
+    official = f"conric @ {CONRIC_WHEEL} --hash=sha256:{CONRIC_WHEEL_SHA256}\n"
+    selected.write_text(
+        "".join(official if line in references else line for line in lines), encoding="utf-8"
     )
-    expected = wheels / f"conric-{package['version']}-py3-none-any.whl"
-    if not expected.is_file() or list(wheels.glob("conric-*.whl")) != [expected]:
-        raise SystemExit("Conric source did not produce one portable pure-Python wheel")
-    selected.write_text("".join(line for line in lines if line not in references), encoding="utf-8")
-    return requirement, f"conric=={package['version']}"
+    return requirement, f"conric=={CONRIC_VERSION}"
+
+
+def check_conric_wheel(wheels: Path) -> None:
+    """Refuse a bundle whose Conric is anything but the pinned official wheel."""
+    expected = wheels / CONRIC_WHEEL.rsplit("/", 1)[-1]
+    if list(wheels.glob("conric-*")) != [expected]:
+        raise SystemExit("The download did not give exactly the pinned Conric wheel")
+    if hashlib.sha256(expected.read_bytes()).hexdigest() != CONRIC_WHEEL_SHA256:
+        raise SystemExit("The downloaded Conric wheel differs from its pinned hash")
 
 
 def main() -> int:
@@ -245,9 +248,9 @@ def main() -> int:
             "--output-file",
             str(selected),
         )
-        conric_source, conric_pinned = materialize_conric(selected, wheels)
+        conric_source, conric_pinned = select_official_conric(selected)
         pin_bundled_conric(wheel, conric_source, conric_pinned)
-        # Each registry wheel is checked against its published hash as it arrives.
+        # Each wheel, Conric's included, is checked against its pinned hash as it arrives.
         run(
             "uv",
             "tool",
@@ -272,6 +275,7 @@ def main() -> int:
             "--requirement",
             str(selected),
         )
+        check_conric_wheel(wheels)
         # Install every recorded wheel without resolving direct Git metadata on the target.
         wheel_requirements = [
             f"./wheels/{item.name} --hash=sha256:{hashlib.sha256(item.read_bytes()).hexdigest()}\n"

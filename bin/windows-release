@@ -21,6 +21,10 @@ import zipfile
 from pathlib import Path, PurePosixPath
 
 EPOCH = (2021, 1, 1, 0, 0, 0)
+# Conric's official release wheel of its locked commit, checked here independently of the
+# builder that fetched it.
+CONRIC_WHEEL = "wheels/conric-0.1.0-py3-none-any.whl"
+CONRIC_WHEEL_SHA256 = "b2afe9998bf6a3a192c5fe6f86c4513cd2e64ed17932f497d3889c883f7bb92c"
 
 
 def sha(data: bytes) -> str:
@@ -109,6 +113,8 @@ def inventory(bundle: Path, source: Path) -> dict:
         if not tags or any(tag.rsplit("-", 1)[-1] not in {"any", "win_amd64"} for tag in tags):
             raise ValueError("Wheel metadata is not Windows x64 or portable")
         digest = sha(data)
+        if name == "conric" and (path != CONRIC_WHEEL or digest != CONRIC_WHEEL_SHA256):
+            raise ValueError("Conric wheel is not the pinned official release wheel")
         package = lock[name]
         if "registry" in package["source"] and digest not in {
             item["hash"].removeprefix("sha256:") for item in package.get("wheels", [])
@@ -305,6 +311,11 @@ def assemble(
             entry.compress_type = zipfile.ZIP_DEFLATED
             entry.external_attr = 0o644 << 16
             archive.writestr(entry, data)
+    with zipfile.ZipFile(output) as archive:
+        assembled = sha(archive.read(CONRIC_WHEEL))
+    if assembled != CONRIC_WHEEL_SHA256:
+        output.unlink()
+        raise ValueError("Assembled release ZIP does not carry the pinned Conric wheel")
     return {"file": str(output), "sha256": sha(output.read_bytes()), "bytes": output.stat().st_size}
 
 

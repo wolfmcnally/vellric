@@ -19,6 +19,15 @@
       "with": ""
     }
   },
+  "pytest:project/tests/test_release_version.py::test_the_bundle_takes_conric_as_its_pinned_official_wheel": {
+    "defect": "The bundle builder no longer checks that the lock still names the commit the pinned official Conric wheel was built from, so a moved lock would ship the old wheel.",
+    "expect": "DID NOT RAISE",
+    "plant": {
+      "path": "project/packaging/windows_bundle.py",
+      "replace": "    if requirement != CONRIC_SOURCE or package[\"version\"] != CONRIC_VERSION:\n        raise SystemExit(\"The locked Conric is not the commit its pinned wheel was built from\")\n",
+      "with": ""
+    }
+  },
   "pytest:project/tests/test_vision.py::test_broker_cleanup_without_posix_sessions_keeps_the_broker_error[False]": {
     "defect": "Broker cleanup consults POSIX sessions on Windows, where os.getsid does not exist.",
     "expect": "AttributeError: module 'os' has no attribute 'getsid'",
@@ -1096,6 +1105,15 @@
     "plant": {
       "path": "bin/_python-toolchain",
       "replace": "  python_toolchain_exclude_runtime_state_from_sync || return $?\n",
+      "with": ""
+    }
+  },
+  "pytest:tests/test_windows_release.py::test_inventory_refuses_unlocked_or_unreleased_artifacts": {
+    "defect": "The release inventory accepts a bundle whose Conric wheel is a different build than the pinned official release wheel.",
+    "expect": "DID NOT RAISE",
+    "plant": {
+      "path": "bin/windows-release",
+      "replace": "        if name == \"conric\" and (path != CONRIC_WHEEL or digest != CONRIC_WHEEL_SHA256):\n            raise ValueError(\"Conric wheel is not the pinned official release wheel\")\n",
       "with": ""
     }
   }
