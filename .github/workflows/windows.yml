@@ -75,13 +75,11 @@ jobs:
             if ((git rev-parse HEAD) -ne $env:CANDIDATE -or $env:GITHUB_SHA -ne $env:CANDIDATE) { throw 'Candidate differs from the checkout or the workflow commit' }
             $version = (Select-String -Path project\pyproject.toml -Pattern '^version = "([0-9]+\.[0-9]+\.[0-9]+)"$' | Select-Object -First 1).Matches.Groups[1].Value
             if (-not $version) { throw 'The project version could not be read' }
-            $PSNativeCommandUseErrorActionPreference = $false
-            git show-ref --verify --quiet "refs/tags/v$version"
-            $localTag = $LASTEXITCODE
-            git ls-remote --exit-code --tags origin "refs/tags/v$version" | Out-Null
-            $remoteTag = $LASTEXITCODE
-            $PSNativeCommandUseErrorActionPreference = $true
-            if ($localTag -ne 1 -or $remoteTag -ne 2) { throw "v$version is tagged, or its absence could not be confirmed" }
+            # Both lookups must succeed: any listed ref is the tag, and a git failure stops the
+            # step. No lookup leaves a nonzero exit code for the step's own exit status.
+            $localTag = git for-each-ref "refs/tags/v$version"
+            $remoteTag = git ls-remote --tags origin "refs/tags/v$version"
+            if ($localTag -or $remoteTag) { throw "v$version is already tagged" }
             "CANDIDATE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           }
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
